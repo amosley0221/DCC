@@ -1,5 +1,6 @@
 import type { UpdateStatus } from './updates'
 import type { SaveReport, SaveDiff, DictScan, RosterPlayer } from '../electron/saveAnalysis'
+import type { InstallReport } from '../electron/gameAssets'
 
 declare global {
   interface Window {
@@ -17,6 +18,9 @@ declare global {
             schools: { slug: string; name: string }[]; players: RosterPlayer[] }
         | { ok: false; message: string }
       >
+      pickInstall(): Promise<string | null>
+      findInstall(): Promise<{ found: true; path: string } | { found: false; searched: number; message: string }>
+      scanInstall(dir: string): Promise<{ ok: true; report: InstallReport } | { ok: false; message: string }>
       backupSave(path: string): Promise<{ ok: true; dest: string } | { ok: false; message: string }>
       diffSaves(a: string, b: string): Promise<{ ok: true; diff: SaveDiff } | { ok: false; message: string }>
       dictionaryState(): Promise<{ present: boolean; bytes?: number; id?: string }>

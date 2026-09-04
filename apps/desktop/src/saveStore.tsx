@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { SaveReport, SaveDiff, DictScan, RosterPlayer } from '../electron/saveAnalysis'
+import type { InstallReport } from '../electron/gameAssets'
 
 /**
  * The analysed save, held above the section switch.
@@ -29,12 +30,17 @@ export interface SaveState {
     schools: { slug: string; name: string }[]; players: RosterPlayer[]
   } | null
   rosterBusy: boolean
+  /** The game install, for reading the art the save does not carry. */
+  install: InstallReport | null
+  installBusy: boolean
+  installNote: string | null
 }
 
 const blank: SaveState = {
   path: null, report: null, busy: false, error: null, backup: null,
   diff: null, diffing: false, scan: null, scanning: false,
   dict: null, dictResult: null, restoring: false, roster: null, rosterBusy: false,
+  install: null, installBusy: false, installNote: null,
 }
 
 interface Ctx {

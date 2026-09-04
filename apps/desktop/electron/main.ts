@@ -7,6 +7,7 @@ import {
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED,
 } from './saveAnalysis'
+import { scanInstall, findInstall } from './gameAssets'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -203,6 +204,30 @@ ipcMain.handle('save:roster', (_e, path: string) => {
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('assets:pickInstall', async () => {
+  const res = await dialog.showOpenDialog(win!, {
+    title: 'Choose your College Football install folder',
+    properties: ['openDirectory'],
+  })
+  return res.canceled ? null : res.filePaths[0]
+})
+
+ipcMain.handle('assets:findInstall', () => {
+  try {
+    return findInstall(dictionaryRoots())
+  } catch (err) {
+    return { found: false as const, searched: 0, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('assets:scan', (_e, dir: string) => {
+  try {
+    return { ok: true as const, report: scanInstall(dir) }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

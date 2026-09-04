@@ -14,6 +14,7 @@ export default function Save() {
   const { dispatch } = useStore()
   const { save, patch } = useSave()
   const { path, report, busy, error, backup, diff, diffing, scan, scanning, dict, dictResult, restoring } = save
+  const { install, installBusy, installNote } = save
   const { roster, rosterBusy } = save
 
   const setPath = (v: typeof path) => patch({ path: v })
@@ -102,6 +103,74 @@ export default function Save() {
       patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, players: res.players } })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     } else setError(res.message)
+  }
+
+  const scanInstall = async (dir: string) => {
+    patch({ installBusy: true, installNote: 'Reading the install…' })
+    const res = await window.dcc.scanInstall(dir)
+    patch({ installBusy: false })
+    if (res.ok) patch({ install: res.report, installNote: null })
+    else patch({ installNote: res.message })
+  }
+
+  const findInstall = async () => {
+    patch({ installBusy: true, installNote: 'Looking for the game…' })
+    const res = await window.dcc.findInstall()
+    if (res.found) { await scanInstall(res.path); return }
+    patch({ installBusy: false, installNote: res.message })
+  }
+
+  const pickInstall = async () => {
+    const dir = await window.dcc.pickInstall()
+    if (dir) await scanInstall(dir)
+  }
+
+  const exportInstall = async () => {
+    if (!install) return
+    const md = [
+      '# Game install scan',
+      '',
+      `- Root: ${install.root}`,
+      `- Frostbite archives present: ${install.looksFrostbite ? 'yes' : 'no'}`,
+      `- Files scanned: ${install.scannedFiles.toLocaleString()} in ${install.scannedDirs.toLocaleString()} directories`,
+      `- Total size: ${(install.totalBytes / 1e9).toFixed(2)} GB${install.truncated ? ' (scan truncated)' : ''}`,
+      '',
+      '## By extension',
+      '',
+      '| Extension | Files | Bytes |',
+      '| --- | --- | --- |',
+      ...install.byExtension.map((e) => `| ${e.ext} | ${e.count} | ${e.bytes.toLocaleString()} |`),
+      '',
+      '## Biggest directories',
+      '',
+      ...install.biggestDirs.map((d) => `- ${d.path} — ${(d.bytes / 1e6).toFixed(1)} MB across ${d.files} files`),
+      '',
+      '## Notable files',
+      '',
+      ...install.notable.flatMap((n) => [
+        `### ${n.path} (${n.bytes.toLocaleString()} bytes)`,
+        '```',
+        n.head,
+        n.headAscii,
+        '```',
+        '',
+      ]),
+      '## Largest archives',
+      '',
+      ...install.largestArchives.flatMap((n) => [
+        `### ${n.path} (${n.bytes.toLocaleString()} bytes)`,
+        '```',
+        n.head,
+        n.headAscii,
+        '```',
+        '',
+      ]),
+      '## Notes',
+      '',
+      ...install.notes.map((n) => `- ${n}`),
+    ].join('\n')
+    const dest = await window.dcc.saveText('game-install-scan.md', md)
+    if (dest) dispatch({ type: 'log', line: { text: `install scan written — ${dest}`, kind: 'good' } })
   }
 
   const makeBackup = async () => {
@@ -197,6 +266,47 @@ export default function Save() {
         {!path && !busy && !restoring ? (
           <Card className="card-pad"><Empty>choose your DYNASTY-*.sav to begin</Empty></Card>
         ) : null}
+
+        <Card className="card-pad">
+          <Kicker>Game art</Kicker>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            Team logos, player portraits and coach faces are not in the save — they live in the
+            game install, in Frostbite's asset archives. That is a different format and it has to
+            be worked out the same way the save was. This reads the install and describes what is
+            there; it decodes nothing and changes nothing.
+          </p>
+          {installNote ? <div className="effect" style={{ marginTop: 8 }}>{installNote}</div> : null}
+          {install ? (
+            <>
+              <div className="grid-3" style={{ marginTop: 10 }}>
+                <div><Meta size={9}>ARCHIVES</Meta><div className="num" style={{ fontSize: 15, color: install.looksFrostbite ? 'var(--good)' : 'var(--accent)' }}>{install.looksFrostbite ? 'Frostbite' : 'none found'}</div></div>
+                <div><Meta size={9}>FILES</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{install.scannedFiles.toLocaleString()}</div></div>
+                <div><Meta size={9}>SIZE</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{(install.totalBytes / 1e9).toFixed(1)} GB</div></div>
+              </div>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--ink3)', marginTop: 8, wordBreak: 'break-all' }}>{install.root}</div>
+              <div style={{ marginTop: 10 }}>
+                {install.byExtension.slice(0, 6).map((e) => (
+                  <div key={e.ext} className="row" style={{ gap: 8, alignItems: 'baseline' }}>
+                    <Meta size={9}>{e.ext}</Meta>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink2)' }}>
+                      {e.count.toLocaleString()} files · {(e.bytes / 1e9).toFixed(2)} GB
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {install.notes.map((n, i) => (
+                <p key={i} className="body-serif" style={{ marginTop: 8, marginBottom: 0, color: 'var(--ink3)' }}>{n}</p>
+              ))}
+            </>
+          ) : null}
+          <div className="row" style={{ gap: 8, marginTop: 12 }}>
+            <Btn variant="primary" onClick={findInstall} disabled={installBusy}>
+              {installBusy ? 'Working…' : 'Find the game'}
+            </Btn>
+            <Btn onClick={pickInstall} disabled={installBusy}>Choose the folder…</Btn>
+            {install ? <Btn onClick={exportInstall}>Export this scan</Btn> : null}
+          </div>
+        </Card>
 
         {report ? (
           <>

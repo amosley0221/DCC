@@ -8,7 +8,15 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **A first step towards the game's own art.** Logos, portraits and coach faces
+  are not in the save at all — they live in the game install, in Frostbite's
+  asset archives, which is a separate format. Save now has a *Game art* card
+  that finds your install, describes what is in it, and exports the description.
+  It decodes nothing yet and changes nothing: it is the same opening move that
+  the save format needed, and the scan is what the decoding gets written
+  against.
 
 ## [0.11.0] - 2026-09-04
 
