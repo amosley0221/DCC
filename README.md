@@ -94,8 +94,21 @@ cd apps/android && ./gradlew assembleRelease
 ```
 
 Building the Windows installer requires Windows (or Wine); CI builds it on a
-Windows runner. Both apps are also built on every push — see
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Windows runner.
+
+## What CI checks
+
+Every push runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml), which
+builds both apps and then tries to *use* them — building is not the same as
+working, and the difference is where the bugs live:
+
+| Check | Catches |
+| --- | --- |
+| Desktop smoke test | Boots the real Electron app under Xvfb and clicks through all ten sections, asserting each renders. A blank window or a section that throws on mount. |
+| Android launch test | Installs the release APK on an emulator and opens it, failing on a crash, an exited process, or an app that never draws a window. A startup crash — the kind where the APK installs perfectly and dies when you tap it. |
+| Font check | A bundled font that is not the format its extension claims. Google Fonts serves a format chosen from the user agent, and the wrong one yields EOT named `.ttf`, which Android cannot load. |
+| APK signature | A change to the signing key, which would stop new APKs installing over an installed one. |
+| Dataset and version sync | A committed dataset that no longer matches its generator, or per-platform versions drifting from the root `package.json`. |
 
 ## Releasing
 
