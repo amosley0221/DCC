@@ -13,10 +13,11 @@ import Export from './sections/Export'
 import Devices from './sections/Devices'
 import Settings from './sections/Settings'
 import NoDynasty from './sections/NoDynasty'
+import Save from './sections/Save'
 import { Meta } from './ui'
 
 const SECTIONS = [
-  'WIRE', 'NATIONAL', 'RECRUIT', 'TEAM', 'TAMPER', 'COACH', 'QUEUE', 'EXPORT', 'DEVICES', 'SETTINGS',
+  'WIRE', 'NATIONAL', 'RECRUIT', 'TEAM', 'TAMPER', 'COACH', 'QUEUE', 'EXPORT', 'DEVICES', 'SAVE', 'SETTINGS',
 ] as const
 type Section = (typeof SECTIONS)[number]
 
@@ -100,6 +101,8 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
                 dynasty to have anything to show. */}
             {section === 'SETTINGS' ? (
               <Settings update={update} version={version} />
+            ) : section === 'SAVE' ? (
+              <Save />
             ) : !d ? (
               <NoDynasty
                 section={section.charAt(0) + section.slice(1).toLowerCase()}

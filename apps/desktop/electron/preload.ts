@@ -19,6 +19,9 @@ const api = {
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
   saveText: (name: string, text: string) =>
     ipcRenderer.invoke('app:saveText', { name, text }) as Promise<string | null>,
+  pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
+  analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
+  backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   onUpdateStatus: (cb: (s: UpdateStatus) => void) => {

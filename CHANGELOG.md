@@ -10,6 +10,19 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.3.0] - 2026-09-04
+
+### Added
+
+- **Save section in the Windows app** — the first step towards reading a real
+  dynasty. Point it at your `DYNASTY-*.sav` and it reports the container format,
+  a SHA-256, an entropy profile across the file, any embedded deflate streams it
+  can decode, and the readable strings inside them. It is read-only; the only
+  files it writes are a backup copy and an exportable Markdown report.
+
+  The report is the point: it carries the structure of the format without
+  carrying the save itself, so the file never has to leave your machine.
+
 ## [0.2.0] - 2026-09-04
 
 ### Changed

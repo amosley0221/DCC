@@ -53,7 +53,7 @@ app.whenReady().then(async () => {
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))
   console.log('ERRORS: ' + (errors.join(' | ') || '(none)'))
-  const ok = errors.length === 0 && r.nav.length === 10 && visited.every((v) => !v.includes('title=""'))
+  const ok = errors.length === 0 && r.nav.length >= 10 && visited.every((v) => !v.includes('title=""'))
   console.log(ok ? 'SMOKE OK' : 'SMOKE FAIL')
   app.exit(ok ? 0 : 1)
 })

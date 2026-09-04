@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'node:path'
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { autoUpdater } from 'electron-updater'
+import { analyzeSave } from './saveAnalysis'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -124,6 +125,41 @@ ipcMain.handle('settings:set', (_e, next: Record<string, unknown>) => {
   return true
 })
 ipcMain.handle('app:openExternal', (_e, url: string) => shell.openExternal(url))
+
+// ── dynasty save ──────────────────────────────────────────────────────────────
+ipcMain.handle('save:pick', async () => {
+  const res = await dialog.showOpenDialog(win!, {
+    title: 'Choose your dynasty save',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Dynasty save', extensions: ['sav', 'dat', 'bin', 'db'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
+  })
+  return res.canceled ? null : res.filePaths[0]
+})
+
+ipcMain.handle('save:analyze', (_e, path: string) => {
+  try {
+    return { ok: true as const, report: analyzeSave(path) }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+/** Copies the save somewhere safe before anything ever writes to it. */
+ipcMain.handle('save:backup', async (_e, path: string) => {
+  try {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const dir = join(app.getPath('userData'), 'save-backups')
+    mkdirSync(dir, { recursive: true })
+    const dest = join(dir, `${stamp}-${path.split(/[\\/]/).pop()}`)
+    copyFileSync(path, dest)
+    return { ok: true as const, dest }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
 ipcMain.handle('app:saveText', async (_e, { name, text }: { name: string; text: string }) => {
   const res = await dialog.showSaveDialog(win!, { defaultPath: name })
   if (res.canceled || !res.filePath) return null
