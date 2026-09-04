@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.14.1] - 2026-09-04
+
 ### Fixed
 
 - **_Find the art_ no longer freezes the window.** It ran for about thirteen
