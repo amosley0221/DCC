@@ -216,6 +216,10 @@ export interface Solved {
   sample: string[]
   /** Rows of evidence behind each key byte. Below ~40 the key gets unreliable. */
   samplesPerByte: number
+  /** The whole key, hex, when it was read from the file rather than derived. */
+  fullKeyHex?: string
+  /** How the key was obtained: read from the header, or recovered by search. */
+  how: 'header' | 'search'
 }
 
 /**
@@ -274,7 +278,7 @@ function scoreText(buf: Buffer) {
  * a threshold that noise cleared comfortably. That is why it reported two
  * solved tables that were nothing of the sort.
  */
-function keyLengths(data: Buffer, max = 1024): number[] {
+function keyLengths(data: Buffer, max = 512): number[] {
   // Index of coincidence, not byte agreement at a lag.
   //
   // Comparing data[i] with data[i+L] only works when the plaintext itself
@@ -284,7 +288,7 @@ function keyLengths(data: Buffer, max = 1024): number[] {
   // plaintext XOR one constant, so it keeps the plaintext's lopsided byte
   // distribution; at any other length the columns are mixtures and flatten out
   // towards uniform.
-  const n = Math.min(data.length, 128 * 1024)
+  const n = Math.min(data.length, 32 * 1024)
   const scored: { len: number; ic: number }[] = []
   for (let len = 1; len <= Math.min(max, Math.floor(n / 24)); len++) {
     let sum = 0
@@ -324,7 +328,10 @@ function deriveKey(data: Buffer, len: number): Buffer {
     for (let cand = 0; cand < 256; cand++) {
       let score = 0
       let n = 0
-      for (let i = k; i < data.length && n < 4096; i += len, n++) {
+      // 192 samples is ample to tell the right key byte from 255 wrong ones,
+      // and this loop runs 256 times per key position — at 4096 it was three
+      // billion operations a file, which froze the window for minutes.
+      for (let i = k; i < data.length && n < 192; i += len, n++) {
         const p = data[i] ^ cand
         if (p === 0) score += 3
         else if (p >= 32 && p < 127) score += 2
@@ -338,10 +345,45 @@ function deriveKey(data: Buffer, len: number): Buffer {
   return key
 }
 
+/**
+ * Frostbite writes the key into the obfuscation header: 257 bytes at 0x128,
+ * each masked with 0x7B, with the payload starting at 0x22C. Reading it is
+ * exact and instant, so it is tried before any cryptanalysis. The search that
+ * follows only exists for files that do not follow this layout — and it is a
+ * search, so it can fit a wrong key to the data, which is what made the same
+ * table report a 17-byte key one run and a 13-byte key the next.
+ */
+export const HEADER_KEY_AT = 0x128
+export const HEADER_KEY_LEN = 257
+export const HEADER_DATA_AT = 0x22c
+export const HEADER_KEY_MASK = 0x7b
+
+export function headerKeyScheme(buf: Buffer): Solved | null {
+  if (buf.length < HEADER_DATA_AT + 4096) return null
+  const key = Buffer.allocUnsafe(HEADER_KEY_LEN)
+  for (let i = 0; i < HEADER_KEY_LEN; i++) key[i] = buf[HEADER_KEY_AT + i] ^ HEADER_KEY_MASK
+  const data = buf.subarray(HEADER_DATA_AT)
+  const n = Math.min(data.length, 48 * 1024)
+  const out = Buffer.allocUnsafe(n)
+  for (let i = 0; i < n; i++) out[i] = data[i] ^ key[i % HEADER_KEY_LEN]
+  const s = scoreText(out)
+  // The same bar the search has to clear, so a header that is not really a key
+  // is rejected rather than trusted for being in the right place.
+  if (!(s.longRuns >= 20 && s.longRuns > Math.max(4, s.expected * 20))) return null
+  return {
+    keyLength: HEADER_KEY_LEN, dataOffset: HEADER_DATA_AT,
+    keyHex: key.subarray(0, 32).toString('hex'), fullKeyHex: key.toString('hex'),
+    samplesPerByte: Math.floor(data.length / HEADER_KEY_LEN), how: 'header', ...s,
+  }
+}
+
 export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | null; tried: number; runners: Solved[] } {
   if (buf.length < 4096) return { obfuscated: false, best: null, tried: 0, runners: [] }
   const magic = buf.readUInt32BE(0)
   if (!OBFUSCATION_MAGIC.includes(magic)) return { obfuscated: false, best: null, tried: 0, runners: [] }
+
+  const fromHeader = headerKeyScheme(buf)
+  if (fromHeader) return { obfuscated: true, best: fromHeader, tried: 1, runners: [] }
 
   const results: Solved[] = []
   let tried = 0
@@ -361,7 +403,7 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
     for (const len of [...cands].sort((a, b) => a - b)) {
       tried++
       const key = deriveKey(data, len)
-      const n = Math.min(data.length, 128 * 1024)
+      const n = Math.min(data.length, 48 * 1024)
       const out = Buffer.allocUnsafe(n)
       for (let i = 0; i < n; i++) out[i] = data[i] ^ key[i % len]
       const s = scoreText(out)
@@ -369,7 +411,7 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
       if (s.longRuns >= 20 && s.longRuns > Math.max(4, s.expected * 20)) {
         results.push({
           keyLength: len, dataOffset, keyHex: key.subarray(0, 32).toString('hex'),
-          samplesPerByte: Math.floor(data.length / len), ...s,
+          samplesPerByte: Math.floor(data.length / len), how: 'search', ...s,
         })
       }
     }
@@ -391,7 +433,7 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
       const part = top.keyLength / d
       if (part < 2) continue
       const key = deriveKey(data, part)
-      const n = Math.min(data.length, 128 * 1024)
+      const n = Math.min(data.length, 48 * 1024)
       const out = Buffer.allocUnsafe(n)
       for (let i = 0; i < n; i++) out[i] = data[i] ^ key[i % part]
       const s2 = scoreText(out)
@@ -402,7 +444,7 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
         results[0] = {
           keyLength: part, dataOffset: top.dataOffset,
           keyHex: key.subarray(0, 32).toString('hex'),
-          samplesPerByte: Math.floor(data.length / part), ...s2,
+          samplesPerByte: Math.floor(data.length / part), how: 'search', ...s2,
         }
         break   // divisors ascend, so the first that holds up is the smallest
       }
@@ -414,7 +456,7 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
 
 export function unscramble(buf: Buffer, d: Solved): Buffer {
   const data = buf.subarray(d.dataOffset)
-  const key = deriveKey(data, d.keyLength)
+  const key = d.fullKeyHex ? Buffer.from(d.fullKeyHex, 'hex') : deriveKey(data, d.keyLength)
   const out = Buffer.allocUnsafe(data.length)
   for (let i = 0; i < data.length; i++) out[i] = data[i] ^ key[i % d.keyLength]
   return out
@@ -441,9 +483,10 @@ export interface TableReport {
  * text it says so and hands back the header, which is the thing worth looking
  * at next.
  */
-export function readTables(root: string, files: string[]): TableReport[] {
+export async function readTables(root: string, files: string[]): Promise<TableReport[]> {
   const out: TableReport[] = []
   for (const rel of files) {
+    await new Promise((r) => setImmediate(r))
     const full = join(root, rel)
     let buf: Buffer
     try {
@@ -465,9 +508,15 @@ export function readTables(root: string, files: string[]): TableReport[] {
       obfuscated: d.obfuscated,
       solved: !!d.best,
       scheme: d.best
-        ? `repeating key of ${d.best.keyLength} bytes from 0x${d.best.dataOffset.toString(16)} — ` +
-          `${d.best.strings} runs against ${d.best.expected} expected from noise, ${d.best.longRuns} of 8+ chars, ` +
-          `${d.best.samplesPerByte} samples per key byte${d.best.samplesPerByte < 40 ? ' (thin — the key may be imperfect)' : ''}`
+        ? (d.best.how === 'header'
+            ? `key read from the file header — ${d.best.keyLength} bytes at ` +
+              `0x${HEADER_KEY_AT.toString(16)}, payload from 0x${d.best.dataOffset.toString(16)}, ` +
+              `${d.best.strings} runs, ${d.best.longRuns} of 8+ chars`
+            : `recovered by search (no usable header key): repeating key of ${d.best.keyLength} bytes ` +
+              `from 0x${d.best.dataOffset.toString(16)} — `) +
+          (d.best.how === 'header' ? '' :
+            `${d.best.strings} runs against ${d.best.expected} expected from noise, ${d.best.longRuns} of 8+ chars, ` +
+            `${d.best.samplesPerByte} samples per key byte${d.best.samplesPerByte < 40 ? ' (thin — the key may be imperfect)' : ''}`)
         : null,
       strings: d.best ? d.best.strings : plainScore.strings,
       known: d.best ? d.best.known : plainScore.known,
@@ -518,15 +567,16 @@ function stringsIn(buf: Buffer, min = 5): string[] {
  * is a lookup rather than a hunt. This gathers the names so the naming scheme
  * can be seen before anything is built on it.
  */
-export function findArtNames(root: string, files: string[], cap = 24): ArtFind[] {
+export async function findArtNames(root: string, files: string[], cap = 24): Promise<ArtFind[]> {
   const out: ArtFind[] = []
   for (const rel of files.slice(0, cap)) {
+    await new Promise((r) => setImmediate(r))
     const full = join(root, rel)
     let buf: Buffer
     try {
       const size = statSync(full).size
       const fd = openSync(full, 'r')
-      buf = Buffer.alloc(Math.min(size, 24 * 1024 * 1024))
+      buf = Buffer.alloc(Math.min(size, 4 * 1024 * 1024))
       readSync(fd, buf, 0, buf.length, 0)
       closeSync(fd)
     } catch { continue }

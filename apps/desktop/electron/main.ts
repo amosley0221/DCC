@@ -233,18 +233,18 @@ ipcMain.handle('assets:scan', (_e, dir: string) => {
   }
 })
 
-ipcMain.handle('assets:readTables', (_e, { root, files }: { root: string; files: string[] }) => {
+ipcMain.handle('assets:readTables', async (_e, { root, files }: { root: string; files: string[] }) => {
   try {
-    return { ok: true as const, tables: readTables(root, files) }
+    return { ok: true as const, tables: await readTables(root, files) }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
 })
 
-ipcMain.handle('assets:findArt', (_e, root: string) => {
+ipcMain.handle('assets:findArt', async (_e, root: string) => {
   try {
     const tocs = listTocs(root)
-    return { ok: true as const, finds: findArtNames(root, tocs), scanned: tocs.length }
+    return { ok: true as const, finds: await findArtNames(root, tocs), scanned: tocs.length }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

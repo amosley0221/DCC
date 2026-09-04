@@ -8,7 +8,23 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **_Find the art_ no longer freezes the window.** It ran for about thirteen
+  minutes on a full install, all of it on the thread that draws the app, so
+  Windows greyed the window out and reported it as not responding. It now
+  finishes in seconds and lets the window repaint between files, so the app
+  stays usable while it works.
+
+- **The key is read from the file instead of being guessed at.** Frostbite
+  stores it in the obfuscation header — 257 bytes at `0x128`, with the payload
+  starting at `0x22C` — and reading it takes about four milliseconds and is
+  exact. The old code went straight to cryptanalysis, which is what made it
+  slow, and worse, a search can fit a wrong key to the data: the same
+  `layout.toc` was reported as a 17-byte key one run and a 13-byte key the
+  next, and at most one of those could have been true. The search is still
+  there for files that do not carry a usable key, and the scan now says which
+  of the two produced the answer, so a guess is never presented as a reading.
 
 ## [0.14.0] - 2026-09-04
 

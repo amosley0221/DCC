@@ -46,6 +46,10 @@ jobs:
           git diff --exit-code -- apps/android/version.properties apps/desktop/package.json \
             || { echo "::error::version files are out of sync — run 'npm run sync:version'"; exit 1; }
 
+      - name: Check the obfuscated-table reader
+        run: npm run check:assets
+        working-directory: apps/desktop
+
       - name: Smoke test the built app
         run: |
           # Boots the real Electron app and clicks through every section, which
