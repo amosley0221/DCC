@@ -10,6 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The dictionary check accepted the wrong answer.** It treated "decompression
+  did not throw" as success, but zstd emits the declared number of bytes with a
+  wrong dictionary too — in a controlled test, 192,711 candidate lengths did not
+  throw and exactly one was correct. Candidates are now scored on whether the
+  frames they decode look like game data at all, across six frames sampled from
+  across the save, and the sweep steps a byte at a time near a promising length
+  rather than in 256-byte jumps that step over the answer. On a synthetic
+  dictionary this picks the exact length as its top candidate in under a second.
+- The scan reports its best few candidate lengths with a preview of what they
+  decode to, so a near miss is visible rather than silently reported as failure.
+
 - A new release could take up to six hours to surface in the Windows app, which
   was the check interval. It now checks every 30 minutes, and again whenever the
   window regains focus (throttled to once every 5 minutes).

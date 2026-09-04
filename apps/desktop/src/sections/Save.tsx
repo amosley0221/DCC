@@ -187,13 +187,23 @@ export default function Save() {
                   <div className="col" style={{ gap: 7, marginTop: 12 }}>
                     <Meta size={10}>
                       {scan.filesScanned.toLocaleString()} files ·{' '}
-                      {(scan.bytesScanned / 1024 ** 3).toFixed(2)} GB scanned
+                      {(scan.bytesScanned / 1024 ** 3).toFixed(2)} GB ·{' '}
+                      {scan.dictionariesSeen.toLocaleString()} dictionaries seen
                     </Meta>
                     {scan.notes.map((n, i) => <span key={i} className="body-serif">{n}</span>)}
                     {scan.hits.map((h) => (
                       <div key={h.file + h.offset} className="col" style={{ gap: 2 }}>
-                        <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink)', wordBreak: 'break-all' }}>{h.file}</span>
-                        <Meta size={9}>0x{h.offset.toString(16)} · {h.reason}</Meta>
+                        <span className="mono" style={{ fontSize: 10.5, color: h.verified ? 'var(--good)' : 'var(--ink)', wordBreak: 'break-all' }}>
+                          {h.verified ? '✓ ' : ''}{h.file}
+                        </span>
+                        <Meta size={9} color={h.verified ? 'var(--good)' : undefined}>
+                          0x{h.offset.toString(16)} · {h.reason}
+                        </Meta>
+                        {h.sampleText ? (
+                          <pre className="mono" style={{ fontSize: 10, color: 'var(--ink2)', whiteSpace: 'pre-wrap', margin: '3px 0 0' }}>
+                            {h.sampleText}
+                          </pre>
+                        ) : null}
                       </div>
                     ))}
                   </div>

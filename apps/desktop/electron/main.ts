@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { autoUpdater } from 'electron-updater'
-import { analyzeSave, diffSaves, findDictionary, sampleFrame, readSavePayload } from './saveAnalysis'
+import { analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload } from './saveAnalysis'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -194,8 +194,8 @@ ipcMain.handle('save:findDict', async (_e, { savePath, dictionaryId }: { savePat
     // A real frame from this save is what proves a candidate dictionary is the
     // right one, so it is extracted and handed to the scan.
     const payload = readSavePayload(savePath)
-    const frame = payload ? sampleFrame(payload) : null
-    return { ok: true as const, scan: findDictionary(res.filePaths[0], dictionaryId, frame) }
+    const frames = payload ? sampleFrames(payload) : []
+    return { ok: true as const, scan: findDictionary(res.filePaths[0], dictionaryId, frames) }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

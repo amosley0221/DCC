@@ -474,6 +474,8 @@ export interface DictHit {
   verified: boolean
   lengthBytes?: number
   sampleText?: string
+  /** Best dictionary lengths found, most plausible first. */
+  candidates?: DictCandidate[]
   reason: string
 }
 
@@ -490,43 +492,110 @@ export interface DictScan {
 const ZSTD_DICT_MAGIC = Buffer.from([0x37, 0xa4, 0x30, 0xec])
 const ZSTD_FRAME_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd])
 
-/** Pulls one small frame out of a save, to test candidate dictionaries against. */
-export function sampleFrame(payload: Buffer): Buffer | null {
-  const at = payload.indexOf(ZSTD_FRAME_MAGIC)
-  if (at < 0) return null
-  const next = payload.indexOf(ZSTD_FRAME_MAGIC, at + 4)
-  return payload.subarray(at, next > at ? next : Math.min(at + 4096, payload.length))
+/** Pulls several small frames out of a save, to test candidate dictionaries. */
+export function sampleFrames(payload: Buffer, count = 6): Buffer[] {
+  const frames: Buffer[] = []
+  let at = payload.indexOf(ZSTD_FRAME_MAGIC)
+  // Spread the samples across the payload rather than taking six neighbours.
+  const stride = Math.max(1, Math.floor(payload.length / (count * 8)))
+  let from = at
+  while (frames.length < count && from >= 0 && from < payload.length) {
+    at = payload.indexOf(ZSTD_FRAME_MAGIC, from)
+    if (at < 0) break
+    const next = payload.indexOf(ZSTD_FRAME_MAGIC, at + 4)
+    const end = next > at ? next : Math.min(at + 2048, payload.length)
+    if (end - at > 16) frames.push(payload.subarray(at, end))
+    from = at + stride
+  }
+  return frames
 }
 
 /**
- * A dictionary's content is the tail of its buffer, so appending bytes changes
- * it and decompression fails — the exact end has to be found. Rather than
- * parsing the dictionary format, candidate lengths are swept and each is tested
- * against a real frame. A frame is a couple of hundred bytes, so thousands of
- * attempts cost milliseconds.
+ * How much a decoded block looks like game data rather than noise.
+ *
+ * Structured records are mostly small integers, zero padding and readable text;
+ * a wrong dictionary window decodes to something close to random. Scoring this
+ * is what separates a correct dictionary length from the many that merely fail
+ * to throw — zstd emits the declared number of bytes either way, so neither
+ * "it did not throw" nor "the length is right" tells you anything.
  */
-function verifyDictionary(buf: Buffer, offset: number, frame: Buffer): { length: number; text: string } | null {
-  const maxLen = Math.min(buf.length - offset, 8 * 1024 * 1024)
-  const tryLen = (len: number) => {
-    try {
-      const out = zstdDecompressSync(frame, { dictionary: buf.subarray(offset, offset + len) })
-      return out
-    } catch {
-      return null
+function plausibility(buf: Buffer): number {
+  if (buf.length === 0) return 0
+  let friendly = 0
+  const freq = new Uint32Array(256)
+  for (const b of buf) {
+    freq[b]++
+    if (b === 0 || (b >= 0x20 && b <= 0x7e)) friendly++
+  }
+  let h = 0
+  for (const f of freq) {
+    if (!f) continue
+    const p = f / buf.length
+    h -= p * Math.log2(p)
+  }
+  // Both terms sit in 0..1; random data scores near 0.35, structured near 0.9.
+  return 0.5 * (friendly / buf.length) + 0.5 * (1 - h / 8)
+}
+
+export interface DictCandidate {
+  length: number
+  score: number
+  preview: string
+}
+
+/**
+ * Finds how many bytes of a candidate dictionary to use.
+ *
+ * A dictionary's content is the tail of its buffer, so the exact end matters,
+ * and the format does not record it. A coarse sweep locates the neighbourhood
+ * and a byte-wise pass refines it, each length scored by how plausible the
+ * frames it decodes look.
+ */
+function verifyDictionary(buf: Buffer, offset: number, frames: Buffer[]): DictCandidate[] {
+  if (frames.length === 0) return []
+  const maxLen = Math.min(buf.length - offset, 4 * 1024 * 1024)
+  const scoreAt = (len: number, using: Buffer[]) => {
+    let total = 0
+    for (const f of using) {
+      let out: Buffer
+      try {
+        out = zstdDecompressSync(f, { dictionary: buf.subarray(offset, offset + len) })
+      } catch {
+        return -1
+      }
+      total += plausibility(out)
+    }
+    return total / using.length
+  }
+
+  const coarse = frames.slice(0, 2)
+  const seen: { length: number; score: number }[] = []
+  for (let len = 512; len <= maxLen; len += 4) {
+    const v = scoreAt(len, coarse)
+    if (v > 0.6) seen.push({ length: len, score: v })
+  }
+  if (seen.length === 0) return []
+
+  seen.sort((a, b) => b.score - a.score)
+  const out: DictCandidate[] = []
+  const tried = new Set<number>()
+  for (const c of seen.slice(0, 12)) {
+    for (let len = c.length - 8; len <= c.length + 8; len++) {
+      if (len < 1 || len > maxLen || tried.has(len)) continue
+      tried.add(len)
+      const v = scoreAt(len, frames)
+      if (v > 0.6) {
+        let preview = ''
+        try {
+          preview = zstdDecompressSync(frames[0], { dictionary: buf.subarray(offset, offset + len) })
+            .subarray(0, 180).toString('latin1').replace(/[^\x20-\x7e]/g, '.')
+        } catch { /* scored above, so this should not happen */ }
+        out.push({ length: len, score: Number(v.toFixed(4)), preview })
+      }
     }
   }
-  // Sizes zstd --train produces, then a sweep, then a fine pass around a hit.
-  const common = [112640, 110 * 1024, 65536, 32768, 16384, 8192, 4096, 131072, 262144]
-  for (const len of common) {
-    if (len > maxLen) continue
-    const out = tryLen(len)
-    if (out) return { length: len, text: out.subarray(0, 200).toString('latin1').replace(/[^\x20-\x7e]/g, '.') }
-  }
-  for (let len = 1024; len <= maxLen; len += 256) {
-    const out = tryLen(len)
-    if (out) return { length: len, text: out.subarray(0, 200).toString('latin1').replace(/[^\x20-\x7e]/g, '.') }
-  }
-  return null
+  out.sort((a, b) => b.score - a.score)
+  return out.slice(0, 5)
 }
 
 /**
@@ -540,7 +609,7 @@ function verifyDictionary(buf: Buffer, offset: number, frame: Buffer): { length:
 export function findDictionary(
   root: string,
   dictionaryId: number,
-  frame: Buffer | null,
+  frames: Buffer[],
   budgetBytes = 12 * 1024 ** 3,
 ): DictScan {
   const idLE = Buffer.alloc(4)
@@ -584,18 +653,21 @@ export function findDictionary(
         const id = at + 8 <= buf.length ? buf.readUInt32LE(at + 4) : 0
         const matches = (id >>> 0) === (dictionaryId >>> 0)
         if (matches) {
-          const check = frame ? verifyDictionary(buf, at, frame) : null
+          const cands = verifyDictionary(buf, at, frames)
+          const best = cands[0]
           hits.push({
             file: full,
             offset: at,
             dictionaryId: `0x${(id >>> 0).toString(16)}`,
             matches: true,
-            verified: !!check,
-            lengthBytes: check?.length,
-            sampleText: check?.text,
-            reason: check
-              ? `the dictionary the save uses — verified, ${check.length.toLocaleString()} bytes`
-              : 'the dictionary id matches, but no frame decoded with it',
+            verified: !!best,
+            lengthBytes: best?.length,
+            sampleText: best?.preview,
+            candidates: cands,
+            reason: best
+              ? `the dictionary the save uses — ${best.length.toLocaleString()} bytes, ` +
+                `frames decode to plausible data (score ${best.score})`
+              : 'the dictionary id matches, but no length decoded frames to anything plausible',
           })
         } else if (hits.length < 40) {
           hits.push({
