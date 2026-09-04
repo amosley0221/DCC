@@ -1,15 +1,21 @@
 package com.dcc.app.ui.sections
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dcc.app.data.Dynasty
 import com.dcc.app.data.Persisted
 import com.dcc.app.state.AppViewModel
@@ -131,8 +137,7 @@ fun CoachSection(vm: AppViewModel, dynasty: Dynasty) {
                     coach.timeline.forEach { t ->
                         Row(Modifier.padding(vertical = 5.dp)) {
                             Box(
-                                Modifier.width(3.dp).height(46.dp)
-                                    .androidBg(c.accent),
+                                Modifier.width(3.dp).height(46.dp).background(c.accent),
                             )
                             Spacer(Modifier.width(12.dp))
                             Column {
@@ -198,24 +203,21 @@ fun CoachSection(vm: AppViewModel, dynasty: Dynasty) {
 }
 
 @Composable
-private fun StatCard(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
+private fun StatCard(label: String, value: String, color: Color, modifier: Modifier) {
     DccCard(modifier) {
         MetaText(label, Dcc.colors.ink3, 9)
         Spacer(Modifier.height(4.dp))
-        androidx.compose.material3.Text(
+        Text(
             value,
-            style = androidx.compose.ui.text.TextStyle(
+            style = TextStyle(
                 fontFamily = Dcc.fonts.serif,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = androidx.compose.ui.unit.TextUnit(22f, androidx.compose.ui.unit.TextUnitType.Sp),
+                fontSize = 22.sp,
                 color = color,
             ),
         )
     }
 }
-
-private fun Modifier.androidBg(color: androidx.compose.ui.graphics.Color) =
-    this.then(androidx.compose.foundation.background(color))
 
 // ── queue ────────────────────────────────────────────────────────────────────
 

@@ -26,7 +26,6 @@ android {
         targetSdk = 35
         versionCode = dccVersionCode
         versionName = dccVersionName
-        resourceConfigurations += listOf("en")
     }
 
     signingConfigs {
@@ -61,7 +60,6 @@ android {
             // install and a release install upgrade each other instead of
             // colliding on a signature mismatch.
             signingConfig = signingConfigs.getByName("release")
-            applicationIdSuffix = ""
         }
     }
 
@@ -79,11 +77,6 @@ android {
 
     packaging {
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
-    }
-
-    androidResources {
-        // The seed dynasty is a single JSON asset; keep it compressed.
-        noCompress += listOf()
     }
 }
 

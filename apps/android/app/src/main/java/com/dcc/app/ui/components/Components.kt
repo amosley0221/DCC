@@ -1,7 +1,6 @@
 package com.dcc.app.ui.components
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,7 +17,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -484,9 +482,6 @@ fun StarRow(stars: Int, size: Int = 10) = Text(
     style = TextStyle(fontFamily = Dcc.fonts.mono, fontSize = size.sp, color = Dcc.colors.warn),
 )
 
-@Suppress("unused")
-private val unusedSpanStyle: SpanStyle? = null
-
 @Composable
 fun BorderCard(
     borderColor: Color,
@@ -497,10 +492,7 @@ fun BorderCard(
 @Composable
 fun EffectCallout(text: String) {
     val c = Dcc.colors
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).background(c.effectBg)
-            .border(BorderStroke(0.dp, Color.Transparent)),
-    ) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(2.dp)).background(c.effectBg)) {
         Box(Modifier.width(2.dp).heightIn(min = 34.dp).background(c.accent))
         Text(
             text,

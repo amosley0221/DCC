@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -266,8 +267,9 @@ fun TeamSection(vm: AppViewModel, dynasty: Dynasty, state: Persisted, d: Derived
 private fun TradeTab(vm: AppViewModel, dynasty: Dynasty, d: Derived, myTeamId: String) {
     val c = Dcc.colors
     var otherId by rememberSaveable { mutableStateOf(dynasty.teams.first { !it.isUser }.id) }
-    var mine by rememberSaveable { mutableStateOf(setOf<String>()) }
-    var theirs by rememberSaveable { mutableStateOf(setOf<String>()) }
+    // A Set has no Bundle saver, and the selection is transient anyway.
+    var mine by remember { mutableStateOf(setOf<String>()) }
+    var theirs by remember { mutableStateOf(setOf<String>()) }
 
     val minePlayers = mine.mapNotNull { d.playersById[it] }
     val theirPlayers = theirs.mapNotNull { d.playersById[it] }
