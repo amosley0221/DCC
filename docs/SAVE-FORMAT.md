@@ -730,7 +730,28 @@ valid prospect ids, against a 6.3% chance rate:
 
 A run of 1,830 entries at a fixed stride is a table, not a coincidence.
 
-What settles the meaning of its columns is a controlled diff, the method that
-solved the ratings: two saves differing by one deliberate recruiting change.
-Spend hours on a single recruit and their commit score moves; the bytes that
-move with it are the column.
+### What a week-advance diff ruled out
+
+Two saves a week apart, each with the game's own class export, gave 688 stage
+changes and 787 offer changes — 1,275 prospects moved in total. Four things
+follow, all negative:
+
+- **Not in the player record.** A field would have to give the same mapping in
+  both saves; across 2,718 prospects paired by player id in each, every 1- to
+  6-bit position fails for stage, offers, gem/bust and commit score.
+- **The id index at `0x1869000` is static.** All 4,098 prospects have a 4-byte
+  row there and **not one changed**, including the 1,275 whose state moved. It
+  is a sorted key list, not the state.
+- **No parallel array.** Nothing byte- or nibble-aligned, in prospect-id order,
+  maps to stage or offers anywhere in the payload.
+- **Commit score does not change week to week** — 0 of 4,100 — so it is a fixed
+  property of the recruit rather than a running total, which is worth knowing
+  before hunting for it as a counter.
+
+The payloads also differ in length by 540 bytes, so raw byte diffing shifts out
+of alignment partway through and cannot be trusted on its own.
+
+What is left is a structure that is bit-packed and not in prospect order. The
+way in is a diff with **one** change: 1,275 simultaneous changes leave too many
+candidate regions, while a single prospect gaining a single offer would leave
+almost nothing else moving, which pins the row and gives up its neighbours.
