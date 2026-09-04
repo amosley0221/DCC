@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.8.3] - 2026-09-04
+
 ### Added
 
 - **DCC reads your roster.** Every player in the save — 16,448 of them — with
