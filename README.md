@@ -46,19 +46,30 @@ switchable in Settings.
 
 ## Current state
 
-Both apps run against a deterministic seed dynasty — 24 fictional programs,
-2,040 players, 3,200 prospects, a full schedule — bundled with the app. Every
-screen, edit and conversation is live against that data, and the queue,
-approvals and edits persist across restarts and updates.
+**Both apps start empty and stay empty until a save reaches them.** Nothing here
+invents a dynasty on your behalf.
 
-The relay service (LLM story generation, the shared cross-device queue, cloud
-save, media) is **not built yet**. Story generation and the tamper conversations
-run on a local engine instead, so nothing depends on a server being up. That
-engine scores the same signals the relay's model is given — the dealbreaker, the
-offer, the depth-chart slot — so wiring the relay in later changes where the
-prose comes from, not how the screens behave. The PC save agent that reads and
-writes `DYNASTY-*.sav` is likewise not built; the Queue and Devices sections
-model its states so the flow is complete end to end.
+Neither of the two pieces that would bring real data in exists yet:
+
+| Piece | What it does | Status |
+| --- | --- | --- |
+| **PC save agent** | Reads `DYNASTY-*.sav` on the gaming PC, parses it into structured data, and applies queued writes back after a backup | **Not built.** Blocked on the save format — see below |
+| **Relay** | Small service on the home server holding the dynasty, the shared queue, media and the save lease; the phone reads from it and the PC pushes to it | **Not built** |
+
+What *is* built is everything above those: the full UI for all sections on both
+platforms, the queue and its state machine, the interest and trade rules, the
+tampering conversation engine, both themes, and the install/update pipeline.
+
+To see how the screens work, Settings → **Load sample dynasty** loads a
+generated 24-program, 3,200-prospect universe. It is invented data, labelled as
+such, and never loads on its own.
+
+### The blocker
+
+The EA College Football 27 save is an undocumented binary format. Until there is
+a way to read it — reverse engineering, an existing community parser, or an
+import path that sidesteps the file entirely — no real dynasty can reach either
+app. That decision shapes everything else, so it is the next thing to settle.
 
 ## No licensed content
 
