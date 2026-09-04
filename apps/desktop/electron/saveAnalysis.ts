@@ -1376,6 +1376,55 @@ export function readCoaches(payload: Buffer): CoachRecord[] {
 
 
 
+
+/* --------------------------------------------------------------- stores */
+
+export interface StoreRecord {
+  name: string
+  offset: number
+  rows: number
+  members: number
+}
+
+/**
+ * The save's own directory of tables.
+ *
+ * Each store announces itself in plain bytes: the marker `SPBF`, the schema
+ * version — 486.1, matching the game's published type schema — its own name
+ * with a length in front, then a `BSFT` block whose counts include the number
+ * of rows and the number of members. `ScheduleKnownGameStore` reports 960 rows
+ * and 9 members, and `ScheduleKnownGame` has exactly 9 members in the schema.
+ *
+ * This is the index the earlier work lacked. It does not give a row's layout —
+ * fields that are references to other tables are not stored inline — but it
+ * says what exists, how much of it there is, and where to start looking.
+ */
+export function readStores(payload: Buffer): StoreRecord[] {
+  const marker = Buffer.from('SPBF', 'latin1')
+  const bsft = Buffer.from('BSFT', 'latin1')
+  const out: StoreRecord[] = []
+  let i = 0
+  while ((i = payload.indexOf(marker, i)) !== -1) {
+    i += 4
+    if (i + 16 > payload.length) break
+    const major = payload.readUInt32BE(i)
+    const nameLen = payload.readUInt32BE(i + 12)
+    if (major !== 486 || nameLen === 0 || nameLen > 96 || i + 16 + nameLen > payload.length) continue
+    const name = payload.subarray(i + 16, i + 16 + nameLen).toString('latin1')
+    if (!/^[A-Za-z0-9_]+$/.test(name)) continue
+    const after = i + 16 + nameLen
+    const at = payload.indexOf(bsft, after)
+    if (at < 0 || at > after + 64) continue
+    out.push({
+      name,
+      offset: i - 4,
+      rows: payload.readUInt32BE(at + 16),
+      members: payload.readUInt32BE(at + 20),
+    })
+  }
+  return out.sort((a, b) => b.rows - a.rows)
+}
+
 export function readTeamNames(payload: Buffer): TeamRecord[] {
   const tag = Buffer.from('teamdb_', 'latin1')
   const hits: number[] = []

@@ -10,6 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.21.2] - 2026-09-04
+
+### Added
+
+- **The scan export lists every table in the save** — all 88 stores with their
+  row and member counts. The save declares them itself, and the counts agree
+  with the game's published schema, so this is the index for everything still
+  to be read: the season's games, the interest table, player stats by game,
+  season and career, and 38,400 history entries.
+
+
 ## [0.21.1] - 2026-09-04
 
 ### Fixed

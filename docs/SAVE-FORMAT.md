@@ -968,3 +968,49 @@ Cracking that would make every remaining field mechanical rather than searched
 for. Until then the method is the one that just worked for team ids: take a
 value the schema names, find it in the payload by its value, and confirm the
 stride.
+
+## The store directory
+
+Every table in the save announces itself, and the announcement is enough to
+build an index from:
+
+```
+"SPBF"  486  1                schema version — matches the published schema
+<len> "ScheduleKnownGameStore"
+"BSFT"  ... 960 ... 9         rows, then members
+```
+
+`readStores` walks these. 88 stores, and the counts agree with the schema —
+`ScheduleKnownGame` has 9 members in the schema and its store reports 9.
+The ones that matter:
+
+| Store | Rows | Members | What it is |
+| --- | --- | --- | --- |
+| `SeasonGameStore` | 983 | 69 | the season's games, with scores by quarter |
+| `ScheduleKnownGameStore` | 960 | 9 | fixed fixtures |
+| `HighSchoolProspectTopSchoolsStore` | 41,010 | 2 | school interest — the table found by value earlier |
+| `HistoryEntryStore` | 38,400 | 9 | history entries |
+| `PlayerSeasonStatRecordStore` | 1,305 | 9 | player stats by season |
+| `PlayerCareerStatRecordStore` | 1,341 | 9 | player stats by career |
+
+### Schedules: located, not decoded
+
+`SeasonGameStore` is at `0x1abf13b` with 983 rows, and the schema names
+`HomeTeam`, `AwayTeam`, `HomeScore`, `AwayScore`, four quarter scores each,
+`GameDateDay`, `GameDateMonth` and `GameStatus`. The quarters have to sum to
+the total, which is a check that needs no outside data.
+
+Searching for that identity near the header, over strides from 48 to 256
+bytes and every bit position, finds nothing — once runs of zeros and constant
+bytes are excluded, which both satisfy it trivially. So the score fields are
+not adjacent in the row, which is the same finding as for the player record:
+**the row layout does not follow the schema's member order**, and the rule it
+does follow is not yet known.
+
+`ScheduleKnownGameStore`'s rows were found (base `0x14c8b3f`, 16 bytes, a
+counter at +12) and hold no team ids inline. Teams are references, resolved
+through some table not yet identified.
+
+Two things would finish this: the layout rule, which would settle every store
+at once; or one game's known score, which would anchor `SeasonGame` the way a
+recruit's ten influences anchored the interest table.

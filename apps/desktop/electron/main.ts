@@ -6,7 +6,7 @@ import { autoUpdater } from 'electron-updater'
 import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
-  RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches,
+  RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readStores,
 } from './saveAnalysis'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
@@ -213,6 +213,7 @@ ipcMain.handle('save:roster', (_e, path: string) => {
       ratingNames: Object.keys(RATING_BITS),
       schools: readTeamNames(payload),
       coaches: readCoaches(payload),
+      stores: readStores(payload),
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }
