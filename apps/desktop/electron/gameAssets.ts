@@ -197,3 +197,159 @@ export function findInstall(roots: string[]): { found: true; path: string } | { 
     message: 'No Frostbite install found in the usual places. Pick the folder holding layout.toc and the Data directory.',
   }
 }
+
+// ── obfuscated tables ─────────────────────────────────────────────────────────
+
+/** Frostbite marks a scrambled table with 0x00D1CE00 or 0x00D1CE01 — "DICE". */
+export const OBFUSCATION_MAGIC = [0x00d1ce00, 0x00d1ce01]
+
+export interface Deobfuscated {
+  keyOffset: number
+  keyLength: number
+  dataOffset: number
+  xor: number
+  /** Printable runs of four or more characters — the signal that it worked. */
+  strings: number
+  /** Known Frostbite table words present, the strongest evidence. */
+  known: string[]
+  sample: string[]
+}
+
+/** Words a real Frostbite table of contents contains once it is readable. */
+const TOC_WORDS = [
+  'superBundles', 'installChunks', 'totalSize', 'alwaysid', 'name', 'cas',
+  'bundles', 'chunks', 'ebx', 'res', 'idx', 'size', 'offset', 'sha1',
+]
+
+function scoreText(buf: Buffer): { strings: number; known: string[]; sample: string[] } {
+  let strings = 0
+  const sample: string[] = []
+  let run = 0
+  let start = 0
+  for (let i = 0; i <= buf.length; i++) {
+    const c = i < buf.length ? buf[i] : 0
+    const printable = c >= 32 && c < 127
+    if (printable) { if (run === 0) start = i; run++ }
+    else {
+      if (run >= 4) {
+        strings++
+        if (sample.length < 12) sample.push(buf.subarray(start, i).toString('latin1'))
+      }
+      run = 0
+    }
+  }
+  const text = buf.toString('latin1')
+  const known = TOC_WORDS.filter((w) => text.includes(w))
+  return { strings, known, sample }
+}
+
+/**
+ * Works out how a scrambled table is scrambled, by trying the shapes the format
+ * is known to use and keeping whichever produces readable text.
+ *
+ * Deliberately a search rather than a single hard-coded scheme: the exact
+ * offsets differ between Frostbite versions, and a guess that happens to be
+ * wrong produces confident nonsense. Readable strings are the test — a wrong
+ * key yields none, and the right one yields hundreds.
+ */
+export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Deobfuscated | null; tried: number; runners: Deobfuscated[] } {
+  if (buf.length < 1024) return { obfuscated: false, best: null, tried: 0, runners: [] }
+  const magic = buf.readUInt32BE(0)
+  if (!OBFUSCATION_MAGIC.includes(magic)) return { obfuscated: false, best: null, tried: 0, runners: [] }
+
+  const keyOffsets = [0x08, 0x0c, 0x10, 0x128, 0x12c, 0x130]
+  const keyLengths = [256, 257, 258, 260, 264]
+  const xors = [0x00, 0x7b]
+  const results: Deobfuscated[] = []
+  let tried = 0
+
+  for (const keyOffset of keyOffsets) {
+    for (const keyLength of keyLengths) {
+      if (keyOffset + keyLength > buf.length) continue
+      const key = buf.subarray(keyOffset, keyOffset + keyLength)
+      // The payload starts either right after the key or at the classic 0x22C.
+      for (const dataOffset of [keyOffset + keyLength, 0x22c, 0x230]) {
+        if (dataOffset >= buf.length) continue
+        for (const xor of xors) {
+          tried++
+          const n = Math.min(buf.length - dataOffset, 64 * 1024)
+          const out = Buffer.allocUnsafe(n)
+          for (let i = 0; i < n; i++) out[i] = buf[dataOffset + i] ^ key[i % keyLength] ^ xor
+          const s = scoreText(out)
+          if (s.strings > 40 || s.known.length >= 3) {
+            results.push({ keyOffset, keyLength, dataOffset, xor, ...s })
+          }
+        }
+      }
+    }
+  }
+  results.sort((a, b) => b.known.length - a.known.length || b.strings - a.strings)
+  return { obfuscated: true, best: results[0] ?? null, tried, runners: results.slice(1, 4) }
+}
+
+/** Applies a solved scheme to the whole file. */
+export function unscramble(buf: Buffer, d: Deobfuscated): Buffer {
+  const key = buf.subarray(d.keyOffset, d.keyOffset + d.keyLength)
+  const n = buf.length - d.dataOffset
+  const out = Buffer.allocUnsafe(n)
+  for (let i = 0; i < n; i++) out[i] = buf[d.dataOffset + i] ^ key[i % d.keyLength] ^ d.xor
+  return out
+}
+
+export interface TableReport {
+  file: string
+  bytes: number
+  magic: string
+  obfuscated: boolean
+  solved: boolean
+  scheme: string | null
+  strings: number
+  known: string[]
+  sample: string[]
+  /** When nothing worked, the raw bytes to reason from. */
+  headHex: string
+  tried: number
+}
+
+/**
+ * Reads the tables that describe the archives, unscrambling them if needed.
+ *
+ * Reports what it managed rather than assuming: if no scheme produces readable
+ * text it says so and hands back the header, which is the thing worth looking
+ * at next.
+ */
+export function readTables(root: string, files: string[]): TableReport[] {
+  const out: TableReport[] = []
+  for (const rel of files) {
+    const full = join(root, rel)
+    let buf: Buffer
+    try {
+      const fd = openSync(full, 'r')
+      const size = statSync(full).size
+      buf = Buffer.alloc(Math.min(size, 4 * 1024 * 1024))
+      readSync(fd, buf, 0, buf.length, 0)
+      closeSync(fd)
+    } catch {
+      continue
+    }
+    const magic = buf.length >= 4 ? '0x' + buf.readUInt32BE(0).toString(16).padStart(8, '0') : '(too short)'
+    const d = deobfuscate(buf)
+    const plainScore = scoreText(buf.subarray(0, 64 * 1024))
+    out.push({
+      file: rel,
+      bytes: buf.length,
+      magic,
+      obfuscated: d.obfuscated,
+      solved: !!d.best,
+      scheme: d.best
+        ? `key at 0x${d.best.keyOffset.toString(16)} length ${d.best.keyLength}, data from 0x${d.best.dataOffset.toString(16)}, xor 0x${d.best.xor.toString(16)}`
+        : null,
+      strings: d.best ? d.best.strings : plainScore.strings,
+      known: d.best ? d.best.known : plainScore.known,
+      sample: d.best ? d.best.sample : plainScore.sample,
+      headHex: buf.subarray(0, 64).toString('hex').replace(/(..)/g, '$1 ').trim(),
+      tried: d.tried,
+    })
+  }
+  return out
+}

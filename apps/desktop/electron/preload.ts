@@ -25,6 +25,7 @@ const api = {
   pickInstall: () => ipcRenderer.invoke('assets:pickInstall') as Promise<string | null>,
   findInstall: () => ipcRenderer.invoke('assets:findInstall'),
   scanInstall: (dir: string) => ipcRenderer.invoke('assets:scan', dir),
+  readTables: (root: string, files: string[]) => ipcRenderer.invoke('assets:readTables', { root, files }),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
   diffSaves: (a: string, b: string) => ipcRenderer.invoke('save:diff', { a, b }),
   dictionaryState: () => ipcRenderer.invoke('save:dictionaryState'),

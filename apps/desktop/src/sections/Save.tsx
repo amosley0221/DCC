@@ -14,7 +14,7 @@ export default function Save() {
   const { dispatch } = useStore()
   const { save, patch } = useSave()
   const { path, report, busy, error, backup, diff, diffing, scan, scanning, dict, dictResult, restoring } = save
-  const { install, installBusy, installNote } = save
+  const { install, installBusy, installNote, tables } = save
   const { roster, rosterBusy } = save
 
   const setPath = (v: typeof path) => patch({ path: v })
@@ -125,6 +125,21 @@ export default function Save() {
     if (dir) await scanInstall(dir)
   }
 
+  const readTables = async () => {
+    if (!install) return
+    patch({ installBusy: true, installNote: 'Unscrambling the tables…' })
+    // The tables that name everything: the top-level layout, and one bundle
+    // table from the biggest package.
+    const wanted = [...new Set([
+      ...install.notable.map((n) => n.path),
+      ...install.largestArchives.filter((a) => a.path.toLowerCase().endsWith('.toc')).map((a) => a.path),
+    ])].slice(0, 5)
+    const res = await window.dcc.readTables(install.root, wanted)
+    patch({ installBusy: false })
+    if (res.ok) patch({ tables: res.tables, installNote: null })
+    else patch({ installNote: res.message })
+  }
+
   const exportInstall = async () => {
     if (!install) return
     const md = [
@@ -168,6 +183,30 @@ export default function Save() {
       '## Notes',
       '',
       ...install.notes.map((n) => `- ${n}`),
+      ...(tables ? [
+        '',
+        '## Tables',
+        '',
+        ...tables.flatMap((t) => [
+          `### ${t.file} (${t.bytes.toLocaleString()} bytes read)`,
+          '',
+          `- Magic: ${t.magic}`,
+          `- Obfuscated: ${t.obfuscated ? 'yes' : 'no'}`,
+          `- Solved: ${t.solved ? 'yes' : 'no'}${t.scheme ? ` — ${t.scheme}` : ''} (${t.tried} combinations tried)`,
+          `- Printable runs: ${t.strings}`,
+          `- Known words: ${t.known.join(', ') || '(none)'}`,
+          '',
+          '```',
+          ...(t.sample.length ? t.sample : ['(no readable strings)']),
+          '```',
+          '',
+          'First 64 bytes:',
+          '```',
+          t.headHex,
+          '```',
+          '',
+        ]),
+      ] : []),
     ].join('\n')
     const dest = await window.dcc.saveText('game-install-scan.md', md)
     if (dest) dispatch({ type: 'log', line: { text: `install scan written — ${dest}`, kind: 'good' } })
@@ -294,6 +333,29 @@ export default function Save() {
                   </div>
                 ))}
               </div>
+              {tables ? (
+                <div style={{ marginTop: 10 }}>
+                  {tables.map((t) => (
+                    <div key={t.file} style={{ borderTop: '1px solid var(--line)', paddingTop: 6, marginTop: 6 }}>
+                      <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
+                        <Meta size={9}>{t.file}</Meta>
+                        <Meta size={9} color={t.solved ? 'var(--good)' : 'var(--accent)'}>
+                          {t.solved ? 'READABLE' : t.obfuscated ? 'SCRAMBLED — NOT SOLVED' : 'PLAIN'}
+                        </Meta>
+                        <span className="mono" style={{ fontSize: 10, color: 'var(--ink3)' }}>
+                          {t.strings.toLocaleString()} strings
+                        </span>
+                      </div>
+                      {t.scheme ? <div className="mono" style={{ fontSize: 10, color: 'var(--ink3)' }}>{t.scheme}</div> : null}
+                      {t.sample.length ? (
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--ink2)', marginTop: 3 }}>
+                          {t.sample.slice(0, 6).join(' · ')}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {install.notes.map((n, i) => (
                 <p key={i} className="body-serif" style={{ marginTop: 8, marginBottom: 0, color: 'var(--ink3)' }}>{n}</p>
               ))}
@@ -304,6 +366,7 @@ export default function Save() {
               {installBusy ? 'Working…' : 'Find the game'}
             </Btn>
             <Btn onClick={pickInstall} disabled={installBusy}>Choose the folder…</Btn>
+            {install ? <Btn onClick={readTables} disabled={installBusy}>Read the tables</Btn> : null}
             {install ? <Btn onClick={exportInstall}>Export this scan</Btn> : null}
           </div>
         </Card>

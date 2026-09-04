@@ -1,6 +1,6 @@
 import type { UpdateStatus } from './updates'
 import type { SaveReport, SaveDiff, DictScan, RosterPlayer } from '../electron/saveAnalysis'
-import type { InstallReport } from '../electron/gameAssets'
+import type { InstallReport, TableReport } from '../electron/gameAssets'
 
 declare global {
   interface Window {
@@ -20,6 +20,9 @@ declare global {
       >
       pickInstall(): Promise<string | null>
       findInstall(): Promise<{ found: true; path: string } | { found: false; searched: number; message: string }>
+      readTables(root: string, files: string[]): Promise<
+        { ok: true; tables: TableReport[] } | { ok: false; message: string }
+      >
       scanInstall(dir: string): Promise<{ ok: true; report: InstallReport } | { ok: false; message: string }>
       backupSave(path: string): Promise<{ ok: true; dest: string } | { ok: false; message: string }>
       diffSaves(a: string, b: string): Promise<{ ok: true; diff: SaveDiff } | { ok: false; message: string }>

@@ -8,7 +8,15 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **The archive tables can be unscrambled.** College Football's tables of
+  contents are marked `0x00D1CE01` and XOR-scrambled with a key kept in their
+  own header, which is why the first scan found no readable text in them. DCC
+  now works out the scheme by trying the shapes the format uses and keeping
+  whichever produces readable words — a wrong key yields none, the right one
+  yields hundreds. *Read the tables* in the Game art card reports what it
+  managed, and the export carries it.
 
 ## [0.12.0] - 2026-09-04
 
