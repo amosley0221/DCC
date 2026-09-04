@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.19.0] - 2026-09-04
+
+### Added
+
+- **Teams carry their real names.** The 503-byte team record holds a full name,
+  an abbreviation, a nickname, a short nickname and an alternate abbreviation
+  at fixed offsets, and DCC was reading only the short display name. The school
+  picker now shows the full name and nickname — *Appalachian State
+  Mountaineers* rather than *App St.* — and searching finds a team by any of
+  them, so typing `BAMA`, `Tide` or `Crimson` all land on Alabama.
+
+  Logo matching uses them too. The art is named from the full name, so trying
+  the full name before the alias list means fewer schools depend on an alias
+  being right.
+
+
 ## [0.18.2] - 2026-09-04
 
 ### Fixed

@@ -1276,17 +1276,51 @@ export function readRoster(payload: Buffer): RosterPlayer[] {
  * own — but it is the game's own list of schools, so it is the right thing to
  * choose a name from rather than typing one.
  */
-export function readTeamNames(payload: Buffer): { slug: string; name: string }[] {
+/**
+ * The 503-byte team record holds several names at fixed offsets from the
+ * `teamdb_` marker, not just the one DCC was reading:
+ *
+ *   -278  display name       "App St."
+ *   -227  full name          "Appalachian State"
+ *   -204  abbreviation       "APP"
+ *   -146  nickname           "Mountaineers"
+ *   -128  short nickname     "Tide", "'Cats"
+ *    -77  alternate abbrev.  "BAMA", "ZONA"
+ *
+ * The full name is the useful one for art: the save says "App St." and the
+ * files say `AppalachianState`, so matching on the display name needed an alias
+ * list that the full name mostly removes.
+ */
+export interface TeamRecord {
+  slug: string
+  /** Short display name, as the game shows it in tables. */
+  name: string
+  fullName: string | null
+  abbr: string | null
+  nickname: string | null
+  shortNickname: string | null
+  altAbbr: string | null
+}
+
+export function readTeamNames(payload: Buffer): TeamRecord[] {
   const tag = Buffer.from('teamdb_', 'latin1')
   const hits: number[] = []
   let i = 0
   while ((i = payload.indexOf(tag, i)) !== -1) { hits.push(i); i++ }
-  const out: { slug: string; name: string }[] = []
+  const out: TeamRecord[] = []
   for (let k = 0; k < hits.length; k++) {
     if (k > 0 && hits[k] - hits[k - 1] !== 503) continue
     const slug = text(payload, hits[k] + 7, 24)
     const name = text(payload, hits[k] - 278, 30)
-    if (slug && name && /^[A-Z]/.test(name)) out.push({ slug, name })
+    if (!slug || !name || !/^[A-Z]/.test(name)) continue
+    out.push({
+      slug, name,
+      fullName: text(payload, hits[k] - 227, 30) || null,
+      abbr: text(payload, hits[k] - 204, 8) || null,
+      nickname: text(payload, hits[k] - 146, 24) || null,
+      shortNickname: text(payload, hits[k] - 128, 24) || null,
+      altAbbr: text(payload, hits[k] - 77, 8) || null,
+    })
   }
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }

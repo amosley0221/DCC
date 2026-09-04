@@ -237,7 +237,10 @@ ipcMain.handle('assets:pickFaces', async () => {
 })
 
 ipcMain.handle('assets:indexFaces', (
-  _e, { dir, assetIds, schools }: { dir: string; assetIds: string[]; schools: string[] },
+  _e, { dir, assetIds, schools }: {
+    dir: string; assetIds: string[]
+    schools: { name: string; fullName?: string | null }[]
+  },
 ) => {
   try {
     const index = indexFaces(dir)

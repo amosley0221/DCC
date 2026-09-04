@@ -872,7 +872,17 @@ export interface SchoolArt {
   categories: { name: string; files: number }[]
 }
 
-export function matchSchools(index: FaceIndex, schools: string[]): SchoolArt {
+/**
+ * Schools are matched on any name the save gives them. The save's display name
+ * is what the game shows in tables — "App St.", "W. Kentucky" — while the team
+ * record also carries the full name, and the art is named from the full one.
+ * Trying both removes most of the aliases below; the rest are genuine
+ * abbreviations that cannot be derived in either direction.
+ */
+export function matchSchools(
+  index: FaceIndex,
+  schools: (string | { name: string; fullName?: string | null })[],
+): SchoolArt {
   // category -> normalised school -> file
   const bank = new Map<string, Map<string, string>>()
   for (const [id, file] of Object.entries(index.map)) {
@@ -889,15 +899,19 @@ export function matchSchools(index: FaceIndex, schools: string[]): SchoolArt {
   const art: Record<string, string> = {}
   const matched: string[] = []
   const missing: string[] = []
-  for (const school of schools) {
-    const key = normSchool(school)
-    const alias = SCHOOL_ALIASES[key]
+  for (const entry of schools) {
+    const label = typeof entry === 'string' ? entry : entry.name
+    const full = typeof entry === 'string' ? null : entry.fullName ?? null
+    const keys = [normSchool(label)]
+    if (full) keys.push(normSchool(full))
+    for (const k of [...keys]) { const a = SCHOOL_ALIASES[k]; if (a) keys.push(a) }
     let any = false
     for (const [cat, inner] of bank) {
-      const hit = inner.get(key) ?? (alias ? inner.get(alias) : undefined)
-      if (hit) { art[`${school}|${cat}`] = hit; any = true }
+      let hit: string | undefined
+      for (const k of keys) { hit = inner.get(k); if (hit) break }
+      if (hit) { art[`${label}|${cat}`] = hit; any = true }
     }
-    ;(any ? matched : missing).push(school)
+    ;(any ? matched : missing).push(label)
   }
 
   return {

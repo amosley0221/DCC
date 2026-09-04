@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import type { SaveReport, SaveDiff, DictScan, RosterPlayer } from '../electron/saveAnalysis'
+import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 
 /**
@@ -27,7 +27,7 @@ export interface SaveState {
   restoring: boolean
   roster: {
     count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
-    schools: { slug: string; name: string }[]; players: RosterPlayer[]
+    schools: TeamRecord[]; players: RosterPlayer[]
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */

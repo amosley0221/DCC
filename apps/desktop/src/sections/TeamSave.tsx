@@ -112,7 +112,9 @@ export default function TeamSave() {
             <Input placeholder="search schools" value={schoolQuery} onChange={(e) => setSchoolQuery(e.target.value)} />
             <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               {roster.schools
-                .filter((sc) => !schoolQuery.trim() || sc.name.toLowerCase().includes(schoolQuery.trim().toLowerCase()))
+                .filter((sc) => !schoolQuery.trim() ||
+                  [sc.name, sc.fullName, sc.abbr, sc.nickname, sc.shortNickname, sc.altAbbr]
+                    .some((n) => n && n.toLowerCase().includes(schoolQuery.trim().toLowerCase())))
                 .slice(0, 24)
                 .map((sc) => (
                   <Chip key={sc.slug} on={false}
@@ -126,7 +128,8 @@ export default function TeamSave() {
                         save.schoolArt[`${sc.name}|logoLight`] ??
                         save.schoolArt[`${sc.name}|icon`] ??
                         save.schoolArt[`${sc.name}|logoGold`]} />
-                      {sc.name}
+                      {sc.fullName && sc.fullName !== sc.name ? sc.fullName : sc.name}
+                      {sc.nickname ? <span style={{ color: 'var(--ink3)' }}> {sc.nickname}</span> : null}
                     </span>
                   </Chip>
                 ))}

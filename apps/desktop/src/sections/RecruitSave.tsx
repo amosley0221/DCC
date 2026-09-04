@@ -62,7 +62,7 @@ export default function RecruitSave() {
     if (!dir || !save.roster) return
     patch({ facesBusy: true })
     const ids = save.roster.players.map((p) => p.assetId)
-    const schools = save.roster.schools.map((s) => s.name)
+    const schools = save.roster.schools.map((s) => ({ name: s.name, fullName: s.fullName }))
     const res = await window.dcc.indexFaces(dir, ids, schools)
     patch({ facesBusy: false })
     if (!res.ok) {
