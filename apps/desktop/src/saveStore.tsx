@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { SaveReport, SaveDiff, DictScan, RosterPlayer } from '../electron/saveAnalysis'
-import type { InstallReport, TableReport } from '../electron/gameAssets'
+import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 
 /**
  * The analysed save, held above the section switch.
@@ -35,13 +35,14 @@ export interface SaveState {
   installBusy: boolean
   installNote: string | null
   tables: TableReport[] | null
+  art: ArtFind[] | null
 }
 
 const blank: SaveState = {
   path: null, report: null, busy: false, error: null, backup: null,
   diff: null, diffing: false, scan: null, scanning: false,
   dict: null, dictResult: null, restoring: false, roster: null, rosterBusy: false,
-  install: null, installBusy: false, installNote: null, tables: null,
+  install: null, installBusy: false, installNote: null, tables: null, art: null,
 }
 
 interface Ctx {

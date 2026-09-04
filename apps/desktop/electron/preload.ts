@@ -26,6 +26,7 @@ const api = {
   findInstall: () => ipcRenderer.invoke('assets:findInstall'),
   scanInstall: (dir: string) => ipcRenderer.invoke('assets:scan', dir),
   readTables: (root: string, files: string[]) => ipcRenderer.invoke('assets:readTables', { root, files }),
+  findArt: (root: string) => ipcRenderer.invoke('assets:findArt', root),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
   diffSaves: (a: string, b: string) => ipcRenderer.invoke('save:diff', { a, b }),
   dictionaryState: () => ipcRenderer.invoke('save:dictionaryState'),

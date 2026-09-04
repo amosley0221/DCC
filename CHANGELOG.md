@@ -8,7 +8,26 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **The bundle tables can be read, and they name the art.** *Find the art* in
+  the Game art card unscrambles every table in the install and reports what the
+  assets are called — logos, uniforms, portraits, coach heads, cranium faces.
+  Names are what make a particular logo findable later, so this is the step that
+  turns the archives from opaque into addressable.
+
+### Fixed
+
+- **Key recovery is now exact.** Two things were wrong. The test for "this
+  decoded" counted four-character runs, which noise produces by the hundred
+  while real text produces fewer and much longer ones — a table of 1,840 asset
+  names scored below the noise floor and was rejected. And picking the
+  best-scoring key length always chose a multiple of the true one, because a
+  longer key has more free bytes to fit noise into looking like text. Judging on
+  long runs, and taking the shortest key within a margin of the best rather than
+  the best outright, fixes both: across key lengths of 17, 128, 257, 260, 512
+  and 1024 every decode is now byte-exact, and eight of eight random files are
+  refused.
 
 ## [0.13.1] - 2026-09-04
 

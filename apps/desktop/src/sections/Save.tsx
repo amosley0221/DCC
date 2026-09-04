@@ -14,7 +14,7 @@ export default function Save() {
   const { dispatch } = useStore()
   const { save, patch } = useSave()
   const { path, report, busy, error, backup, diff, diffing, scan, scanning, dict, dictResult, restoring } = save
-  const { install, installBusy, installNote, tables } = save
+  const { install, installBusy, installNote, tables, art } = save
   const { roster, rosterBusy } = save
 
   const setPath = (v: typeof path) => patch({ path: v })
@@ -140,6 +140,18 @@ export default function Save() {
     else patch({ installNote: res.message })
   }
 
+  const findArt = async () => {
+    if (!install) return
+    patch({ installBusy: true, installNote: 'Unscrambling the bundle tables and reading the names…' })
+    const res = await window.dcc.findArt(install.root)
+    patch({ installBusy: false })
+    if (res.ok) {
+      patch({ art: res.finds, installNote: null })
+      const n = res.finds.reduce((t, f) => t + f.art.length, 0)
+      dispatch({ type: 'log', line: { text: `read ${res.finds.length} bundle tables — ${n} art names`, kind: 'good' } })
+    } else patch({ installNote: res.message })
+  }
+
   const exportInstall = async () => {
     if (!install) return
     const md = [
@@ -203,6 +215,24 @@ export default function Save() {
           'First 64 bytes:',
           '```',
           t.headHex,
+          '```',
+          '',
+        ]),
+      ] : []),
+      ...(art ? [
+        '',
+        '## Bundle tables and asset names',
+        '',
+        ...art.flatMap((f) => [
+          `### ${f.file}`,
+          '',
+          `- ${f.bytes.toLocaleString()} bytes read, ${f.solved ? `unscrambled with a ${f.keyLength}-byte key` : 'not scrambled or not solved'}`,
+          `- ${f.totalStrings.toLocaleString()} strings, ${f.art.length} looking like art`,
+          '',
+          ...(f.art.length ? ['Art names:', '```', ...f.art, '```', ''] : []),
+          'Sample of all names:',
+          '```',
+          ...f.sample.slice(0, 20),
           '```',
           '',
         ]),
@@ -356,6 +386,21 @@ export default function Save() {
                   ))}
                 </div>
               ) : null}
+              {art ? (
+                <div style={{ marginTop: 10 }}>
+                  <Meta size={9}>
+                    {art.length} BUNDLE TABLES · {art.reduce((t, f) => t + f.art.length, 0)} ART NAMES
+                  </Meta>
+                  {art.filter((f) => f.art.length).slice(0, 4).map((f) => (
+                    <div key={f.file} style={{ borderTop: '1px solid var(--line)', paddingTop: 6, marginTop: 6 }}>
+                      <div className="mono" style={{ fontSize: 10, color: 'var(--ink3)' }}>{f.file}</div>
+                      <div className="mono" style={{ fontSize: 10, color: 'var(--ink2)', marginTop: 3 }}>
+                        {f.art.slice(0, 8).join(' · ')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {install.notes.map((n, i) => (
                 <p key={i} className="body-serif" style={{ marginTop: 8, marginBottom: 0, color: 'var(--ink3)' }}>{n}</p>
               ))}
@@ -367,6 +412,7 @@ export default function Save() {
             </Btn>
             <Btn onClick={pickInstall} disabled={installBusy}>Choose the folder…</Btn>
             {install ? <Btn onClick={readTables} disabled={installBusy}>Read the tables</Btn> : null}
+            {tables ? <Btn onClick={findArt} disabled={installBusy}>Find the art</Btn> : null}
             {install ? <Btn onClick={exportInstall}>Export this scan</Btn> : null}
           </div>
         </Card>

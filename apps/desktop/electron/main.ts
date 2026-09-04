@@ -7,7 +7,7 @@ import {
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED,
 } from './saveAnalysis'
-import { scanInstall, findInstall, readTables } from './gameAssets'
+import { scanInstall, findInstall, readTables, findArtNames, listTocs } from './gameAssets'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -236,6 +236,15 @@ ipcMain.handle('assets:scan', (_e, dir: string) => {
 ipcMain.handle('assets:readTables', (_e, { root, files }: { root: string; files: string[] }) => {
   try {
     return { ok: true as const, tables: readTables(root, files) }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('assets:findArt', (_e, root: string) => {
+  try {
+    const tocs = listTocs(root)
+    return { ok: true as const, finds: findArtNames(root, tocs), scanned: tocs.length }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

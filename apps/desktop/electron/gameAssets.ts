@@ -228,8 +228,17 @@ const TOC_WORDS = [
   'chunks', 'install', 'layout', 'Bundle', 'Chunk', 'football', 'package',
 ]
 
-/** Printable runs expected from random bytes: P(run of 4+) per position. */
-const NOISE_RATE = (1 - 95 / 256) * Math.pow(95 / 256, 4)
+/**
+ * Runs of 12+ printable characters expected from random bytes, per position.
+ *
+ * Counting short runs is the wrong test: noise produces a great many of them —
+ * about 786 in 64 KB — while real data produces fewer but far longer ones. A
+ * table of 1,840 asset names scores below what noise gives, which is how an
+ * earlier version rejected a perfectly good decode. Runs this long are what
+ * noise essentially never manages: fewer than one per 87 KB.
+ */
+const LONG = 12
+const NOISE_RATE = (1 - 95 / 256) * Math.pow(95 / 256, LONG)
 
 function scoreText(buf: Buffer) {
   let strings = 0
@@ -240,12 +249,10 @@ function scoreText(buf: Buffer) {
   for (let i = 0; i <= buf.length; i++) {
     const c = i < buf.length ? buf[i] : 0
     if (c >= 32 && c < 127) { if (run === 0) start = i; run++ } else {
-      if (run >= 4) {
-        strings++
-        if (run >= 8) {
-          longRuns++
-          if (sample.length < 12) sample.push(buf.subarray(start, i).toString('latin1'))
-        }
+      if (run >= 4) strings++
+      if (run >= LONG) {
+        longRuns++
+        if (sample.length < 12) sample.push(buf.subarray(start, i).toString('latin1'))
       }
       run = 0
     }
@@ -268,23 +275,40 @@ function scoreText(buf: Buffer) {
  * solved tables that were nothing of the sort.
  */
 function keyLengths(data: Buffer, max = 1024): number[] {
-  const scored: { len: number; agree: number }[] = []
-  const n = Math.min(data.length, 256 * 1024)
-  for (let len = 1; len <= max; len++) {
-    let same = 0
-    let total = 0
-    for (let i = 0; i + len < n; i += 7) { if (data[i] === data[i + len]) same++; total++ }
-    if (total > 200) scored.push({ len, agree: same / total })
+  // Index of coincidence, not byte agreement at a lag.
+  //
+  // Comparing data[i] with data[i+L] only works when the plaintext itself
+  // repeats at that lag, which is a property of the plaintext rather than the
+  // key — it happened to hold for one table and failed for others. Splitting
+  // into L columns is the right test: at the true length each column is the
+  // plaintext XOR one constant, so it keeps the plaintext's lopsided byte
+  // distribution; at any other length the columns are mixtures and flatten out
+  // towards uniform.
+  const n = Math.min(data.length, 128 * 1024)
+  const scored: { len: number; ic: number }[] = []
+  for (let len = 1; len <= Math.min(max, Math.floor(n / 24)); len++) {
+    let sum = 0
+    let cols = 0
+    for (let k = 0; k < len; k++) {
+      const freq = new Uint32Array(256)
+      let count = 0
+      for (let i = k; i < n; i += len) { freq[data[i]]++; count++ }
+      if (count < 20) continue
+      let coincid = 0
+      for (let b = 0; b < 256; b++) coincid += freq[b] * (freq[b] - 1)
+      sum += coincid / (count * (count - 1))
+      cols++
+    }
+    if (cols) scored.push({ len, ic: sum / cols })
   }
-  scored.sort((a, b) => b.agree - a.agree)
-  // Keep the strongest, plus their smallest divisors — a true length of 257
-  // also scores at 514, and the shorter one is the real answer.
+  scored.sort((a, b) => b.ic - a.ic)
+  // A true length of 17 also scores at 34 and 51; keep the shortest of each
+  // family, since it gives every key byte the most evidence.
   const out: number[] = []
-  for (const s of scored.slice(0, 24)) {
-    let l = s.len
-    for (const cand of out) if (l % cand === 0) { l = cand; break }
-    if (!out.includes(l)) out.push(l)
-    if (out.length >= 8) break
+  for (const s of scored.slice(0, 40)) {
+    if (out.some((l) => s.len % l === 0)) continue
+    out.push(s.len)
+    if (out.length >= 6) break
   }
   return out
 }
@@ -341,9 +365,8 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
       const out = Buffer.allocUnsafe(n)
       for (let i = 0; i < n; i++) out[i] = data[i] ^ key[i % len]
       const s = scoreText(out)
-      // Noise clears the old bar easily; require several times what noise gives,
-      // plus runs long enough that noise essentially never produces them.
-      if (s.strings > s.expected * 3 && s.longRuns > 20) {
+      // Judge on long runs only, against what noise would give at this size.
+      if (s.longRuns >= 20 && s.longRuns > Math.max(4, s.expected * 20)) {
         results.push({
           keyLength: len, dataOffset, keyHex: key.subarray(0, 32).toString('hex'),
           samplesPerByte: Math.floor(data.length / len), ...s,
@@ -351,9 +374,41 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
       }
     }
   }
-  // Best evidence first; among equals prefer the shorter key, which is the real
-  // period rather than a multiple of it.
-  results.sort((a, b) => b.known.length - a.known.length || b.longRuns - a.longRuns || a.keyLength - b.keyLength)
+  results.sort((a, b) => b.known.length - a.known.length || b.longRuns - a.longRuns)
+
+  // Reduce to the true period. A key of 221 decrypts the same text as its
+  // factor 17, but derives each byte from a thirteenth of the evidence, which
+  // is where stray wrong characters come from. Test each divisor properly
+  // rather than inspecting the key for repetition — that shortcut silently
+  // produced worse keys when it was tried.
+  const top = results[0]
+  if (top) {
+    const data = buf.subarray(top.dataOffset)
+    // Divisors from the largest down, so `part` ascends and the first that
+    // holds up is the shortest period.
+    for (let d = top.keyLength; d >= 2; d--) {
+      if (top.keyLength % d) continue
+      const part = top.keyLength / d
+      if (part < 2) continue
+      const key = deriveKey(data, part)
+      const n = Math.min(data.length, 128 * 1024)
+      const out = Buffer.allocUnsafe(n)
+      for (let i = 0; i < n; i++) out[i] = data[i] ^ key[i % part]
+      const s2 = scoreText(out)
+      // Within a margin, not above it. A longer key has more free bytes and can
+      // fit noise into looking like text, so the raw score climbs with length —
+      // picking the maximum always lands on a multiple of the real period.
+      if (s2.longRuns >= top.longRuns * 0.95) {
+        results[0] = {
+          keyLength: part, dataOffset: top.dataOffset,
+          keyHex: key.subarray(0, 32).toString('hex'),
+          samplesPerByte: Math.floor(data.length / part), ...s2,
+        }
+        break   // divisors ascend, so the first that holds up is the smallest
+      }
+    }
+  }
+
   return { obfuscated: true, best: results[0] ?? null, tried, runners: results.slice(1, 4) }
 }
 
@@ -422,4 +477,95 @@ export function readTables(root: string, files: string[]): TableReport[] {
     })
   }
   return out
+}
+
+// ── asset names ───────────────────────────────────────────────────────────────
+
+export interface ArtFind {
+  file: string
+  bytes: number
+  solved: boolean
+  keyLength: number
+  totalStrings: number
+  /** Names that look like art: logos, portraits, heads, crests. */
+  art: string[]
+  /** Everything, capped, so the naming scheme is visible even when nothing matches. */
+  sample: string[]
+}
+
+/** What an art asset tends to be called, across the games that use this engine. */
+const ART = /logo|crest|helmet|uniform|portrait|headshot|face|head_|_head|cranium|team_|_team|coach|roster|player_|_logo/i
+
+function stringsIn(buf: Buffer, min = 5): string[] {
+  const out: string[] = []
+  let run = 0
+  let start = 0
+  for (let i = 0; i <= buf.length; i++) {
+    const c = i < buf.length ? buf[i] : 0
+    const ok = c >= 32 && c < 127
+    if (ok) { if (run === 0) start = i; run++ } else {
+      if (run >= min) out.push(buf.subarray(start, i).toString('latin1'))
+      run = 0
+    }
+  }
+  return out
+}
+
+/**
+ * Unscrambles the bundle tables and reports what the assets inside are called.
+ *
+ * The tables name everything; once they are readable, finding a particular logo
+ * is a lookup rather than a hunt. This gathers the names so the naming scheme
+ * can be seen before anything is built on it.
+ */
+export function findArtNames(root: string, files: string[], cap = 24): ArtFind[] {
+  const out: ArtFind[] = []
+  for (const rel of files.slice(0, cap)) {
+    const full = join(root, rel)
+    let buf: Buffer
+    try {
+      const size = statSync(full).size
+      const fd = openSync(full, 'r')
+      buf = Buffer.alloc(Math.min(size, 24 * 1024 * 1024))
+      readSync(fd, buf, 0, buf.length, 0)
+      closeSync(fd)
+    } catch { continue }
+
+    const d = deobfuscate(buf)
+    const plain = d.best ? unscramble(buf, d.best) : buf
+    const all = stringsIn(plain)
+    const art = all.filter((s) => ART.test(s))
+    // Deduplicate, keeping the order they appear in.
+    const seen = new Set<string>()
+    const uniqArt: string[] = []
+    for (const a of art) { if (!seen.has(a)) { seen.add(a); uniqArt.push(a) } }
+    out.push({
+      file: rel,
+      bytes: buf.length,
+      solved: !!d.best,
+      keyLength: d.best?.keyLength ?? 0,
+      totalStrings: all.length,
+      art: uniqArt.slice(0, 40),
+      sample: all.slice(0, 30),
+    })
+  }
+  return out
+}
+
+/** Every .toc under the install, biggest first — the bundle tables. */
+export function listTocs(root: string, limit = 200): string[] {
+  const found: { rel: string; bytes: number }[] = []
+  const walk = (dir: string, depth: number) => {
+    if (depth > 8 || found.length > 2000) return
+    let entries: import('node:fs').Dirent[]
+    try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      const full = join(dir, e.name)
+      if (e.isDirectory()) { walk(full, depth + 1); continue }
+      if (!e.isFile() || !e.name.toLowerCase().endsWith('.toc')) continue
+      try { found.push({ rel: relative(root, full), bytes: statSync(full).size }) } catch { /* gone */ }
+    }
+  }
+  walk(root, 0)
+  return found.sort((a, b) => b.bytes - a.bytes).slice(0, limit).map((f) => f.rel)
 }
