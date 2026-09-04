@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.10.1] - 2026-09-04
+
 ### Added
 
 - **Your programme has its name on it.** Pick your roster by a player on it, then
