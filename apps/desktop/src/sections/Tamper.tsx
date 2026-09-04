@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import type { Convo } from '../model'
 import {
   PROMISES, ROLES, TALKING_POINTS, newConvo, nilVerdict, scoreExchange, standing,
@@ -9,7 +9,7 @@ import {
 } from '../ui'
 
 export default function Tamper() {
-  const { dynasty, state, dispatch, d, sem } = useStore()
+  const { dynasty, state, dispatch, d, sem } = useDynasty()
   const [target, setTarget] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [teamFilter, setTeamFilter] = useState<string | null>(null)
@@ -135,7 +135,7 @@ export default function Tamper() {
                   const c = state.convos[p.id]
                   return (
                     <tr key={p.id} aria-selected={target === p.id} onClick={() => setTarget(p.id)}>
-                      <td className="num" style={{ fontWeight: 600, color: p.ovr >= 90 ? 'var(--warn)' : 'var(--ink2)' }}>{p.ovr}</td>
+                      <td className="num" style={{ fontWeight: 600, color: p.ovr >= 90 ? 'var(--ink)' : 'var(--ink2)' }}>{p.ovr}</td>
                       <td>
                         <span className="row" style={{ gap: 8 }}>
                           <Portrait name={p.name} size={24} />

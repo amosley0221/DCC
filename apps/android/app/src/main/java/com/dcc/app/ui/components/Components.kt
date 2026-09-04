@@ -479,7 +479,7 @@ fun SchoolBadge(monogram: String, name: String, isUser: Boolean, size: Dp = 22.d
 @Composable
 fun StarRow(stars: Int, size: Int = 10) = Text(
     Rules.stars(stars),
-    style = TextStyle(fontFamily = Dcc.fonts.mono, fontSize = size.sp, color = Dcc.colors.warn),
+    style = TextStyle(fontFamily = Dcc.fonts.mono, fontSize = size.sp, color = Dcc.colors.accent),
 )
 
 @Composable

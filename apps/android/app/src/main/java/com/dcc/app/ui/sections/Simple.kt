@@ -84,7 +84,7 @@ fun NationalSection(dynasty: Dynasty, d: Derived) {
                                 RowTitle(row.name, c.ink, 14, Modifier.weight(1f))
                                 MetaText(row.team, c.ink3, 9)
                                 Spacer(Modifier.width(10.dp))
-                                NumText(row.value, c.warn, 13, FontWeight.SemiBold)
+                                NumText(row.value, c.ink, 13, FontWeight.SemiBold)
                             }
                         }
                     }
@@ -126,7 +126,7 @@ fun CoachSection(vm: AppViewModel, dynasty: Dynasty) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatCard("ALL-TIME", "${coach.record.wins}–${coach.record.losses}", c.ink, Modifier.weight(1f))
-                    StatCard("TITLES", "${coach.titles}", c.warn, Modifier.weight(1f))
+                    StatCard("TITLES", "${coach.titles}", c.accent, Modifier.weight(1f))
                     StatCard("DRAFTED", "${coach.drafted}", c.ink, Modifier.weight(1f))
                 }
             }
@@ -156,7 +156,7 @@ fun CoachSection(vm: AppViewModel, dynasty: Dynasty) {
                     Spacer(Modifier.height(10.dp))
                     coach.draftPicks.forEach { p ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            MonoLabel("RD ${p.round}", if (p.round == 1) c.warn else c.ink3, 10, Modifier.width(46.dp))
+                            MonoLabel("RD ${p.round}", if (p.round == 1) c.accent else c.ink3, 10, Modifier.width(46.dp))
                             RowTitle(p.name, c.ink, 14, Modifier.weight(1f))
                             MetaText("${p.pos} · ${p.year}", c.ink3, 9)
                         }
@@ -230,11 +230,8 @@ fun QueueSection(vm: AppViewModel, state: Persisted) {
         SectionHeader(
             title = "Queue",
             sub = {
-                MetaText(
-                    if (state.gameRunning) "GAME RUNNING ON PC — SAVE LOCKED, WRITES HELD"
-                    else "SAVE UNLOCKED — THE PC AGENT CAN APPLY",
-                    if (state.gameRunning) c.warn else c.good,
-                )
+                // No agent exists yet, so nothing can actually drain this queue.
+                MetaText("NO PC AGENT CONNECTED — NOTHING CAN BE APPLIED YET", c.warn)
             },
         )
 

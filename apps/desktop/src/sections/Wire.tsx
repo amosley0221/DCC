@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import { Btn, Card, Empty, HeatMeter, Kicker, Meta, SectionHeader, Tab } from '../ui'
 import type { Story } from '../model'
 
 export default function Wire() {
-  const { state, dispatch, d, sem } = useStore()
+  const { state, dispatch, d, sem } = useDynasty()
   const [mode, setMode] = useState<'stories' | 'reel'>('stories')
 
   const stories = useMemo(

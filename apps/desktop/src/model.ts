@@ -114,6 +114,15 @@ export interface Convo {
 export interface LogLine { at: number; text: string; kind: 'info' | 'good' | 'warn' | 'bad' }
 
 export interface Persisted {
+  /**
+   * Where the loaded dynasty came from: 'none' until one is imported, or
+   * 'sample' for the bundled demo. The app shows nothing real until a save has
+   * actually been read off the PC.
+   */
+  dynastySource: 'none' | 'sample'
+  /** Relay base URL, empty until paired. */
+  relayUrl: string
+  relayToken: string
   theme: 'night' | 'field'
   week: number
   heat: number

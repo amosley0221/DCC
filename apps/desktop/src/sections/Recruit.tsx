@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import type { Prospect, Stage } from '../model'
 import { interestFor, STAGES, stageColor, starText } from '../logic'
 import {
@@ -10,7 +10,7 @@ const TABS = ['MY BOARD', 'PLAYER RANKINGS', 'TEAM RANKINGS', 'PROGRAM STATS'] a
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'OT', 'IOL', 'EDGE', 'DT', 'LB', 'CB', 'S', 'K', 'P']
 
 export default function Recruit() {
-  const { dynasty, state, dispatch, d } = useStore()
+  const { dynasty, state, dispatch, d } = useDynasty()
   const [tab, setTab] = useState<(typeof TABS)[number]>('MY BOARD')
   const [selected, setSelected] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -82,7 +82,7 @@ export default function Recruit() {
                     <div className="row" style={{ gap: 8 }}>
                       <span className="row-title" style={{ color: 'var(--ink)' }}>{p.name}</span>
                       <Meta size={10}>{p.pos} · #{p.natlRank} NATL</Meta>
-                      <span style={{ color: 'var(--warn)', fontSize: 10 }}>{starText(p.stars)}</span>
+                      <span style={{ color: 'var(--accent)', fontSize: 10 }}>{starText(p.stars)}</span>
                       {d.queuedProspectIds.has(p.id) ? (
                         <Meta size={9} color="var(--warn)">● QUEUED</Meta>
                       ) : null}
@@ -203,7 +203,7 @@ export default function Recruit() {
                               <Portrait name={p.name} size={22} />
                               <span className="col">
                                 <span className="row-title" style={{ fontSize: 13, color: 'var(--ink)' }}>{p.name}</span>
-                                <span style={{ color: 'var(--warn)', fontSize: 8.5 }}>{starText(p.stars)}</span>
+                                <span style={{ color: 'var(--accent)', fontSize: 8.5 }}>{starText(p.stars)}</span>
                               </span>
                             </span>
                           </td>
@@ -342,7 +342,7 @@ export default function Recruit() {
                   <td className="num" style={{ color: t.isUser ? 'var(--accent)' : 'var(--ink3)' }}>{i + 1}</td>
                   <td><span className="row" style={{ gap: 8 }}><SchoolBadge teamId={t.id} size={20} /><span className="row-title">{t.name}</span></span></td>
                   <td className="num">{10 + ((t.prestige * 3) % 14)}</td>
-                  <td className="num" style={{ color: 'var(--warn)' }}>{(t.prestige * 271 + 900).toLocaleString()}</td>
+                  <td className="num" style={{ color: 'var(--ink)' }}>{(t.prestige * 271 + 900).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

@@ -81,18 +81,56 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var seq = 0
 
+    private val _loading = MutableStateFlow(true)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
     init {
         viewModelScope.launch {
-            // 3,200 prospects is too much JSON for the main thread.
-            val loaded = withContext(Dispatchers.IO) {
-                val d = Repository.loadDynasty(getApplication())
-                d to Repository.loadState(getApplication(), d)
+            val saved = withContext(Dispatchers.IO) { Repository.loadState(getApplication()) }
+            _state.value = saved
+            // Nothing is shown until a dynasty has actually been brought in.
+            if (saved.dynastySource != "none") {
+                // 3,200 prospects is too much JSON for the main thread.
+                val d = withContext(Dispatchers.IO) { Repository.loadDynasty(getApplication()) }
+                _dynasty.value = d
+                _derived.value = Derived(d, saved)
             }
-            _dynasty.value = loaded.first
-            _state.value = loaded.second
-            _derived.value = Derived(loaded.first, loaded.second)
+            _loading.value = false
         }
     }
+
+    /** Loads the bundled demo dynasty. Explicit, and clearly not the user's save. */
+    fun loadSampleDynasty() {
+        viewModelScope.launch {
+            _loading.value = true
+            val d = withContext(Dispatchers.IO) { Repository.loadDynasty(getApplication()) }
+            val next = Repository.seed(d).copy(
+                theme = _state.value.theme,
+                relayUrl = _state.value.relayUrl,
+                relayToken = _state.value.relayToken,
+            )
+            _dynasty.value = d
+            _state.value = next
+            _derived.value = Derived(d, next)
+            withContext(Dispatchers.IO) { Repository.saveState(getApplication(), next) }
+            _loading.value = false
+        }
+    }
+
+    /** Drops whatever is loaded and returns the app to its empty state. */
+    fun clearDynasty() {
+        val next = Persisted(
+            theme = _state.value.theme,
+            relayUrl = _state.value.relayUrl,
+            relayToken = _state.value.relayToken,
+        )
+        _dynasty.value = null
+        _derived.value = null
+        _state.value = next
+        viewModelScope.launch(Dispatchers.IO) { Repository.saveState(getApplication(), next) }
+    }
+
+    fun setRelay(url: String, token: String) = update { it.copy(relayUrl = url, relayToken = token) }
 
     private fun update(persist: Boolean = true, block: (Persisted) -> Persisted) {
         val next = block(_state.value)
@@ -240,8 +278,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun reset() {
-        val d = _dynasty.value ?: return
+        val d = _dynasty.value ?: return clearDynasty()
         Repository.clearState(getApplication())
-        update { Repository.seed(d) }
+        update { Repository.seed(d).copy(theme = _state.value.theme) }
     }
 }

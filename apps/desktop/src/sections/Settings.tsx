@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { THEMES, type ThemeName } from '../theme'
-import { Btn, Card, Chip, Kicker, Meta, SectionHeader, Track } from '../ui'
+import { Btn, Card, Chip, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
 import type { UpdateStatus } from '../updates'
 
 const RELEASES = 'https://github.com/amosley0221/DCC/releases'
@@ -10,6 +10,8 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
   const { state, dispatch, dynasty } = useStore()
   const [info, setInfo] = useState<{ userData: string; isDev: boolean } | null>(null)
   const [checking, setChecking] = useState(false)
+  const [relayUrl, setRelayUrl] = useState(state.relayUrl)
+  const [relayToken, setRelayToken] = useState(state.relayToken)
 
   useEffect(() => { void window.dcc.info().then((i) => setInfo({ userData: i.userData, isDev: i.isDev })) }, [])
 
@@ -71,22 +73,69 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
         </Card>
 
         <Card className="card-pad">
-          <Kicker>Data</Kicker>
-          <div className="col" style={{ gap: 7, marginTop: 10 }}>
-            <Meta size={10}>Season {dynasty.meta.season} · {dynasty.teams.length} programs · {dynasty.prospects.length.toLocaleString()} prospects</Meta>
+          <Kicker>Dynasty</Kicker>
+          <div className="col" style={{ gap: 8, marginTop: 10 }}>
+            {state.dynastySource === 'sample' && dynasty ? (
+              <>
+                <Meta color="var(--warn)">SAMPLE DYNASTY LOADED — INVENTED DATA, NOT YOUR SAVE</Meta>
+                <Meta size={10}>
+                  Season {dynasty.meta.season} · {dynasty.teams.length} programs ·{' '}
+                  {dynasty.prospects.length.toLocaleString()} prospects
+                </Meta>
+                <div className="row" style={{ gap: 8, marginTop: 4 }}>
+                  <Btn onClick={() => dispatch({ type: 'reset', dynasty })}>Reset edits</Btn>
+                  <Btn variant="accent" onClick={() => dispatch({ type: 'clearDynasty' })}>Clear dynasty</Btn>
+                </div>
+              </>
+            ) : (
+              <>
+                <Meta size={10}>NO DYNASTY LOADED</Meta>
+                <span className="body-serif">
+                  The save agent that reads <code>DYNASTY-*.sav</code> is not built yet, so no real
+                  dynasty can be loaded. The sample is invented data for looking at the screens.
+                </span>
+                <div className="row" style={{ gap: 8, marginTop: 4 }}>
+                  <Btn
+                    variant="primary"
+                    onClick={async () => {
+                      const d = (await window.dcc.dynasty()) as never
+                      dispatch({ type: 'loadSample', dynasty: d })
+                    }}
+                  >
+                    Load sample dynasty
+                  </Btn>
+                </div>
+              </>
+            )}
             {info ? <Meta size={10}>State file: {info.userData}</Meta> : null}
+          </div>
+        </Card>
+
+        <Card className="card-pad">
+          <Kicker>Relay</Kicker>
+          <div className="col" style={{ gap: 8, marginTop: 10 }}>
+            <span className="body-serif">
+              The home server that holds the dynasty, the shared queue and the media. This machine
+              pushes to it; the phone reads from it.
+            </span>
+            <Meta size={9}>SERVER ADDRESS</Meta>
+            <Input
+              placeholder="http://den-server.local:8080"
+              value={relayUrl}
+              onChange={(e) => setRelayUrl(e.target.value)}
+            />
+            <Meta size={9}>PAIRING TOKEN</Meta>
+            <Input
+              placeholder="shared with the phone"
+              value={relayToken}
+              onChange={(e) => setRelayToken(e.target.value)}
+            />
             <div className="row" style={{ gap: 8, marginTop: 4 }}>
-              <Btn
-                variant="accent"
-                onClick={() => {
-                  if (confirm('Reset the queue, board and every local edit back to the seed dynasty?')) {
-                    dispatch({ type: 'reset', dynasty })
-                  }
-                }}
-              >
-                Reset local state
+              <Btn onClick={() => dispatch({ type: 'relay', url: relayUrl.trim(), token: relayToken.trim() })}>
+                Save
               </Btn>
             </div>
+            <Meta color="var(--warn)">RELAY SERVICE NOT BUILT YET — NOTHING TO CONNECT TO</Meta>
           </div>
         </Card>
       </div>

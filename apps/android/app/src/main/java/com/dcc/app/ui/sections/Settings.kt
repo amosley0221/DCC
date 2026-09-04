@@ -17,11 +17,13 @@ import com.dcc.app.update.Updater
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty) {
+fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty?) {
     val c = Dcc.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var update by remember { mutableStateOf<Updater.State>(Updater.State.Idle) }
+    var relayUrl by remember(state.relayUrl) { mutableStateOf(state.relayUrl) }
+    var relayToken by remember(state.relayToken) { mutableStateOf(state.relayToken) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SectionHeader(
@@ -29,6 +31,65 @@ fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty) {
             sub = { MetaText("VERSION ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
         )
 
+        // ── dynasty ──────────────────────────────────────────────────────────
+        DccCard {
+            Kicker("Dynasty")
+            Spacer(Modifier.height(9.dp))
+            when (state.dynastySource) {
+                "sample" -> {
+                    MonoLabel("SAMPLE DYNASTY LOADED — INVENTED DATA, NOT YOUR SAVE", c.warn, 10)
+                    Spacer(Modifier.height(7.dp))
+                    dynasty?.let {
+                        MetaText(
+                            "Season ${it.meta.season} · ${it.teams.size} programs · " +
+                                "${it.prospects.size} prospects",
+                            c.ink3,
+                        )
+                    }
+                    Spacer(Modifier.height(11.dp))
+                    DccButton("Clear dynasty", Modifier.fillMaxWidth(), BtnStyle.ACCENT) { vm.clearDynasty() }
+                }
+                else -> {
+                    MetaText("NO DYNASTY LOADED", c.ink3, 10)
+                    Spacer(Modifier.height(7.dp))
+                    BodySerif(
+                        "Your dynasty arrives from the Windows app by way of the relay. Neither " +
+                            "exists yet, so nothing can come in. The sample below is invented " +
+                            "data for looking at the screens.",
+                    )
+                    Spacer(Modifier.height(11.dp))
+                    DccButton("Load sample dynasty", Modifier.fillMaxWidth()) { vm.loadSampleDynasty() }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // ── relay ────────────────────────────────────────────────────────────
+        DccCard {
+            Kicker("Relay")
+            Spacer(Modifier.height(9.dp))
+            BodySerif(
+                "The home server that holds the dynasty, the shared queue and the media. The " +
+                    "Windows app pushes to it; this phone reads from it.",
+            )
+            Spacer(Modifier.height(11.dp))
+            MetaText("SERVER ADDRESS", c.ink3, 9)
+            Spacer(Modifier.height(5.dp))
+            DccField(relayUrl, "http://den-server.local:8080") { relayUrl = it }
+            Spacer(Modifier.height(8.dp))
+            MetaText("PAIRING TOKEN", c.ink3, 9)
+            Spacer(Modifier.height(5.dp))
+            DccField(relayToken, "from the Windows app") { relayToken = it }
+            Spacer(Modifier.height(10.dp))
+            DccButton("Save", Modifier.fillMaxWidth()) { vm.setRelay(relayUrl.trim(), relayToken.trim()) }
+            Spacer(Modifier.height(8.dp))
+            MonoLabel("RELAY SERVICE NOT BUILT YET — NOTHING TO CONNECT TO", c.warn, 9)
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        // ── appearance ───────────────────────────────────────────────────────
         DccCard {
             Kicker("Appearance")
             Spacer(Modifier.height(10.dp))
@@ -42,12 +103,13 @@ fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty) {
 
         Spacer(Modifier.height(10.dp))
 
+        // ── updates ──────────────────────────────────────────────────────────
         DccCard {
             Kicker("Updates")
             Spacer(Modifier.height(9.dp))
             MetaText(
-                "New versions install over this one — Android keeps your data because every build is " +
-                    "signed with the same key. You never have to uninstall first.",
+                "New versions install over this one — Android keeps your data because every " +
+                    "build is signed with the same key. You never have to uninstall first.",
                 c.ink3, 10, maxLines = 4,
             )
             Spacer(Modifier.height(10.dp))
@@ -96,20 +158,6 @@ fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty) {
             }
             Spacer(Modifier.height(8.dp))
             DccButton("Release notes", Modifier.fillMaxWidth()) { Updater.openReleases(context) }
-        }
-
-        Spacer(Modifier.height(10.dp))
-
-        DccCard {
-            Kicker("Data")
-            Spacer(Modifier.height(9.dp))
-            MetaText(
-                "Season ${dynasty.meta.season} · ${dynasty.teams.size} programs · " +
-                    "${dynasty.prospects.size} prospects",
-                c.ink3, 10,
-            )
-            Spacer(Modifier.height(10.dp))
-            DccButton("Reset local state", Modifier.fillMaxWidth(), BtnStyle.ACCENT) { vm.reset() }
         }
 
         Spacer(Modifier.height(24.dp))

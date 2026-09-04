@@ -115,7 +115,7 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
  */
 export function SchoolBadge({ teamId, size = 22, me }: { teamId: string; size?: number; me?: boolean }) {
   const { d, state } = useStore()
-  const team = d.teamsById.get(teamId)
+  const team = d?.teamsById.get(teamId)
   const isMe = me ?? team?.isUser ?? false
   const tone = toneFor(team?.name ?? teamId, state.theme as ThemeName)
   return (

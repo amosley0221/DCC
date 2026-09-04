@@ -104,7 +104,7 @@ fun TamperSection(
                 val convo = state.convos[p.id]
                 DccCard(onClick = { onOpenTarget(p.id) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        NumText("${p.ovr}", if (p.ovr >= 90) c.warn else c.ink2, 15, FontWeight.SemiBold, Modifier.width(34.dp))
+                        NumText("${p.ovr}", if (p.ovr >= 90) c.ink else c.ink2, 15, FontWeight.SemiBold, Modifier.width(34.dp))
                         Portrait(p.name, 30.dp)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {

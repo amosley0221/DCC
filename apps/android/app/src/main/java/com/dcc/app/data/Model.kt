@@ -234,11 +234,20 @@ data class ProspectPatch(
 /** Everything the user changes. Written to filesDir so it survives an update. */
 @Serializable
 data class Persisted(
+    /**
+     * Where the loaded dynasty came from: "none" until one is imported, or
+     * "sample" for the bundled demo. The app shows nothing real until a save
+     * has actually been brought in from the PC.
+     */
+    val dynastySource: String = "none",
     val theme: String = "night",
-    val week: Int = 9,
-    val heat: Int = 62,
+    val week: Int = 1,
+    val heat: Int = 0,
     val gameRunning: Boolean = true,
     val leaseHolder: String = "gaming-pc",
+    /** Relay base URL, e.g. http://den-server.local:8080 — empty until paired. */
+    val relayUrl: String = "",
+    val relayToken: String = "",
     val queue: List<QueueItem> = emptyList(),
     val storyStatus: Map<String, String> = emptyMap(),
     val board: List<String> = emptyList(),

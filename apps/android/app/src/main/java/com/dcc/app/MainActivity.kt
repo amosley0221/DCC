@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
             val state by vm.state.collectAsState()
             val dynasty by vm.dynasty.collectAsState()
             val derived by vm.derived.collectAsState()
+            val loading by vm.loading.collectAsState()
 
             DccTheme(state.theme) {
                 val c = Dcc.colors
@@ -41,9 +42,9 @@ class MainActivity : ComponentActivity() {
                 val dy = dynasty
 
                 Box(Modifier.fillMaxSize().background(c.bg0)) {
-                    if (dy == null || d == null) {
+                    if (loading) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            MonoLabel("LOADING DYNASTY…", c.ink4, 11)
+                            MonoLabel("LOADING…", c.ink4, 11)
                         }
                     } else {
                         var section by rememberSaveable { mutableStateOf(SECTIONS[0]) }
@@ -97,8 +98,8 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     MonoLabel("HEAT", c.ink4, 8)
                                     NumText(
-                                        "${state.heat}",
-                                        if (state.heat >= 80) c.accent else c.ink,
+                                        if (dy == null) "—" else "${state.heat}",
+                                        if (dy != null && state.heat >= 80) c.accent else c.ink,
                                         16,
                                         androidx.compose.ui.text.font.FontWeight.SemiBold,
                                     )
@@ -111,18 +112,27 @@ class MainActivity : ComponentActivity() {
                                     .fillMaxHeight()
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                             ) {
-                                when (section) {
-                                    "WIRE" -> WireSection(vm, state, d)
-                                    "NATIONAL" -> NationalSection(dy, d)
-                                    "RECRUIT" -> RecruitSection(vm, state, d, dy.meta.userTeamId)
-                                    "TEAM" -> TeamSection(vm, dy, state, d) { id ->
-                                        callTarget = id
-                                        section = "TAMPER"
+                                // Settings is always reachable; every other
+                                // section needs a dynasty to have something to show.
+                                if (section == "SETTINGS") {
+                                    SettingsSection(vm, state, dy)
+                                } else if (dy == null || d == null) {
+                                    NoDynasty(section.lowercase().replaceFirstChar { it.uppercase() }, state) {
+                                        section = "SETTINGS"
                                     }
-                                    "TAMPER" -> TamperSection(vm, dy, state, d, callTarget) { callTarget = it }
-                                    "COACH" -> CoachSection(vm, dy)
-                                    "QUEUE" -> QueueSection(vm, state)
-                                    else -> SettingsSection(vm, state, dy)
+                                } else {
+                                    when (section) {
+                                        "WIRE" -> WireSection(vm, state, d)
+                                        "NATIONAL" -> NationalSection(dy, d)
+                                        "RECRUIT" -> RecruitSection(vm, state, d, dy.meta.userTeamId)
+                                        "TEAM" -> TeamSection(vm, dy, state, d) { id ->
+                                            callTarget = id
+                                            section = "TAMPER"
+                                        }
+                                        "TAMPER" -> TamperSection(vm, dy, state, d, callTarget) { callTarget = it }
+                                        "COACH" -> CoachSection(vm, dy)
+                                        else -> QueueSection(vm, state)
+                                    }
                                 }
                             }
                         }

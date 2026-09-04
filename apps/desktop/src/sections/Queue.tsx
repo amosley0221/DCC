@@ -1,8 +1,8 @@
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, StateTag } from '../ui'
 
 export default function Queue() {
-  const { state, dispatch } = useStore()
+  const { state, dispatch } = useDynasty()
   const held = state.queue.filter((q) => q.state === 'HELD')
   const blocked = state.gameRunning
 

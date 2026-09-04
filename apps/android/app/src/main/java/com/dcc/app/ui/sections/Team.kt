@@ -98,7 +98,7 @@ fun TeamSection(vm: AppViewModel, dynasty: Dynasty, state: Persisted, d: Derived
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             NumText(
                                 "${p.ovr}",
-                                if (p.ovr >= 90) c.warn else c.ink2, 15,
+                                if (p.ovr >= 90) c.ink else c.ink2, 15,
                                 androidx.compose.ui.text.font.FontWeight.SemiBold,
                                 Modifier.width(34.dp),
                             )
@@ -204,7 +204,7 @@ fun TeamSection(vm: AppViewModel, dynasty: Dynasty, state: Persisted, d: Derived
                                     RowTitle(p.name, c.ink, 14)
                                     MetaText("${p.year} · ${p.dev}", c.ink3, 9)
                                 }
-                                NumText("${p.ovr}", if (p.ovr >= 90) c.warn else c.ink2, 14)
+                                NumText("${p.ovr}", if (p.ovr >= 90) c.ink else c.ink2, 14)
                                 Spacer(Modifier.width(8.dp))
                                 DccButton("↑", small = true, enabled = i > 0) {
                                     val order = group.map { it.id }.toMutableList()
@@ -387,7 +387,7 @@ private fun TradeRow(p: Player, picked: Boolean, onClick: () -> Unit) {
                 RowTitle(p.name, c.ink, 14)
                 MetaText("${p.pos}${p.depth} · ${p.year}", c.ink3, 9)
             }
-            NumText("${p.ovr}", if (p.ovr >= 90) c.warn else c.ink2, 14)
+            NumText("${p.ovr}", if (p.ovr >= 90) c.ink else c.ink2, 14)
         }
     }
 }

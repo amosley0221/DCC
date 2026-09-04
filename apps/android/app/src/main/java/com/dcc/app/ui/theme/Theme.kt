@@ -16,6 +16,10 @@ import com.dcc.app.R
 /**
  * The token set from shared/tokens.json, expressed as Compose types. Both
  * themes ship; Night Wire is the default and the choice is a user setting.
+ *
+ * Night Wire is black / white / red. That departs from the original handoff,
+ * which specified a warm near-black with cream text and a brick accent — in use
+ * that palette read as brown and orange. Field Office keeps its warm identity.
  */
 @Immutable
 data class DccColors(
@@ -49,35 +53,36 @@ data class DccColors(
 )
 
 private val NightWire = DccColors(
-    bg0 = Color(0xFF131110),
-    bar = Color(0xFF0E0C0B),
-    surface = Color(0xFF171412),
-    surfaceLine = Color(0xFF262220),
-    line = Color(0xFF2A2624),
-    track = Color(0xFF2A2624),
-    rule = Color(0xFFEDE6DA),
-    ink = Color(0xFFEDE6DA),
-    ink2 = Color(0xFFB5ACA0),
-    ink3 = Color(0xFF8D857A),
-    ink4 = Color(0xFF6E675E),
-    accent = Color(0xFFB33A2B),
-    onAccent = Color(0xFFEDE6DA),
-    good = Color(0xFF7D8F6A),
-    warn = Color(0xFFC9873A),
-    btnBg = Color(0xFFEDE6DA),
-    btnInk = Color(0xFF131110),
-    btn2Line = Color(0xFF3C3733),
-    btn2Ink = Color(0xFF8D857A),
-    heroBg = Color(0xFF171412),
-    heroInk = Color(0xFFEDE6DA),
-    heroInk2 = Color(0xFFB5ACA0),
-    effectBg = Color(0xFF1E1A17),
-    effectInk = Color(0xFFC8BFB2),
-    heatBoxBg = Color(0xFF1E1613),
-    heatFill = Brush.horizontalGradient(listOf(Color(0xFFB33A2B), Color(0xFFB33A2B))),
+    bg0 = Color(0xFF000000),
+    bar = Color(0xFF080808),
+    surface = Color(0xFF121212),
+    surfaceLine = Color(0xFF262626),
+    line = Color(0xFF1E1E1E),
+    track = Color(0xFF1E1E1E),
+    rule = Color(0xFFFFFFFF),
+    ink = Color(0xFFFFFFFF),
+    ink2 = Color(0xFFC8C8C8),
+    ink3 = Color(0xFF8E8E8E),
+    ink4 = Color(0xFF5A5A5A),
+    accent = Color(0xFFDC2626),
+    onAccent = Color(0xFFFFFFFF),
+    good = Color(0xFF5FAF6E),
+    warn = Color(0xFFD9A441),
+    btnBg = Color(0xFFFFFFFF),
+    btnInk = Color(0xFF000000),
+    btn2Line = Color(0xFF333333),
+    btn2Ink = Color(0xFF9A9A9A),
+    heroBg = Color(0xFF121212),
+    heroInk = Color(0xFFFFFFFF),
+    heroInk2 = Color(0xFFC8C8C8),
+    effectBg = Color(0xFF141414),
+    effectInk = Color(0xFFD0D0D0),
+    heatBoxBg = Color(0xFF160A0A),
+    heatFill = Brush.horizontalGradient(listOf(Color(0xFFDC2626), Color(0xFFDC2626))),
+    // Neutral greys so avatars read as chrome, not as a second accent colour.
     tones = listOf(
-        Color(0xFF3D2F2A), Color(0xFF2F3A34), Color(0xFF33313F),
-        Color(0xFF3F382A), Color(0xFF2A3340), Color(0xFF3A2A33),
+        Color(0xFF1C1C1C), Color(0xFF222222), Color(0xFF191919),
+        Color(0xFF252525), Color(0xFF1F1F1F), Color(0xFF2A2A2A),
     ),
 )
 

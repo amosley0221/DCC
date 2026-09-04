@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import { Card, Kicker, Meta, SchoolBadge, SectionHeader, Tab } from '../ui'
 
 const TABS = ['TOP STORIES', 'SCORES', 'LEADERS', 'STANDINGS'] as const
 
 export default function National() {
-  const { dynasty, d } = useStore()
+  const { dynasty, d } = useDynasty()
   const [tab, setTab] = useState<(typeof TABS)[number]>('TOP STORIES')
 
   return (
@@ -61,7 +61,7 @@ export default function National() {
                     <span className="num" style={{ width: 16, color: 'var(--ink4)', fontSize: 11 }}>{i + 1}</span>
                     <span className="row-title" style={{ flex: 1 }}>{row.name}</span>
                     <Meta size={9.5}>{row.team}</Meta>
-                    <span className="num" style={{ color: 'var(--warn)', fontWeight: 600, minWidth: 46, textAlign: 'right' }}>
+                    <span className="num" style={{ color: 'var(--ink)', fontWeight: 600, minWidth: 46, textAlign: 'right' }}>
                       {row.value}
                     </span>
                   </div>

@@ -12,6 +12,7 @@ import Queue from './sections/Queue'
 import Export from './sections/Export'
 import Devices from './sections/Devices'
 import Settings from './sections/Settings'
+import NoDynasty from './sections/NoDynasty'
 import { Meta } from './ui'
 
 const SECTIONS = [
@@ -51,17 +52,19 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
           ))}
         </nav>
 
-        {/* Agent status: save verified / game running / relay + phone. */}
+        {/* Agent status. None of these are connected yet, and the strip says
+            so rather than showing green for something that does not exist. */}
         <div className="agent-strip">
           <div className="agent-row">
-            <span className="dot" style={{ background: 'var(--good)' }} />SAVE VERIFIED
+            <span className="dot" style={{ background: d ? 'var(--warn)' : 'var(--ink4)' }} />
+            {d ? 'SAVE NOT READ' : 'NO SAVE'}
           </div>
           <div className="agent-row">
-            <span className="dot" style={{ background: state.gameRunning ? 'var(--warn)' : 'var(--ink4)' }} />
-            {state.gameRunning ? 'GAME RUNNING' : 'GAME CLOSED'}
+            <span className="dot" style={{ background: 'var(--ink4)' }} />AGENT OFFLINE
           </div>
           <div className="agent-row">
-            <span className="dot" style={{ background: 'var(--good)' }} />RELAY · PHONE
+            <span className="dot" style={{ background: state.relayUrl ? 'var(--warn)' : 'var(--ink4)' }} />
+            {state.relayUrl ? 'RELAY UNREACHABLE' : 'NO RELAY'}
           </div>
         </div>
       </aside>
@@ -78,25 +81,43 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
           ) : update?.state === 'downloading' ? (
             <Meta size={9} color="var(--warn)">DOWNLOADING UPDATE {update.percent}%</Meta>
           ) : null}
-          <Meta size={9}>
-            HEAT {state.heat}
-            {state.heat >= sem.heat.threshold ? ' — CRITICAL' : ''}
-          </Meta>
-          <Meta size={9}>{d.userTeam.wins}–{d.userTeam.losses} · WK {state.week}</Meta>
+          {d ? (
+            <>
+              <Meta size={9}>
+                HEAT {state.heat}
+                {state.heat >= sem.heat.threshold ? ' — CRITICAL' : ''}
+              </Meta>
+              <Meta size={9}>{d.userTeam.wins}–{d.userTeam.losses} · WK {state.week}</Meta>
+            </>
+          ) : (
+            <Meta size={9}>NO DYNASTY LOADED</Meta>
+          )}
         </div>
 
         <div className="content">
           <div className="content-narrow">
-            {section === 'WIRE' ? <Wire /> : null}
-            {section === 'NATIONAL' ? <National /> : null}
-            {section === 'RECRUIT' ? <Recruit /> : null}
-            {section === 'TEAM' ? <Team /> : null}
-            {section === 'TAMPER' ? <Tamper /> : null}
-            {section === 'COACH' ? <Coach /> : null}
-            {section === 'QUEUE' ? <Queue /> : null}
-            {section === 'EXPORT' ? <Export /> : null}
-            {section === 'DEVICES' ? <Devices /> : null}
-            {section === 'SETTINGS' ? <Settings update={update} version={version} /> : null}
+            {/* Settings is always reachable; every other section needs a
+                dynasty to have anything to show. */}
+            {section === 'SETTINGS' ? (
+              <Settings update={update} version={version} />
+            ) : !d ? (
+              <NoDynasty
+                section={section.charAt(0) + section.slice(1).toLowerCase()}
+                onOpenSettings={() => setSection('SETTINGS')}
+              />
+            ) : (
+              <>
+                {section === 'WIRE' ? <Wire /> : null}
+                {section === 'NATIONAL' ? <National /> : null}
+                {section === 'RECRUIT' ? <Recruit /> : null}
+                {section === 'TEAM' ? <Team /> : null}
+                {section === 'TAMPER' ? <Tamper /> : null}
+                {section === 'COACH' ? <Coach /> : null}
+                {section === 'QUEUE' ? <Queue /> : null}
+                {section === 'EXPORT' ? <Export /> : null}
+                {section === 'DEVICES' ? <Devices /> : null}
+              </>
+            )}
           </div>
         </div>
       </main>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import type { Player, Story } from '../model'
 import { ROSTER_LIMIT, countColor, playerValue, tradeVerdict } from '../logic'
 import {
@@ -12,7 +12,7 @@ const CLASSES = ['FR', 'FR (RS)', 'SO', 'JR', 'SR']
 const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'OT', 'IOL', 'EDGE', 'DT', 'LB', 'CB', 'S', 'K', 'P']
 
 function TeamPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  const { dynasty } = useStore()
+  const { dynasty } = useDynasty()
   return (
     <select
       className="input"
@@ -30,7 +30,7 @@ function TeamPicker({ value, onChange }: { value: string; onChange: (id: string)
 }
 
 export default function Team() {
-  const { dynasty, state, dispatch, d } = useStore()
+  const { dynasty, state, dispatch, d } = useDynasty()
   const [tab, setTab] = useState<(typeof TABS)[number]>('SCHEDULE')
   const [teamId, setTeamId] = useState(dynasty.meta.userTeamId)
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null)
@@ -160,7 +160,7 @@ export default function Team() {
                     .filter((p) => !rosterQuery || p.name.toLowerCase().includes(rosterQuery.toLowerCase()) || p.pos.toLowerCase() === rosterQuery.toLowerCase())
                     .map((p) => (
                       <tr key={p.id} aria-selected={selectedPlayer === p.id} onClick={() => setSelectedPlayer(p.id)}>
-                        <td className="num" style={{ fontWeight: 600, fontSize: 14, color: p.ovr >= 90 ? 'var(--warn)' : 'var(--ink2)' }}>{p.ovr}</td>
+                        <td className="num" style={{ fontWeight: 600, fontSize: 14, color: p.ovr >= 90 ? 'var(--ink)' : 'var(--ink2)' }}>{p.ovr}</td>
                         <td>
                           <span className="row" style={{ gap: 8 }}>
                             <Portrait name={p.name} size={26} />
@@ -276,7 +276,7 @@ export default function Team() {
 // ── depth chart ───────────────────────────────────────────────────────────────
 
 function Depth({ teamId, pos, setPos }: { teamId: string; pos: string; setPos: (p: string) => void }) {
-  const { dispatch, d } = useStore()
+  const { dispatch, d } = useDynasty()
   const group = d.depthOf(teamId, pos)
 
   const move = (from: number, to: number) => {
@@ -315,7 +315,7 @@ function Depth({ teamId, pos, setPos }: { teamId: string; pos: string; setPos: (
             <Portrait name={p.name} size={26} />
             <span className="row-title" style={{ flex: 1, color: 'var(--ink)' }}>{p.name}</span>
             <Meta size={10}>{p.year} · {p.dev}</Meta>
-            <span className="num" style={{ fontWeight: 600, color: p.ovr >= 90 ? 'var(--warn)' : 'var(--ink2)' }}>{p.ovr}</span>
+            <span className="num" style={{ fontWeight: 600, color: p.ovr >= 90 ? 'var(--ink)' : 'var(--ink2)' }}>{p.ovr}</span>
             <div className="row" style={{ gap: 4 }}>
               <Btn size="sm" disabled={i === 0} onClick={() => move(i, i - 1)}>↑</Btn>
               <Btn size="sm" disabled={i === group.length - 1} onClick={() => move(i, i + 1)}>↓</Btn>
@@ -334,7 +334,7 @@ function TradePanel({ teamId, onPick, picked, projected }: {
   teamId: string; picked: Set<string>; projected: number
   onPick: (p: Player) => void
 }) {
-  const { d } = useStore()
+  const { d } = useDynasty()
   const team = d.teamsById.get(teamId)!
   const roster = d.rosterOf(teamId)
   return (
@@ -365,7 +365,7 @@ function TradePanel({ teamId, onPick, picked, projected }: {
               <span className="row-title" style={{ fontSize: 13, color: 'var(--ink)' }}>{p.name}</span>
               <Meta size={9.5}>{p.pos}{p.depth} · {p.year}</Meta>
             </span>
-            <span className="num" style={{ fontWeight: 600, color: p.ovr >= 90 ? 'var(--warn)' : 'var(--ink2)' }}>{p.ovr}</span>
+            <span className="num" style={{ fontWeight: 600, color: p.ovr >= 90 ? 'var(--ink)' : 'var(--ink2)' }}>{p.ovr}</span>
           </button>
         ))}
       </div>
@@ -374,7 +374,7 @@ function TradePanel({ teamId, onPick, picked, projected }: {
 }
 
 function Trade({ myTeamId }: { myTeamId: string }) {
-  const { dispatch, d, dynasty } = useStore()
+  const { dispatch, d, dynasty } = useDynasty()
   const [otherId, setOtherId] = useState(dynasty.teams.find((t) => !t.isUser)!.id)
   const [mine, setMine] = useState<Set<string>>(new Set())
   const [theirs, setTheirs] = useState<Set<string>>(new Set())

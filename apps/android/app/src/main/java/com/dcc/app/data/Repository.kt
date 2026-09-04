@@ -23,13 +23,13 @@ object Repository {
             json.decodeFromString(Dynasty.serializer(), stream.readBytes().decodeToString())
         }
 
-    fun loadState(context: Context, dynasty: Dynasty): Persisted {
+    fun loadState(context: Context): Persisted {
         val file = File(context.filesDir, STATE_FILE)
-        if (!file.exists()) return seed(dynasty)
+        if (!file.exists()) return Persisted()
         return runCatching { json.decodeFromString(Persisted.serializer(), file.readText()) }
             // A state file written by an older build should never brick the app;
-            // falling back to the seed is better than refusing to start.
-            .getOrElse { seed(dynasty) }
+            // starting empty beats refusing to start.
+            .getOrElse { Persisted() }
     }
 
     fun saveState(context: Context, state: Persisted) {
@@ -43,8 +43,11 @@ object Repository {
         File(context.filesDir, STATE_FILE).delete()
     }
 
+    /** Starting state for the bundled sample dynasty. */
     fun seed(dynasty: Dynasty) = Persisted(
+        dynastySource = "sample",
         week = dynasty.meta.currentWeek,
+        heat = 62,
         leaseHolder = dynasty.devices.holder,
         board = dynasty.seededBoard,
         log = listOf(LogLine(System.currentTimeMillis(), "relay connected — save verified on the PC", "good")),

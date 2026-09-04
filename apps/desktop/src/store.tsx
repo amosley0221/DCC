@@ -9,7 +9,32 @@ import { SEMANTICS } from './theme'
 
 // ── initial state ─────────────────────────────────────────────────────────────
 
+/** The state the app starts in: no dynasty, nothing to show. */
+export const blankPersisted = (): Persisted => ({
+  dynastySource: 'none',
+  relayUrl: '',
+  relayToken: '',
+  theme: 'night',
+  week: 1,
+  heat: 0,
+  gameRunning: true,
+  leaseHolder: 'gaming-pc',
+  queue: [],
+  storyStatus: {},
+  board: [],
+  playerOverrides: {},
+  prospectOverrides: {},
+  depthOverrides: {},
+  convos: {},
+  recaps: {},
+  extraStories: [],
+  log: [],
+})
+
+/** Starting state for the bundled sample dynasty. */
 export const emptyPersisted = (d: Dynasty): Persisted => ({
+  ...blankPersisted(),
+  dynastySource: 'sample',
   theme: 'night',
   week: d.meta.currentWeek,
   heat: 62,
@@ -49,6 +74,9 @@ export type Action =
   | { type: 'recap'; gameId: string; story: Story }
   | { type: 'log'; line: Omit<LogLine, 'at'> }
   | { type: 'reset'; dynasty: Dynasty }
+  | { type: 'loadSample'; dynasty: Dynasty }
+  | { type: 'clearDynasty' }
+  | { type: 'relay'; url: string; token: string }
 
 let seq = 0
 const nextId = () => `q${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -147,7 +175,13 @@ export function reducer(state: Persisted, action: Action): Persisted {
     case 'log':
       return { ...state, log: log(state, action.line.text, action.line.kind) }
     case 'reset':
-      return emptyPersisted(action.dynasty)
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, relayUrl: state.relayUrl, relayToken: state.relayToken }
+    case 'loadSample':
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, relayUrl: state.relayUrl, relayToken: state.relayToken }
+    case 'clearDynasty':
+      return { ...blankPersisted(), theme: state.theme, relayUrl: state.relayUrl, relayToken: state.relayToken }
+    case 'relay':
+      return { ...state, relayUrl: action.url, relayToken: action.token }
     default:
       return state
   }
@@ -217,10 +251,11 @@ function derive(d: Dynasty, s: Persisted): Derived {
 // ── context ───────────────────────────────────────────────────────────────────
 
 interface Ctx {
-  dynasty: Dynasty
+  dynasty: Dynasty | null
   state: Persisted
   dispatch: React.Dispatch<Action>
-  d: Derived
+  /** Null until a dynasty is loaded. */
+  d: Derived | null
   /** Heat threshold and stage sizes come from the shared token file. */
   sem: typeof SEMANTICS
 }
@@ -233,8 +268,19 @@ export function useStore(): Ctx {
   return ctx
 }
 
+/**
+ * For sections that only ever render with a dynasty loaded. The shell shows the
+ * empty state instead of mounting them, so this narrows the types in one place
+ * rather than every section asserting non-null.
+ */
+export function useDynasty(): Omit<Ctx, 'dynasty' | 'd'> & { dynasty: Dynasty; d: Derived } {
+  const ctx = useStore()
+  if (!ctx.dynasty || !ctx.d) throw new Error('useDynasty called with no dynasty loaded')
+  return ctx as Omit<Ctx, 'dynasty' | 'd'> & { dynasty: Dynasty; d: Derived }
+}
+
 export function StoreProvider({ dynasty, initial, children }: {
-  dynasty: Dynasty
+  dynasty: Dynasty | null
   initial: Persisted
   children: React.ReactNode
 }) {
@@ -250,7 +296,7 @@ export function StoreProvider({ dynasty, initial, children }: {
     return () => clearTimeout(t)
   }, [state])
 
-  const d = useMemo(() => derive(dynasty, state), [dynasty, state])
+  const d = useMemo(() => (dynasty ? derive(dynasty, state) : null), [dynasty, state])
   const value = useMemo(() => ({ dynasty, state, dispatch, d, sem: SEMANTICS }), [dynasty, state, d])
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
@@ -258,20 +304,22 @@ export function StoreProvider({ dynasty, initial, children }: {
 
 /** Loads the dynasty and any saved state before the app renders. */
 export function useBootstrap() {
-  const [boot, setBoot] = useState<{ dynasty: Dynasty; initial: Persisted } | null>(null)
+  const [boot, setBoot] = useState<{ dynasty: Dynasty | null; initial: Persisted } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
       try {
-        const dynasty = (await window.dcc.dynasty()) as Dynasty
         const saved = await window.dcc.getSettings()
-        const base = emptyPersisted(dynasty)
-        // Merge rather than replace, so a state file written by an older build
+        // Merge onto the blank state, so a state file written by an older build
         // still loads after an update adds new fields.
         const initial: Persisted = saved && typeof saved.theme === 'string'
-          ? { ...base, ...(saved as unknown as Persisted) }
-          : base
+          ? { ...blankPersisted(), ...(saved as unknown as Persisted) }
+          : blankPersisted()
+        // Nothing is read until a dynasty is actually in use.
+        const dynasty = initial.dynastySource === 'none'
+          ? null
+          : ((await window.dcc.dynasty()) as Dynasty)
         setBoot({ dynasty, initial })
       } catch (e) {
         setError(String((e as Error)?.message ?? e))

@@ -10,6 +10,29 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.2.0] - 2026-09-04
+
+### Changed
+
+- **Both apps now start empty.** They previously opened straight into a bundled
+  sample dynasty, which looked like real data and was not. Every section shows a
+  "no dynasty loaded" state until a save actually reaches the app, and the
+  sample is an explicit, clearly-labelled choice in Settings.
+- **Night Wire is black, white and red.** It was a warm near-black with cream
+  text and a brick accent, with amber on stars and ratings — which read as
+  brown and orange. Amber is now reserved for caution and held status; stars,
+  titles and first-round picks are red, and highlighted ratings are white.
+  Field Office keeps its warm palette.
+- Status indicators tell the truth. The desktop sidebar no longer reports
+  "save verified" and "relay · phone" in green when no agent, save or relay
+  exists, and the queue header no longer claims a PC is holding the save.
+
+### Added
+
+- A Relay card in Settings on both apps for the home-server address and pairing
+  token, with the state persisted. The relay service itself is not built yet and
+  the card says so.
+
 ## [0.1.1] - 2026-09-04
 
 ### Fixed

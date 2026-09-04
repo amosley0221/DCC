@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Tab, Toggle, Track } from '../ui'
 
 const STEPS = ['reading save…', 'resolving roster…', 'scrubbing identities…', 'mapping archetypes…', 'writing file…']
 
 export default function Export() {
-  const { dynasty, dispatch, d } = useStore()
+  const { dynasty, dispatch, d } = useDynasty()
   const [tab, setTab] = useState<'DRAFT CLASS' | 'PLAY NOW ROSTER'>('DRAFT CLASS')
   const [step, setStep] = useState(-1)
   const [result, setResult] = useState<string | null>(null)
@@ -91,10 +91,10 @@ export default function Export() {
                     <tr key={p.id}>
                       <td><span className="row-title" style={{ color: 'var(--ink)' }}>{p.name}</span></td>
                       <td className="num">{p.pos}</td>
-                      <td className="num" style={{ color: p.ovr >= 90 ? 'var(--warn)' : 'var(--ink2)' }}>{p.ovr}</td>
+                      <td className="num" style={{ color: p.ovr >= 90 ? 'var(--ink)' : 'var(--ink2)' }}>{p.ovr}</td>
                       <td className="num">{p.year}</td>
                       <td><Meta size={10}>{mapArchetypes ? p.archetype : '—'}</Meta></td>
-                      <td className="num" style={{ color: i < 3 ? 'var(--warn)' : 'var(--ink3)' }}>RD {i < 3 ? 1 : i < 8 ? 2 : Math.min(7, 3 + (i % 5))}</td>
+                      <td className="num" style={{ color: i < 3 ? 'var(--accent)' : 'var(--ink3)' }}>RD {i < 3 ? 1 : i < 8 ? 2 : Math.min(7, 3 + (i % 5))}</td>
                       <td><Meta size={10}>EXPORTS AS {scrubbed(p.name)}</Meta></td>
                     </tr>
                   ))}

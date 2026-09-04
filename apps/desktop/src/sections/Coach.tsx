@@ -1,8 +1,8 @@
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import { Btn, Card, Kicker, Meta, SectionHeader, Stat } from '../ui'
 
 export default function Coach() {
-  const { dynasty, dispatch } = useStore()
+  const { dynasty, dispatch } = useDynasty()
   const c = dynasty.coach
 
   const exportPage = async () => {
@@ -34,7 +34,7 @@ export default function Coach() {
 
       <div className="grid-3" style={{ maxWidth: 720, marginBottom: 14 }}>
         <Stat label="ALL-TIME RECORD" value={`${c.record.wins}–${c.record.losses}`} />
-        <Stat label="NATIONAL TITLES" value={c.titles} color="var(--warn)" />
+        <Stat label="NATIONAL TITLES" value={c.titles} color="var(--accent)" />
         <Stat label="PLAYERS DRAFTED" value={c.drafted} />
       </div>
 
@@ -63,7 +63,7 @@ export default function Coach() {
                 <div key={p.name} className="row" style={{ gap: 10 }}>
                   <span
                     className="num"
-                    style={{ width: 44, fontWeight: 600, color: p.round === 1 ? 'var(--warn)' : 'var(--ink3)' }}
+                    style={{ width: 44, fontWeight: 600, color: p.round === 1 ? 'var(--accent)' : 'var(--ink3)' }}
                   >
                     RD {p.round}
                   </span>
@@ -85,7 +85,7 @@ export default function Coach() {
                     className="mono"
                     style={{
                       width: 46, fontSize: 9, letterSpacing: 1.2, fontWeight: 600,
-                      color: h.tag === 'CHAMP' ? 'var(--good)' : h.tag === 'MILE' ? 'var(--warn)' : 'var(--ink3)',
+                      color: h.tag === 'CHAMP' ? 'var(--good)' : h.tag === 'MILE' ? 'var(--ink)' : 'var(--ink3)',
                     }}
                   >
                     {h.tag}

@@ -1,10 +1,10 @@
-import { useStore } from '../store'
+import { useDynasty } from '../store'
 import { Btn, Card, Kicker, Meta, SectionHeader } from '../ui'
 
 const THIS_MACHINE = 'gaming-pc'
 
 export default function Devices() {
-  const { dynasty, state, dispatch } = useStore()
+  const { dynasty, state, dispatch } = useDynasty()
   const holds = state.leaseHolder === THIS_MACHINE
   const holder = dynasty.devices.machines.find((m) => m.id === state.leaseHolder)
   const other = dynasty.devices.machines.find((m) => m.id !== THIS_MACHINE && m.id !== 'den-server')!
