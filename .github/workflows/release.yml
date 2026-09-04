@@ -1,15 +1,17 @@
 name: Release
 
-# Two ways in:
+# Three ways in:
 #   - push a v* tag (the normal flow, see docs/RELEASING.md)
-#   - run this workflow by hand on a branch, which creates the tag from the
-#     version already in package.json
+#   - run this workflow by hand from the Actions tab
+#   - push a commit whose message contains [release]
 #
-# Either way both apps are built and published to a GitHub Release with the
-# CHANGELOG section for that version as the notes.
+# The last two take the version from package.json and create the tag at the
+# commit they built. Either way both apps are built and published to a GitHub
+# Release with the CHANGELOG section for that version as the notes.
 on:
   push:
     tags: ['v*']
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
@@ -18,6 +20,12 @@ permissions:
 jobs:
   check:
     name: Check version
+    # An ordinary push must not publish anything: a branch push only releases
+    # when the commit says so.
+    if: >-
+      github.ref_type == 'tag' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[release]')
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}

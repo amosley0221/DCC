@@ -30,10 +30,15 @@ commits, and creates an annotated tag.
 
 ## Releasing without pushing a tag
 
-The workflow also runs from **Actions → Release → Run workflow** on any branch.
-It takes the version from `package.json`, builds both apps, and creates the
-`v<version>` tag at the commit it built. Use this to re-run a release, or when
-you cannot push tags from where you are working.
+Two other ways in, for when you cannot push a tag from where you are working, or
+you want to re-run a release:
+
+- **Actions → Release → Run workflow** on any branch.
+- Push a commit whose message contains `[release]`.
+
+Both take the version from `package.json`, build both apps, and create the
+`v<version>` tag at the commit they built. An ordinary push publishes nothing —
+the workflow only proceeds for a tag, a manual run, or a `[release]` commit.
 
 ## Where the version lives
 
