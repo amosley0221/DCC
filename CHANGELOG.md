@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.9.0] - 2026-09-04
+
 ### Added
 
 - **A Roster section.** Every player in your dynasty, sorted best first, filtered
