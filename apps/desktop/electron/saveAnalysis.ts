@@ -1027,6 +1027,63 @@ export const REDSHIRT_BIT = 1088
  */
 export const RECRUIT_BIT = 658
 
+/* ------------------------------------------------------------- recruiting */
+
+/**
+ * Fields solved against a 4,100-row export of the game's own recruiting class
+ * for the same save. Each was required to agree with every one of 4,026
+ * unambiguously named players — names occurring twice were dropped, since one
+ * bad pairing rejects a correct field — so these are readings, not fits.
+ *
+ * Not here: recruiting stage, gem/bust, commit score and total offers. Those
+ * change as recruiting happens and are not in the player record at all; they
+ * belong to a table DCC has not found yet.
+ */
+export const HEIGHT_BIT = 650        // inches, 7 bits, no offset
+export const WEIGHT_BIT = 365        // pounds, 8 bits, plus 160
+export const STARS_BIT = 1241        // 3 bits, plus 1
+export const NIL_BIT = 171           // $K, 9 bits, minus 255
+export const CLASS_YEAR_BIT = 1189   // 2 bits
+export const DEV_TRAIT_BIT = 322     // 2 bits
+export const STATE_BIT = 998         // 6 bits
+export const PIPELINE_BIT = 1037     // 6 bits
+export const DEALBREAKER_BIT = 867   // 4 bits
+export const PITCH_BIT = 1109        // 5 bits
+export const ARCHETYPE_BIT = 511     // 3 bits, read against the position
+
+export const CLASS_YEARS: (string | null)[] = ["HighSchool", "JuniorCollege_Sophomore", "JuniorCollege_Junior"]
+export const DEV_TRAITS: (string | null)[] = ["Normal", "Impact", "Star", "Elite"]
+export const HOME_STATES: (string | null)[] = ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "NewHampshire", "NewJersey", "NewMexico", "NewYork", "NorthCarolina", "NorthDakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "RhodeIsland", "SouthCarolina", null, "Tennessee", "Texas", "Utah", null, "Virginia", "Washington", "WestVirginia", "Wisconsin", "Wyoming"]
+export const PIPELINES: (string | null)[] = ["Alabama", "Arizona", "Arkansas", "Big Apple", "Big Sky", "Central Florida", "Colorado", "East Texas", "Hawaii", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Metro Atlanta", "Michigan", "Minnesota", "Mississippi", "Missouri", "Nebraska", "Nevada", "New England", "New Mexico", "North Carolina", "North Florida", "North Texas", "Northern California", "Ohio", "Oklahoma", "Pacific Northwest", "Pennsylvania", "South Carolina", "South Florida", "South Georgia", "Southern California", "Southwest Texas", "Tennessee", "Tidewater", "Utah", "West Virginia", "Wisconsin"]
+export const DEALBREAKERS: (string | null)[] = [null, null, "Brand Exposure", null, "Championship Contender", "Coach Prestige", null, "Conference Prestige", "Playing Style", "Playing Time", "Pro Potential", null, "Proximity to Home"]
+export const IDEAL_PITCHES: (string | null)[] = ["College Experience", "Team Player", "Campus Personality", "It's Game Time", "Prestigious", "Student of the Game", "Hometown Hero", "Prove Yourself", "The Clutch", "TV Time", "Coach's Favorite", "Aspirational", "To the House", "Football Influencer", "Time to Get to Work", "Starter", "Grassroots", "Conference Spotlight", "Sunday Bound", "Work Horse"]
+
+/** Archetype names are reused across positions, so the table is per position. */
+export const ARCHETYPES: Record<string, (string | null)[]> = {
+  "QB": ["Field General", null, "Improviser", "Scrambler", "Pure Scrambler"],
+  "HB": ["HB Power Blocking", "HB Power Receiving", "HB Elusive Power", null, null, "HB Power Back", "HB Elusive Back", "HB Receiving Back"],
+  "FB": [null, null, null, null, "FB Blocking", "FB Utility"],
+  "WR": ["Physical Route Runner", "Shifty Route Runner", "Physical Blocker", "Gadget Receiver", "Physical", null, "Deep Threat", "Playmaker"],
+  "TE": ["Physical Route Runner", "Possession Blocking", "Possession", null, null, null, "Blocking", "Vertical Threat"],
+  "LT": ["Power", "Well Rounded", "Agile", null, null, null, null, "Pass Protector"],
+  "LG": [null, null, null, "G Pass Protector", "G Well Rounded", "G Power", "G Agile"],
+  "C": [null, null, null, "Pass Protector", "Power", "Well Rounded", "Agile"],
+  "RG": [null, null, null, "G Pass Protector", "G Well Rounded", "G Power", "G Agile"],
+  "RT": ["Power", "Well Rounded", "Agile", null, null, null, null, "Pass Protector"],
+  "LE": ["Power Rusher", "Pure Power", "Run Stopper", null, null, null, null, "Smaller Speed Rusher"],
+  "RE": ["Power Rusher", "Pure Power", "Run Stopper", null, null, null, null, "Smaller Speed Rusher"],
+  "DT": [null, null, null, "Nose Tackle", "Pure Power", "Speed Rusher", "Power Rusher"],
+  "LOLB": ["Power Rusher", "Pass Coverage", "Run Stopper"],
+  "MLB": [null, null, null, "Field General", "Pass Coverage", "Run Stopper"],
+  "ROLB": ["Power Rusher", "Pass Coverage", "Run Stopper"],
+  "CB": ["Zone", "Hybrid Corner", null, null, null, null, "Manto Man", "Slot"],
+  "FS": [null, null, "Zone", "Hybrid", "Run Support"],
+  "SS": [null, null, "Zone", "Hybrid", "Run Support"],
+  "K": [null, null, null, null, null, "KP Accurate", "KP Power"],
+  "P": [null, null, null, null, null, "KP Accurate", "KP Power"],
+}
+
+
 /**
  * Position, a 5-bit field. Its 21 values partition the league exactly the way
  * football does: value 0 averages 85 Throwing Power, 5–9 average 82 Strength
@@ -1112,8 +1169,19 @@ export interface RosterPlayer {
   /** The save's own team id. TEAM_UNASSIGNED means recruit or portal. */
   team: number
   redshirt: boolean
-  /** See RECRUIT_BIT — provisional, and only meaningful for the unrostered. */
+  /** See RECRUIT_BIT — only meaningful for the unrostered. */
   recruitFlag: boolean
+  heightIn: number
+  weightLb: number
+  stars: number
+  nilK: number
+  classYear: string | null
+  devTrait: string | null
+  homeState: string | null
+  pipeline: string | null
+  dealbreaker: string | null
+  idealPitch: string | null
+  archetype: string | null
   ratings: Record<string, number>
 }
 
@@ -1168,6 +1236,17 @@ export function readRoster(payload: Buffer): RosterPlayer[] {
       overall: bits(payload, base, OVERALL_BIT, 7),
       redshirt: bits(payload, base, REDSHIRT_BIT, 1) === 1,
       recruitFlag: bits(payload, base, RECRUIT_BIT, 1) === 1,
+      heightIn: bits(payload, base, HEIGHT_BIT, 7),
+      weightLb: bits(payload, base, WEIGHT_BIT, 8) + 160,
+      stars: bits(payload, base, STARS_BIT, 3) + 1,
+      nilK: bits(payload, base, NIL_BIT, 9) - 255,
+      classYear: CLASS_YEARS[bits(payload, base, CLASS_YEAR_BIT, 2)] ?? null,
+      devTrait: DEV_TRAITS[bits(payload, base, DEV_TRAIT_BIT, 2)] ?? null,
+      homeState: HOME_STATES[bits(payload, base, STATE_BIT, 6)] ?? null,
+      pipeline: PIPELINES[bits(payload, base, PIPELINE_BIT, 6)] ?? null,
+      dealbreaker: DEALBREAKERS[bits(payload, base, DEALBREAKER_BIT, 4)] ?? null,
+      idealPitch: IDEAL_PITCHES[bits(payload, base, PITCH_BIT, 5)] ?? null,
+      archetype: (ARCHETYPES[POSITIONS[bits(payload, base, POSITION_BIT, 5)] ?? ''] ?? [])[bits(payload, base, ARCHETYPE_BIT, 3)] ?? null,
       ratings,
     })
   }

@@ -10,6 +10,29 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.18.0] - 2026-09-04
+
+### Added
+
+- **Recruits carry their real details now:** star rating, archetype, class
+  year, development trait, height, weight, home state, pipeline, NIL demand,
+  dealbreaker and ideal pitch. Filter by stars, search by town, state, pipeline
+  or archetype, and open a recruit for the rest.
+
+  Each of these was solved against a 4,100-row export of the game's own class
+  for the same save, and each agrees with it on all 4,026 recruits whose names
+  are unambiguous — exactly, not approximately.
+
+  The same export confirmed two things from outside this project. Bit 658, which
+  0.17.3 shipped as provisional, keeps all 4,100 of the class and admits 8 that
+  are not: 99.82%. And the rating map is right — overall, position, hometown and
+  every rating the export carries agree on 4,068 of 4,100, the 32 exceptions
+  being duplicate names paired to the wrong record.
+
+  Recruiting stage, gem/bust, commit score and total offers are still absent.
+  They are not in the player record at all.
+
+
 ## [0.17.3] - 2026-09-04
 
 ### Fixed

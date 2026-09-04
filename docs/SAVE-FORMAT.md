@@ -676,3 +676,41 @@ What this needs is ground truth from a single save: the list of who is actually
 a prospect, with stars and class, alongside the save itself. That is how the 53
 ratings were solved, and guessing has been worse than useless everywhere it has
 been tried here.
+
+## Recruiting fields
+
+Solved against a 4,100-row export of the game's own recruiting class for the
+same save. Every field had to agree with all 4,026 unambiguously named players
+— names occurring twice were dropped, because a single bad pairing rejects a
+correct field — so these are readings rather than fits.
+
+| Field | Bit | Width | Note |
+| --- | --- | --- | --- |
+| Height | 650 | 7 | inches |
+| Weight | 365 | 8 | plus 160 |
+| Stars | 1241 | 3 | plus 1 |
+| NIL demand | 171 | 9 | $K, minus 255 |
+| Class year | 1189 | 2 | HighSchool, JuniorCollege_Sophomore, JuniorCollege_Junior |
+| Development trait | 322 | 2 | Normal, Impact, Star, Elite |
+| Home state | 998 | 6 | 48 values |
+| Pipeline | 1037 | 6 | 42 values |
+| Dealbreaker | 867 | 4 | 8 values |
+| Ideal pitch | 1109 | 5 | 20 values |
+| Archetype | 511 | 3 | read against the position — the names are reused |
+
+The same export settled bit 658: of 4,528 unrostered generated players it keeps
+all 4,100 in the class, misses none, and admits 8 that are not, which is 99.82%
+against a source that had no part in finding it.
+
+It also confirmed the rating map from outside this project for the first time.
+Overall, position, hometown and every rating the export carries — Speed,
+Acceleration, Agility, Strength, Awareness, Jumping — agree on 4,068 of 4,100,
+the 32 exceptions being duplicate names paired to the wrong record.
+
+### Still missing
+
+Recruiting **stage**, **gem/bust**, **commit score** and **total offers** are
+not in the player record. They change while recruiting happens, and they live
+in a table DCC has not found. Searching for that table by tracing a prospect's
+record index at a constant stride found nothing byte-aligned; it is presumably
+bit-packed like the rest of this format.

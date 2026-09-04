@@ -105,6 +105,7 @@ export default function RecruitSave() {
     } })
   }
   const [group, setGroup] = useState('ALL')
+  const [stars, setStars] = useState<number | null>(null)
   const [kind, setKind] = useState<Kind>('RECRUITS')
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<number | null>(null)
@@ -128,9 +129,11 @@ export default function RecruitSave() {
     const want = GROUPS.find(([g]) => g === group)?.[1] ?? []
     return pool
       .filter((p) => (want.length === 0 || want.includes(p.position)) &&
-        (!q || `${p.first} ${p.last} ${p.hometown} ${p.position}`.toLowerCase().includes(q)))
-      .sort((a, b) => b.overall - a.overall)
-  }, [pool, group, query])
+        (stars === null || p.stars === stars) &&
+        (!q || `${p.first} ${p.last} ${p.hometown} ${p.homeState ?? ''} ${p.pipeline ?? ''} ` +
+          `${p.archetype ?? ''} ${p.position}`.toLowerCase().includes(q)))
+      .sort((a, b) => b.stars - a.stars || b.overall - a.overall)
+  }, [pool, group, query, stars])
 
   const load = async () => {
     if (!save.path) return
@@ -221,8 +224,17 @@ export default function RecruitSave() {
         ))}
       </div>
 
+      <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
+        <Chip on={stars === null} onClick={() => setStars(null)}>ALL STARS</Chip>
+        {[5, 4, 3, 2, 1].map((n) => (
+          <Chip key={n} on={stars === n} onClick={() => setStars(stars === n ? null : n)}>
+            {n}★ {pool.filter((p) => p.stars === n).length.toLocaleString()}
+          </Chip>
+        ))}
+      </div>
+
       <div style={{ marginTop: 10 }}>
-        <Input placeholder="search name, hometown or position"
+        <Input placeholder="search name, town, state, pipeline or archetype"
           value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
 
@@ -265,14 +277,37 @@ function RecruitRow(
         }}>
         <Face file={face} first={p.first} last={p.last} />
         <span style={{ width: 34, color: 'var(--ink3)', fontSize: 12 }}>{p.position}</span>
+        <span style={{ width: 46, color: 'var(--accent)', fontSize: 11, letterSpacing: -1 }}>
+          {'★'.repeat(p.stars)}
+        </span>
         <span style={{ flex: 1 }}>{p.first} {p.last}</span>
-        <span style={{ color: 'var(--ink3)', fontSize: 12 }}>{p.hometown}</span>
+        <span style={{ color: 'var(--ink3)', fontSize: 12 }}>{p.archetype ?? ''}</span>
+        <span style={{ width: 150, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
+          {p.hometown}{p.homeState ? `, ${p.homeState}` : ''}
+        </span>
         <span style={{ width: 30, textAlign: 'right', color: ovrColour(p.overall), fontWeight: 600 }}>
           {p.overall}
         </span>
       </button>
       {open && (
-        <div className="row" style={{ gap: 10, flexWrap: 'wrap', padding: '6px 8px 10px 44px' }}>
+        <div className="col" style={{ gap: 8, padding: '6px 8px 10px 44px' }}>
+          <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+            {([
+              ['CLASS', p.classYear],
+              ['DEV', p.devTrait],
+              ['HEIGHT', `${Math.floor(p.heightIn / 12)}'${p.heightIn % 12}"`],
+              ['WEIGHT', `${p.weightLb} lb`],
+              ['PIPELINE', p.pipeline],
+              ['NIL', `$${p.nilK}K`],
+              ['DEALBREAKER', p.dealbreaker],
+              ['PITCH', p.idealPitch],
+            ] as [string, string | null][]).map(([k, v]) => v == null ? null : (
+              <Chip key={k} on={false}>
+                <span style={{ color: 'var(--ink3)' }}>{k}</span> {v}
+              </Chip>
+            ))}
+          </div>
+          <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
           {ratingNames.map((n) => {
             const v = p.ratings[n]
             return v === undefined ? null : (
@@ -281,6 +316,7 @@ function RecruitRow(
               </Chip>
             )
           })}
+          </div>
         </div>
       )}
     </div>
