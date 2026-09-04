@@ -8,7 +8,25 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **A Roster section.** Every player in your dynasty, sorted best first, filtered
+  by position, searchable by name. Click anyone for their full card — all 53
+  ratings with bars. The position counts are live: 955 quarterbacks, 2,325 wide
+  receivers, 322 kickers.
+- **Position and overall are decoded.** Position is a 21-value field, and each
+  group profiles exactly as it should — the five offensive line slots average 82
+  Strength and 76 Pass Blocking, the two kicker slots average 82 Kicking Power
+  and nothing else above 40. Overall tracks whichever ratings its position is
+  judged on, plus Awareness throughout.
+
+### Changed
+
+- **Empty sections say what they are actually waiting for.** They used to blame
+  a missing save agent, which is no longer true — the app reads the save
+  directly. Each one now names the specific piece of the format it still needs:
+  Team wants the player→team link, Wire wants the storyline objects, Tamper
+  wants writing, which is deliberately not attempted yet.
 
 ## [0.8.4] - 2026-09-04
 

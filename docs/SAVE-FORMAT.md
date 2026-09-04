@@ -399,12 +399,56 @@ Speed/Change of Direction. Reading a player is unaffected — both numbers are
 right, only which name goes on which is open. One more single-rating edit to
 either member of a pair settles it.
 
+### Position, and an overall
+
+Two more fields fell out once the rating block was known.
+
+**Position** is a 5-bit field ending at bit **1010**, with exactly 21 values —
+the size of an EA depth chart. Grouping the league by it produces football:
+
+| Code | | Mean of the group |
+| --- | --- | --- |
+| 0 | QB | Throwing Power 85, everything else ordinary |
+| 5–9 | LT LG C RG RT | Strength 82, Pass Blocking 76, Speed 63 |
+| 10–12 | LE RE DT | Tackling 76, Block Shedding 71 |
+| 16–18 | CB FS SS | Speed 86, Man Coverage 68 |
+| 19–20 | K P | Kicking Power 82, and nothing else above 40 |
+
+**Overall** is a 7-bit field ending at bit **561**. What identifies it is that
+for *every* position it tracks the ratings that position is judged on —
+Catching 0.75 for tight ends, Run Blocking 0.75 for tackles, Tackling 0.81 for
+defensive tackles, Kicking Power 0.87 for kickers, Man Coverage 0.79 for
+safeties — plus Awareness between 0.77 and 0.89 throughout, which is how EA's
+overall behaves. League mean 68.9, range 40–99.
+
+Both are confirmed from outside the file: sorting the league by overall returns
+real, correctly-ranked players at their real positions and hometowns — Keelon
+Russell QB Duncanville, CJ Carr QB Saline, Bryce Underwood QB Detroit, Malachi
+Toney WR. None of that went into deriving either field.
+
+### Tried and rejected: a team field on the player
+
+A 9-bit field ending at bit **235** looks like the team and is not good enough
+to use. It scores 85.8% precision and 77.1% recall against the team in the
+asset id, its big buckets are unmistakably rosters — bucket 4 is 99% one team,
+bucket 51 is 98% — and it is not an index artefact: its buckets span the whole
+array (median span 16,004 of 17,470 slots) and correlate with the array index
+at r=0.096.
+
+But only 84 of its 512 buckets hold 60 or more players, where 240 teams need
+240 rosters, and widening the window in either direction does not improve
+either score. Something team-shaped is in there; a usable team id is not.
+
+A first attempt scored it at 86.8% "purity" and looked much better than it is.
+That metric counted, for each bucket, the share belonging to its majority team —
+which a field that shatters every team into singletons passes perfectly.
+Measuring recall as well, and checking bucket sizes against roster sizes, is
+what exposed it.
+
 ### Still unmapped
 
-Position and class year are not in the rating block. Neither is the
-authoritative player→team link: it is not a plain integer anywhere in the
-192-byte record, though the asset id supplies a team for the 11,804 generated
-players.
+Class year, the schedule, standings, the recruiting board and coach records are
+all still unread, along with the player→team link above.
 
 ### What this buys immediately
 

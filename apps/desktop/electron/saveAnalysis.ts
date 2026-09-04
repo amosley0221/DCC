@@ -1007,6 +1007,25 @@ export const RECORD_BASE = 65890
 export const REDSHIRT_BIT = 1088
 
 /**
+ * Position, a 5-bit field. Its 21 values partition the league exactly the way
+ * football does: value 0 averages 85 Throwing Power, 5–9 average 82 Strength
+ * and 76 Pass Blocking, 19–20 average 82 Kicking Power and nothing else.
+ */
+export const POSITION_BIT = 1010
+export const POSITIONS = [
+  'QB', 'HB', 'FB', 'WR', 'TE', 'LT', 'LG', 'C', 'RG', 'RT',
+  'LE', 'RE', 'DT', 'LOLB', 'MLB', 'ROLB', 'CB', 'FS', 'SS', 'K', 'P',
+]
+
+/**
+ * Overall. For every position it tracks the ratings that position is judged on
+ * — Catching for tight ends, Run Blocking for tackles, Kicking Power for
+ * kickers, Man Coverage for safeties — and Awareness throughout, which is how
+ * EA's overall behaves. League mean 68.9, range 40–99.
+ */
+export const OVERALL_BIT = 561
+
+/**
  * Ratings are 7-bit fields packed most-significant-bit first; the number here
  * is the bit the field ends on. Every one was checked against a real rating
  * card, and no player in the file falls outside 1–99 on any of them.
@@ -1048,8 +1067,14 @@ export interface RosterPlayer {
   last: string
   hometown: string
   assetId: string
-  /** Present for generated players, whose asset id carries it. */
+  /**
+   * The team the player was *generated* for, from the asset id — not
+   * necessarily where they play now, and absent for the 4,644 unique players.
+   * The save's own team field is not resolved; see docs/SAVE-FORMAT.md.
+   */
   teamId: string | null
+  position: string
+  overall: number
   redshirt: boolean
   ratings: Record<string, number>
 }
@@ -1100,6 +1125,8 @@ export function readRoster(payload: Buffer): RosterPlayer[] {
       hometown: text(payload, n + 112, 26),
       assetId,
       teamId: team ? team[1] : null,
+      position: POSITIONS[bits(payload, base, POSITION_BIT, 5)] ?? '—',
+      overall: bits(payload, base, OVERALL_BIT, 7),
       redshirt: bits(payload, base, REDSHIRT_BIT, 1) === 1,
       ratings,
     })

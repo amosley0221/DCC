@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect } from 'react'
 import { useStore } from '../store'
 import { useSave } from '../saveStore'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
@@ -15,7 +15,6 @@ export default function Save() {
   const { save, patch } = useSave()
   const { path, report, busy, error, backup, diff, diffing, scan, scanning, dict, dictResult, restoring } = save
   const { roster, rosterBusy } = save
-  const [query, setQuery] = useState('')
 
   const setPath = (v: typeof path) => patch({ path: v })
   const setReport = (v: typeof report) => patch({ report: v })
@@ -93,15 +92,6 @@ export default function Save() {
       void window.dcc.dictionaryState().then(setDict)
     }
   }
-
-  const matches = useMemo(() => {
-    if (!roster) return []
-    const q = query.trim().toLowerCase()
-    const list = q
-      ? roster.players.filter((p) => (p.first + ' ' + p.last).toLowerCase().includes(q))
-      : roster.players
-    return list.slice(0, 12)
-  }, [roster, query])
 
   const loadRoster = async () => {
     if (!path) return
@@ -226,58 +216,35 @@ export default function Save() {
               {backup ? <div className="effect" style={{ marginTop: 10 }}>BACKED UP TO {backup}</div> : null}
             </Card>
 
-          <Card className="card-pad">
-            <Kicker>Roster</Kicker>
-            {!roster ? (
-              <>
-                <p className="body-serif" style={{ marginTop: 7 }}>
-                  Names, hometowns, redshirt status and all 53 ratings, read straight out of the
-                  save. Ratings are 7-bit fields whose positions were worked out from controlled
-                  edits and checked against a real rating card.
-                </p>
-                <Btn variant="primary" onClick={loadRoster} disabled={rosterBusy}>
-                  {rosterBusy ? 'Reading…' : 'Read the roster'}
-                </Btn>
-              </>
-            ) : (
-              <>
-                <div className="grid-3" style={{ marginTop: 10 }}>
-                  <div><Meta size={9}>PLAYERS</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{roster.count.toLocaleString()}</div></div>
-                  <div><Meta size={9}>RATINGS EACH</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{roster.ratingNames.length}</div></div>
-                  <div><Meta size={9}>REDSHIRTED</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{roster.players.filter((p) => p.redshirt).length.toLocaleString()}</div></div>
-                </div>
-                <input
-                  className="input mono"
-                  style={{ marginTop: 12, width: '100%' }}
-                  placeholder="search by name"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <div style={{ marginTop: 10 }}>
-                  {matches.length === 0 ? <Empty>no player by that name</Empty> : null}
-                  {matches.map((p) => (
-                    <div key={p.index} style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 8 }}>
-                      <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
-                        <strong style={{ color: 'var(--ink)' }}>{p.first} {p.last}</strong>
-                        <Meta size={9}>{p.hometown}</Meta>
-                        {p.teamId ? <Meta size={9}>TEAM {p.teamId}</Meta> : null}
-                        {p.redshirt ? <Meta size={9} color="var(--warn)">REDSHIRT</Meta> : null}
-                      </div>
-                      <div className="mono" style={{ fontSize: 10, color: 'var(--ink3)', marginTop: 5, lineHeight: 1.7 }}>
-                        {roster.ratingNames.map((n) => n + ' ' + p.ratings[n]).join('  ·  ')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="body-serif" style={{ marginTop: 12, marginBottom: 0, color: 'var(--ink3)' }}>
-                  Five pairs sit at known positions but could be labelled the other way round —
-                  within each, the two ratings behave almost identically across the league, so
-                  nothing in the file separates them:{' '}
-                  {roster.unverifiedPairs.map((p) => p.join(' / ')).join(', ')}.
-                </p>
-              </>
-            )}
-          </Card>
+            <Card className="card-pad">
+              <Kicker>Roster</Kicker>
+              {!roster ? (
+                <>
+                  <p className="body-serif" style={{ marginTop: 7 }}>
+                    Names, hometowns, positions, overalls, redshirt status and all 53 ratings, read
+                    straight out of the save. Ratings are 7-bit fields whose positions were worked
+                    out from controlled edits and checked against a real rating card.
+                  </p>
+                  <Btn variant="primary" onClick={loadRoster} disabled={rosterBusy}>
+                    {rosterBusy ? 'Reading…' : 'Read the roster'}
+                  </Btn>
+                </>
+              ) : (
+                <>
+                  <div className="grid-3" style={{ marginTop: 10 }}>
+                    <div><Meta size={9}>PLAYERS</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{roster.count.toLocaleString()}</div></div>
+                    <div><Meta size={9}>RATINGS EACH</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{roster.ratingNames.length}</div></div>
+                    <div><Meta size={9}>REDSHIRTED</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{roster.players.filter((p) => p.redshirt).length.toLocaleString()}</div></div>
+                  </div>
+                  <p className="body-serif" style={{ marginTop: 10, marginBottom: 0 }}>
+                    Browse them in the Roster section. Five rating pairs sit at known positions but
+                    could be labelled the other way round — within each, the two behave almost
+                    identically across the league, so nothing in the file separates them:{' '}
+                    {roster.unverifiedPairs.map((p) => p.join(' / ')).join(', ')}.
+                  </p>
+                </>
+              )}
+            </Card>
 
             {report.zstd ? (
               <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
