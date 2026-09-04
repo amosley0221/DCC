@@ -751,7 +751,34 @@ follow, all negative:
 The payloads also differ in length by 540 bytes, so raw byte diffing shifts out
 of alignment partway through and cannot be trusted on its own.
 
-What is left is a structure that is bit-packed and not in prospect order. The
-way in is a diff with **one** change: 1,275 simultaneous changes leave too many
-candidate regions, while a single prospect gaining a single offer would leave
-almost nothing else moving, which pins the row and gives up its neighbours.
+### One scholarship: 52 bytes
+
+Two saves differing only by one scholarship offer differ by **52 bytes in 12
+clusters**, and the payloads are the same length, so every offset lines up.
+That one experiment says more than the week-advance did.
+
+**No player record changed at all.** Not by search this time, by experiment: an
+offer touches nothing in the 192-byte record.
+
+**The save addresses rows by handle, not by offset.** Every structure that
+moved is built from 4-byte handles — a 16-bit table tag and a 16-bit row index.
+Tags seen in the changed clusters alone: `0x209a`, `0x213e`, `0x2160`, `0x2172`,
+`0x219c`, `0x2d5c`, `0x2dc4`, `0x2dce`. This is why every earlier search failed.
+There is no flat array in prospect order to find; there are tables joined by
+handles, and a prospect's recruiting state is reached by following one.
+
+**The offer itself is an append.** At `0x14bb110` a counter goes 37 → 38, and
+immediately after it a list of 4-byte handles runs `0x21600005` … `0x2160002a`,
+with `0x2160002a` newly written at the end. One offer, one appended handle into
+table `0x2160`.
+
+A second list, of `0x209a` handles at `0x18e2087`, was **reordered** — one
+element moved to the end — which looks like a board or priority ordering rather
+than a value.
+
+What is still missing is the row data behind handle `0x2160002a`. The handle
+appears nowhere else in the payload, so rows are addressed by computed offset
+from a table base, and the area around the other writes is zero-filled rather
+than a run of populated rows. Pinning it needs the class export for the *after*
+save: knowing which prospect gained the offer turns every one of these 12
+clusters from an anonymous change into a labelled one.
