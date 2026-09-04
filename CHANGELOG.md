@@ -10,6 +10,18 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.17.2] - 2026-09-04
+
+### Fixed
+
+- **Recruit shows recruits.** The tab is `RECRUITS` again, and it is now backed
+  by evidence rather than by a guess: checked against a class list from the same
+  save, 28 confirmed recruits all carry a generated face and 10 confirmed
+  departed players all carry an authored one, with no errors either way. The
+  0.17.1 wording hedged this on the strength of two outliers, which
+  under-reported what the split actually does.
+
+
 ## [0.17.1] - 2026-09-04
 
 ### Fixed

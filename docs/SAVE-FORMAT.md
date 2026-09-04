@@ -612,14 +612,25 @@ Every player the save leaves off a roster — the 138 schools hold exactly 85
 each — lands in one pool of about 4,700. It contains three kinds of people:
 recruits, players in the portal, and players who have left.
 
-The asset id separates most of them. Real players carry an authored `Unique_`
-face and generated players a `Generic_` one, which in one Penn State save is
-180 against 4,528. That is what put Malachi Toney at 99 and Jadan Baugh at 95
-on top of a list of supposed recruits.
+The asset id separates them. Real players carry an authored `Unique_` face and
+generated players a `Generic_` one, which in one Penn State save is 180 against
+4,528. That is what put Malachi Toney at 99 and Jadan Baugh at 95 on top of a
+list of supposed recruits.
 
-It does not separate all of them. A generated player who has left keeps a
-generated face, and those rate above any real prospect: 89 and 86 in that save
-against a best recruit of 83.
+Validated against a class list from the same save, on 38 labelled players:
+
+| | Labelled | Asset id |
+| --- | --- | --- |
+| In the recruiting class | 28 | all `Generic_` |
+| Flagged as not a recruit | 10 | all `Unique_` |
+
+No errors in either direction. Examples: `Unique_PiercePayton_5831` and
+`Unique_PruittCam_22469` against `Generic_4202_P_T0198_M_8_1` (Moses Beckner,
+the top recruit).
+
+A residual remains. Two generated players in that save rate 89 and 86 against a
+best real recruit of 83, and the generated pool is 4,528 where the class list
+counts 4,100.
 
 ### A prospect flag: looked for, not found
 
