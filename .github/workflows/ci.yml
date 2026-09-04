@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
 
@@ -53,6 +53,35 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
           xvfb-run -a ./node_modules/electron/dist/electron smoke.cjs --no-sandbox
         working-directory: apps/desktop
+
+  installer:
+    name: Windows installer (package)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - run: npm ci
+        working-directory: apps/desktop
+
+      - name: Package the installer
+        working-directory: apps/desktop
+        run: npm run dist
+
+      - name: Check the installer and its updater manifest exist
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          # Packaging is the step that a toolchain upgrade breaks, and until now
+          # it only ran at release time — where a failure means a tag with no
+          # artifacts behind it. Building it on every push moves that discovery
+          # to the commit that causes it.
+          ls -l release/*.exe release/latest.yml
+          test -s release/latest.yml
 
   android:
     name: Android (assemble)
