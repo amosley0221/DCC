@@ -4,7 +4,8 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from
 import { autoUpdater } from 'electron-updater'
 import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
-  checkDictionary, decodeFrames, autoFindDictionary,
+  checkDictionary, decodeFrames, autoFindDictionary, readRoster,
+  RATING_BITS, RATING_PAIRS_UNVERIFIED,
 } from './saveAnalysis'
 
 const isDev = !app.isPackaged
@@ -182,6 +183,25 @@ ipcMain.handle('save:pick', async () => {
 ipcMain.handle('save:analyze', (_e, path: string) => {
   try {
     return { ok: true as const, report: analyzeSave(path) }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:roster', (_e, path: string) => {
+  try {
+    const payload = readSavePayload(path)
+    if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
+    const players = readRoster(payload)
+    // The renderer only ever shows a page at a time; sending 16,000 full rating
+    // sets across the bridge would cost more than reading the save did.
+    return {
+      ok: true as const,
+      count: players.length,
+      ratingNames: Object.keys(RATING_BITS),
+      unverifiedPairs: RATING_PAIRS_UNVERIFIED,
+      players,
+    }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

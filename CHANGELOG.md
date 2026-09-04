@@ -8,6 +8,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **DCC reads your roster.** Every player in the save — 16,448 of them — with
+  name, hometown, redshirt status and all 53 ratings, in about a fifth of a
+  second. The Save section has a searchable list; look up any player and see
+  their card as the game has it.
+
 ### Changed
 
 - **The analysis notes no longer warn about a dictionary you already have.**

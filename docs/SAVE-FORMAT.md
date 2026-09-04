@@ -333,18 +333,78 @@ Byte 136 changed `0x80 → 0x00`, which most-significant-first is record bit
 Priester's redshirt comes off in the second save and Scroggins's in the third,
 matching how the saves were taken.
 
-### Still unmapped, and what would settle it
+### The rating map
 
-The rating block is located but only two of its fields are named. Labelling the
-rest needs one thing: a player's rating card as the game shows it. With ~59
-values to match against ~59 fields, and values as distinctive as 98, 23, 91, 43,
-the assignment is essentially unique — one screenshot of Peyton Falzone's
-ratings would name the whole block in a single pass, no further save pairs
-needed.
+Peyton Falzone's card, read off the game in TEST5, gave 53 known values against
+the record. Positions follow from four constraints, none of them guesswork:
 
-Position and class year are not in the rating block and are still unknown, as is
-the authoritative player→team link — it is not a plain integer anywhere in the
-192-byte record.
+1. The 7-bit value at that position must equal the card value.
+2. It must never exceed 99 for any of the 16,448 players.
+3. Fields are 7 bits, so no two may sit within 7 bits of each other.
+4. Acceleration is 504 and Strength 824, fixed by the controlled edits.
+
+That leaves 37 ratings pinned to exactly one position. The rest were ties
+between ratings sharing a value, and the league itself separates those: Spin
+Move tracks Juke Move at r=0.91, Pass Block Power tracks Pass Block Finesse at
+0.91, Zone Coverage tracks Man Coverage at 0.85, Break Sack tracks Throwing
+Power at 0.68 while the other candidates sit near zero.
+
+| Bit | Rating | Bit | Rating |
+| --- | --- | --- | --- |
+| 294 | Deep Route Running | 746 | Injury |
+| 490 | Agility | 753 | Impact Blocking |
+| 497 | Play Action | 778 | Deep Throw Accuracy |
+| 504 | **Acceleration** | 785 | Short Throw Accuracy |
+| 522 | Pass Block Power | 799 | Medium Throw Accuracy |
+| 536 | Awareness | 810 | Throw on the Run |
+| 543 | Pass Blocking | 817 | Trucking |
+| 560 | Release | 824 | **Strength** |
+| 568 | Pass Block Finesse | 831 | Tackling |
+| 575 | BC Vision | 842 | Catching |
+| 586 | Break Tackle | 849 | Speed |
+| 593 | Finesse Moves | 856 | Spin Move |
+| 600 | Break Sack | 863 | Stamina |
+| 607 | Block Shedding | 874 | Toughness |
+| 618 | Man Coverage | 888 | Throwing Power |
+| 625 | Medium Route Running | 895 | Short Route Running |
+| 632 | Change of Direction | 906 | Run Block Power |
+| 650 | Throw Under Pressure | 913 | Run Block Finesse |
+| 657 | Spectacular Catch | 920 | Run Blocking |
+| 671 | Catch in Traffic | 927 | Stiff Arm |
+| 682 | Kick/Punt Return | 938 | Power Moves |
+| 689 | Hit Power | 945 | Press |
+| 696 | Carrying | 952 | Pursuit |
+| 703 | Lead Block | 984 | Play Recognition |
+| 714 | Juke Move | 991 | Zone Coverage |
+| 721 | Jumping | 728 | Kicking Accuracy |
+| 735 | Kicking Power | | |
+
+All 53 reproduce the card exactly, none overlap, and between TEST3 and TEST5 the
+only two that move are the two that were edited.
+
+Deep Route Running at bit 294 sits well outside the block the rest occupy, which
+looked like an artefact until it turned out to track Short Route Running at 0.81
+and Medium Route Running at 0.84. It is genuinely the third route stat, stored
+apart from its siblings.
+
+Bit 529 also reads 68 for Falzone and would have fitted Trucking or Stiff Arm,
+but it correlates with nothing — r≈0.02 against every ball-carrier rating, where
+both 817 and 927 track Break Tackle at 0.69 and 0.73. It was never a field.
+
+**Five pairs are placed but not distinguished.** Within each, the two ratings
+behave so alike across the league that nothing in the file separates them, so
+the labels inside a pair could be swapped: Short/Medium Throw Accuracy, Run
+Block Power/Finesse, Trucking/Stiff Arm, Finesse/Power Moves, and
+Speed/Change of Direction. Reading a player is unaffected — both numbers are
+right, only which name goes on which is open. One more single-rating edit to
+either member of a pair settles it.
+
+### Still unmapped
+
+Position and class year are not in the rating block. Neither is the
+authoritative player→team link: it is not a plain integer anywhere in the
+192-byte record, though the asset id supplies a team for the 11,804 generated
+players.
 
 ### What this buys immediately
 

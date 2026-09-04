@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import type { SaveReport, SaveDiff, DictScan } from '../electron/saveAnalysis'
+import type { SaveReport, SaveDiff, DictScan, RosterPlayer } from '../electron/saveAnalysis'
 
 /**
  * The analysed save, held above the section switch.
@@ -24,12 +24,14 @@ export interface SaveState {
   dictResult: string | null
   /** True while the remembered save is being re-read at startup. */
   restoring: boolean
+  roster: { count: number; ratingNames: string[]; unverifiedPairs: [string, string][]; players: RosterPlayer[] } | null
+  rosterBusy: boolean
 }
 
 const blank: SaveState = {
   path: null, report: null, busy: false, error: null, backup: null,
   diff: null, diffing: false, scan: null, scanning: false,
-  dict: null, dictResult: null, restoring: false,
+  dict: null, dictResult: null, restoring: false, roster: null, rosterBusy: false,
 }
 
 interface Ctx {

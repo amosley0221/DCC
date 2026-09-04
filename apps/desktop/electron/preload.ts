@@ -21,6 +21,7 @@ const api = {
     ipcRenderer.invoke('app:saveText', { name, text }) as Promise<string | null>,
   pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
+  roster: (path: string) => ipcRenderer.invoke('save:roster', path),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
   diffSaves: (a: string, b: string) => ipcRenderer.invoke('save:diff', { a, b }),
   dictionaryState: () => ipcRenderer.invoke('save:dictionaryState'),

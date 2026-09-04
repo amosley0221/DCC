@@ -1,5 +1,5 @@
 import type { UpdateStatus } from './updates'
-import type { SaveReport, SaveDiff, DictScan } from '../electron/saveAnalysis'
+import type { SaveReport, SaveDiff, DictScan, RosterPlayer } from '../electron/saveAnalysis'
 
 declare global {
   interface Window {
@@ -12,6 +12,10 @@ declare global {
       saveText(name: string, text: string): Promise<string | null>
       pickSave(): Promise<string | null>
       analyzeSave(path: string): Promise<{ ok: true; report: SaveReport } | { ok: false; message: string }>
+      roster(path: string): Promise<
+        | { ok: true; count: number; ratingNames: string[]; unverifiedPairs: [string, string][]; players: RosterPlayer[] }
+        | { ok: false; message: string }
+      >
       backupSave(path: string): Promise<{ ok: true; dest: string } | { ok: false; message: string }>
       diffSaves(a: string, b: string): Promise<{ ok: true; diff: SaveDiff } | { ok: false; message: string }>
       dictionaryState(): Promise<{ present: boolean; bytes?: number; id?: string }>

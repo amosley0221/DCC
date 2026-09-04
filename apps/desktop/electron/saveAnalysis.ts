@@ -987,3 +987,122 @@ export function autoFindDictionary(payload: Buffer, roots: string[]): AutoDictRe
       : 'No zstd-dicts directory found. The dictionary ships with tools that read these saves.',
   }
 }
+
+// ── the roster ────────────────────────────────────────────────────────────────
+
+/**
+ * Where a player's data lives, worked out from five controlled saves and one
+ * in-game rating card. The write-up is in docs/SAVE-FORMAT.md.
+ *
+ * Strings and numbers sit in two parallel arrays sharing one index: player `i`
+ * has its name at NAME_TABLE + i × 138 and its record at (65890 + i) × 192.
+ */
+export const NAME_TABLE = 0x00f44e68
+export const NAME_STRIDE = 138
+export const NAME_SLOTS = 17470
+export const RECORD_STRIDE = 192
+export const RECORD_BASE = 65890
+
+/** Record bit holding the redshirt flag. */
+export const REDSHIRT_BIT = 1088
+
+/**
+ * Ratings are 7-bit fields packed most-significant-bit first; the number here
+ * is the bit the field ends on. Every one was checked against a real rating
+ * card, and no player in the file falls outside 1–99 on any of them.
+ */
+export const RATING_BITS: Record<string, number> = {
+  Speed: 849, Acceleration: 504, Agility: 490, Strength: 824, Awareness: 536,
+  Carrying: 696, 'BC Vision': 575, 'Break Tackle': 586, Trucking: 817, 'Stiff Arm': 927,
+  'Change of Direction': 632, 'Spin Move': 856, 'Juke Move': 714, Catching: 842,
+  'Catch in Traffic': 671, 'Spectacular Catch': 657, 'Short Route Running': 895,
+  'Medium Route Running': 625, 'Deep Route Running': 294, Release: 560, Jumping: 721,
+  'Throwing Power': 888, 'Short Throw Accuracy': 785, 'Medium Throw Accuracy': 799,
+  'Deep Throw Accuracy': 778, 'Throw on the Run': 810, 'Throw Under Pressure': 650,
+  'Break Sack': 600, 'Play Action': 497, 'Pass Blocking': 543, 'Pass Block Power': 522,
+  'Pass Block Finesse': 568, 'Run Blocking': 920, 'Run Block Power': 906,
+  'Run Block Finesse': 913, 'Lead Block': 703, 'Impact Blocking': 753,
+  'Play Recognition': 984, Tackling: 831, 'Hit Power': 689, 'Block Shedding': 607,
+  'Finesse Moves': 593, 'Power Moves': 938, Pursuit: 952, 'Man Coverage': 618,
+  'Zone Coverage': 991, Press: 945, 'Kick/Punt Return': 682, 'Kicking Power': 735,
+  'Kicking Accuracy': 728, Stamina: 863, Toughness: 874, Injury: 746,
+}
+
+/**
+ * Five pairs sit at known positions but could be the other way round: within
+ * each pair the two ratings behave almost identically across the league, so
+ * nothing in the file distinguishes them. Reading a player is unaffected —
+ * only which of the two labels goes on which number.
+ */
+export const RATING_PAIRS_UNVERIFIED: [string, string][] = [
+  ['Short Throw Accuracy', 'Medium Throw Accuracy'],
+  ['Run Block Power', 'Run Block Finesse'],
+  ['Trucking', 'Stiff Arm'],
+  ['Finesse Moves', 'Power Moves'],
+  ['Speed', 'Change of Direction'],
+]
+
+export interface RosterPlayer {
+  index: number
+  first: string
+  last: string
+  hometown: string
+  assetId: string
+  /** Present for generated players, whose asset id carries it. */
+  teamId: string | null
+  redshirt: boolean
+  ratings: Record<string, number>
+}
+
+/** Reads `w` bits ending at `end`, counting most-significant-bit first. */
+function bits(payload: Buffer, base: number, end: number, w: number): number {
+  let v = 0
+  for (let b = end - w + 1; b <= end; b++) {
+    v = (v << 1) | ((payload[base + (b >> 3)] >> (7 - (b & 7))) & 1)
+  }
+  return v
+}
+
+function text(payload: Buffer, off: number, max: number): string {
+  let e = off
+  while (e < off + max && payload[e] >= 32 && payload[e] < 127) e++
+  return payload.subarray(off, e).toString('latin1')
+}
+
+/**
+ * Every player in the save, with names and ratings joined by their shared index.
+ *
+ * Slots with no name are empty entries in the pool and are skipped rather than
+ * reported as blank players.
+ */
+export function readRoster(payload: Buffer): RosterPlayer[] {
+  const out: RosterPlayer[] = []
+  const end = RECORD_BASE * RECORD_STRIDE + NAME_SLOTS * RECORD_STRIDE
+  if (payload.length < Math.max(end, NAME_TABLE + NAME_SLOTS * NAME_STRIDE)) return out
+
+  for (let i = 0; i < NAME_SLOTS; i++) {
+    const n = NAME_TABLE + i * NAME_STRIDE
+    const assetId = text(payload, n + 17, 33)
+    if (!/^(Unique|Generic)_/.test(assetId)) continue
+    const first = text(payload, n, 17)
+    const last = text(payload, n + 50, 21)
+    if (!first && !last) continue
+
+    const base = (RECORD_BASE + i) * RECORD_STRIDE
+    const ratings: Record<string, number> = {}
+    for (const [name, bit] of Object.entries(RATING_BITS)) ratings[name] = bits(payload, base, bit, 7)
+
+    const team = /^Generic_\d+_P_T(\d+)_/.exec(assetId)
+    out.push({
+      index: i,
+      first,
+      last,
+      hometown: text(payload, n + 112, 26),
+      assetId,
+      teamId: team ? team[1] : null,
+      redshirt: bits(payload, base, REDSHIRT_BIT, 1) === 1,
+      ratings,
+    })
+  }
+  return out
+}
