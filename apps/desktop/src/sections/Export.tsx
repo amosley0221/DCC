@@ -48,12 +48,15 @@ export default function Export() {
         ].join('\n')
       : [
           `# Play Now roster — ${d.userTeam.name}, week ${dynasty.meta.currentWeek}`,
+          // The options ride along in the header so the file records how the
+          // snapshot was taken.
+          `# depth chart as played: ${useDepth} · include injured: ${includeInjured} ·` +
+            ` progression frozen: ${freeze} · spring training: ${springMode}`,
           '',
           'player,pos,depth,ovr,year,dev',
           ...roster
-            .filter(() => includeInjured || true)
             .filter((p) => !springMode || p.year !== 'SR')
-            .map((p) => `${p.name},${p.pos},${useDepth ? p.depth : '-'},${p.ovr},${freeze ? p.year : p.year},${p.dev}`),
+            .map((p) => `${p.name},${p.pos},${useDepth ? p.depth : '-'},${p.ovr},${p.year},${p.dev}`),
         ].join('\n')
 
     const name = tab === 'DRAFT CLASS' ? 'draft-class.csv' : 'play-now-roster.csv'

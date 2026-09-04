@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
                             // and the rail keeps the reading column intact.
                             Column(
                                 Modifier
-                                    .width(64.dp)
+                                    .width(72.dp)
                                     .fillMaxHeight()
                                     .background(c.bar)
                                     .verticalScroll(rememberScrollState()),
@@ -72,11 +72,7 @@ class MainActivity : ComponentActivity() {
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            MonoLabel(
-                                                s.take(7),
-                                                if (active) c.ink else c.ink4,
-                                                9,
-                                            )
+                                            MonoLabel(s, if (active) c.ink else c.ink4, 9)
                                             if (active) {
                                                 Spacer(Modifier.height(4.dp))
                                                 Box(
