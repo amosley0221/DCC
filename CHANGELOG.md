@@ -10,6 +10,28 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.14.2] - 2026-09-04
+
+### Fixed
+
+- **The tables decode correctly now.** 0.14.1 read the key out of the file
+  header, which was the right idea and still gave the wrong answer: the key is
+  stored masked by a constant, and using the wrong constant produces output
+  that keeps every run and repetition of the real thing while being wrong in
+  every byte. Runs of `{{{y{` were always runs of zeros; `HIJHHNLCCLIO` was
+  always `321335788724`. The reader now recovers that constant from the data
+  instead of assuming one — padding decodes to zero when the key is right, so
+  the most common byte in the output *is* the constant.
+
+- **A key read from the header no longer wins just for being in the right
+  place.** On `layout.toc` the header does not hold the key, but the decode it
+  produced still cleared the old acceptance bar with 240 long printable runs of
+  pure noise, and because 0.14.1 stopped as soon as the header path answered,
+  the search that reads that file correctly never ran. Both paths are now
+  scored on the same scale — how much of the output is padding, and whether
+  known words appear — and the better one wins.
+
+
 ## [0.14.1] - 2026-09-04
 
 ### Fixed

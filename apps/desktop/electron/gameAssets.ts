@@ -220,6 +220,10 @@ export interface Solved {
   fullKeyHex?: string
   /** How the key was obtained: read from the header, or recovered by search. */
   how: 'header' | 'search'
+  /** Constant folded back into the key so padding decodes to zero. */
+  mask?: number
+  /** Share of the decode that is 0x00 — padding, and the sign of a real one. */
+  zeros?: number
 }
 
 /**
@@ -261,8 +265,14 @@ function scoreText(buf: Buffer) {
       run = 0
     }
   }
+  let zero = 0
+  for (let i = 0; i < buf.length; i++) if (buf[i] === 0) zero++
   const text = buf.toString('latin1')
-  return { strings, longRuns, known: TOC_WORDS.filter((w) => text.includes(w)), sample, expected: Math.round(buf.length * NOISE_RATE) }
+  return {
+    strings, longRuns, zeros: buf.length ? zero / buf.length : 0,
+    known: TOC_WORDS.filter((w) => text.includes(w)), sample,
+    expected: Math.round(buf.length * NOISE_RATE),
+  }
 }
 
 /**
@@ -356,16 +366,42 @@ function deriveKey(data: Buffer, len: number): Buffer {
 export const HEADER_KEY_AT = 0x128
 export const HEADER_KEY_LEN = 257
 export const HEADER_DATA_AT = 0x22c
-export const HEADER_KEY_MASK = 0x7b
+
+/**
+ * A key that is right except for a constant is still wrong, and it does not
+ * look wrong: XOR by a constant only shifts the histogram, so the output keeps
+ * every run and every repetition the real plaintext has. That is exactly what
+ * shipping a fixed 0x7B mask produced — runs of "{{{y{" that were always runs
+ * of zeros, and "HIJHHNLCCLIO" that was always "321335788724".
+ *
+ * These tables are padded with zeros, so the most frequent byte in a correct
+ * decode is 0x00. Folding the most frequent byte back into the key removes the
+ * offset without having to know what it should have been. The search path got
+ * this for free — it scores candidate key bytes by how many zeros they produce
+ * — which is why it read layout.toc correctly while the "exact" header key did
+ * not.
+ */
+export function calibrate(out: Buffer): number {
+  const freq = new Uint32Array(256)
+  for (let i = 0; i < out.length; i++) freq[out[i]]++
+  let m = 0
+  for (let b = 1; b < 256; b++) if (freq[b] > freq[m]) m = b
+  return m
+}
 
 export function headerKeyScheme(buf: Buffer): Solved | null {
   if (buf.length < HEADER_DATA_AT + 4096) return null
   const key = Buffer.allocUnsafe(HEADER_KEY_LEN)
-  for (let i = 0; i < HEADER_KEY_LEN; i++) key[i] = buf[HEADER_KEY_AT + i] ^ HEADER_KEY_MASK
+  for (let i = 0; i < HEADER_KEY_LEN; i++) key[i] = buf[HEADER_KEY_AT + i]
   const data = buf.subarray(HEADER_DATA_AT)
   const n = Math.min(data.length, 48 * 1024)
   const out = Buffer.allocUnsafe(n)
   for (let i = 0; i < n; i++) out[i] = data[i] ^ key[i % HEADER_KEY_LEN]
+  const mask = calibrate(out)
+  if (mask) {
+    for (let i = 0; i < HEADER_KEY_LEN; i++) key[i] ^= mask
+    for (let i = 0; i < n; i++) out[i] ^= mask
+  }
   const s = scoreText(out)
   // The same bar the search has to clear, so a header that is not really a key
   // is rejected rather than trusted for being in the right place.
@@ -373,7 +409,7 @@ export function headerKeyScheme(buf: Buffer): Solved | null {
   return {
     keyLength: HEADER_KEY_LEN, dataOffset: HEADER_DATA_AT,
     keyHex: key.subarray(0, 32).toString('hex'), fullKeyHex: key.toString('hex'),
-    samplesPerByte: Math.floor(data.length / HEADER_KEY_LEN), how: 'header', ...s,
+    samplesPerByte: Math.floor(data.length / HEADER_KEY_LEN), how: 'header', mask, ...s,
   }
 }
 
@@ -382,11 +418,22 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
   const magic = buf.readUInt32BE(0)
   if (!OBFUSCATION_MAGIC.includes(magic)) return { obfuscated: false, best: null, tried: 0, runners: [] }
 
-  const fromHeader = headerKeyScheme(buf)
-  if (fromHeader) return { obfuscated: true, best: fromHeader, tried: 1, runners: [] }
-
+  // Read the header key first, but do not stop there. It is cheap and usually
+  // right, and when it is wrong it is wrong convincingly — it cleared the old
+  // acceptance bar on layout.toc with 240 long runs and produced nothing but
+  // noise. So it competes with the search on the same score instead of
+  // pre-empting it.
   const results: Solved[] = []
   let tried = 0
+  const fromHeader = headerKeyScheme(buf)
+  if (fromHeader) {
+    tried++
+    results.push(fromHeader)
+    // Padding decodes to zero when the key is right. Well above what a wrong
+    // key gives means there is nothing for the search to improve on, and the
+    // search is what costs seconds.
+    if ((fromHeader.zeros ?? 0) >= 0.08) return { obfuscated: true, best: fromHeader, tried, runners: [] }
+  }
   // The key repeats, so guessing the payload start only rotates the recovered
   // key — it does not have to be exact.
   for (const dataOffset of [0x22c, 0x128, 0x08]) {
@@ -416,7 +463,10 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
       }
     }
   }
-  results.sort((a, b) => b.known.length - a.known.length || b.longRuns - a.longRuns)
+  results.sort((a, b) =>
+    b.known.length - a.known.length ||
+    (b.zeros ?? 0) - (a.zeros ?? 0) ||
+    b.longRuns - a.longRuns)
 
   // Reduce to the true period. A key of 221 decrypts the same text as its
   // factor 17, but derives each byte from a thirteenth of the evidence, which
@@ -424,7 +474,7 @@ export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | 
   // rather than inspecting the key for repetition — that shortcut silently
   // produced worse keys when it was tried.
   const top = results[0]
-  if (top) {
+  if (top && top.how === 'search') {
     const data = buf.subarray(top.dataOffset)
     // Divisors from the largest down, so `part` ascends and the first that
     // holds up is the shortest period.
@@ -510,12 +560,15 @@ export async function readTables(root: string, files: string[]): Promise<TableRe
       scheme: d.best
         ? (d.best.how === 'header'
             ? `key read from the file header — ${d.best.keyLength} bytes at ` +
-              `0x${HEADER_KEY_AT.toString(16)}, payload from 0x${d.best.dataOffset.toString(16)}, ` +
+              `0x${HEADER_KEY_AT.toString(16)}, payload from 0x${d.best.dataOffset.toString(16)}` +
+              `, stored under 0x${(d.best.mask ?? 0).toString(16).padStart(2, '0')}` +
+              `, ${(100 * (d.best.zeros ?? 0)).toFixed(1)}% padding, ` +
               `${d.best.strings} runs, ${d.best.longRuns} of 8+ chars`
             : `recovered by search (no usable header key): repeating key of ${d.best.keyLength} bytes ` +
               `from 0x${d.best.dataOffset.toString(16)} — `) +
           (d.best.how === 'header' ? '' :
             `${d.best.strings} runs against ${d.best.expected} expected from noise, ${d.best.longRuns} of 8+ chars, ` +
+            `${(100 * (d.best.zeros ?? 0)).toFixed(1)}% padding, ` +
             `${d.best.samplesPerByte} samples per key byte${d.best.samplesPerByte < 40 ? ' (thin — the key may be imperfect)' : ''}`)
         : null,
       strings: d.best ? d.best.strings : plainScore.strings,
