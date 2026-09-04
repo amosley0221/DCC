@@ -5,7 +5,7 @@ import { useSave } from '../saveStore'
  * What a section shows when the save cannot fill it yet.
  *
  * The save itself is readable — names, positions, overalls and all 53 ratings
- * come out of it, and the Roster section shows them. What each of these
+ * come out of it, and the Team section shows them. What each of these
  * sections still needs is a specific piece of the format that has not been
  * decoded, so it says which piece rather than blaming the save.
  */
@@ -27,13 +27,6 @@ const BLOCKED: Record<string, { needs: string; detail: string }> = {
     detail:
       'Prospects, interest levels and visits are not decoded. Some of the players already read ' +
       'out of the save are recruits, but nothing marks them as such yet.',
-  },
-  Team: {
-    needs: 'the player→team link',
-    detail:
-      'Every player is readable, but which school they play for is not. The team id in a ' +
-      'player’s asset name is where they were generated, not where they are now, and the ' +
-      'save’s own team field has resisted the same treatment that cracked the ratings.',
   },
   Tamper: {
     needs: 'writing to the save',
@@ -73,8 +66,8 @@ export default function NoDynasty({ section, onOpenSettings }: {
             </p>
             <p className="body-serif" style={{ marginBottom: 0 }}>
               Your save <strong>is</strong> loaded and readable — {save.roster
-                ? `${save.roster.count.toLocaleString()} players, with positions, overalls and all 53 ratings, are in the Roster section.`
-                : 'the Roster section will read every player out of it, with positions, overalls and all 53 ratings.'}
+                ? `${save.roster.count.toLocaleString()} players, with positions, overalls and all 53 ratings, are in the Team section.`
+                : 'the Team section will read every player out of it, with positions, overalls and all 53 ratings.'}
             </p>
           </Card>
         ) : (

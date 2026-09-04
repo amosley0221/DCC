@@ -8,7 +8,18 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- **The roster lives inside Team, where the design puts it.** It shipped as a
+  separate nav section, which was not what was asked for: the design has Team
+  scoped by a team picker with roster, depth chart, schedule and trade beneath
+  it. Team now carries those four tabs and reads your save; the standalone
+  Roster section is gone.
+- **The player list says whose players these are.** It lists every player in the
+  dynasty — all 240 programs — because which school a player belongs to is not
+  decoded yet. Headed `16,448 PLAYERS — READ FROM YOUR SAVE`, that read as your
+  roster, which is why the best players in it were strangers. It now says
+  `EVERY SCHOOL` and opens with a note explaining why there is no team picker.
 
 ## [0.9.0] - 2026-09-04
 

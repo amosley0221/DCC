@@ -15,12 +15,12 @@ import Devices from './sections/Devices'
 import Settings from './sections/Settings'
 import NoDynasty from './sections/NoDynasty'
 import Save from './sections/Save'
-import Roster from './sections/Roster'
+import TeamSave from './sections/TeamSave'
 import { Meta } from './ui'
 import UpdateToast from './UpdateToast'
 
 const SECTIONS = [
-  'WIRE', 'NATIONAL', 'RECRUIT', 'ROSTER', 'TEAM', 'TAMPER', 'COACH', 'QUEUE', 'EXPORT', 'DEVICES', 'SAVE', 'SETTINGS',
+  'WIRE', 'NATIONAL', 'RECRUIT', 'TEAM', 'TAMPER', 'COACH', 'QUEUE', 'EXPORT', 'DEVICES', 'SAVE', 'SETTINGS',
 ] as const
 type Section = (typeof SECTIONS)[number]
 
@@ -116,8 +116,8 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
               <Settings update={update} version={version} />
             ) : section === 'SAVE' ? (
               <Save />
-            ) : section === 'ROSTER' ? (
-              <Roster />
+            ) : section === 'TEAM' && save.report ? (
+              <TeamSave />
             ) : !d ? (
               <NoDynasty
                 section={section.charAt(0) + section.slice(1).toLowerCase()}

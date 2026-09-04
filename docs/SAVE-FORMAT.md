@@ -426,24 +426,33 @@ real, correctly-ranked players at their real positions and hometowns — Keelon
 Russell QB Duncanville, CJ Carr QB Saline, Bryce Underwood QB Detroit, Malachi
 Toney WR. None of that went into deriving either field.
 
-### Tried and rejected: a team field on the player
+### Tried and rejected: three ways to find the team
 
-A 9-bit field ending at bit **235** looks like the team and is not good enough
-to use. It scores 85.8% precision and 77.1% recall against the team in the
-asset id, its big buckets are unmistakably rosters — bucket 4 is 99% one team,
-bucket 51 is 98% — and it is not an index artefact: its buckets span the whole
-array (median span 16,004 of 17,470 slots) and correlate with the array index
-at r=0.096.
+**A team field on the player.** A 9-bit field ending at bit 235 scores 85.8%
+precision and 77.1% recall against the team in the asset id, and its big buckets
+really are rosters — bucket 4 is 99% one team. But only 84 of its 512 buckets
+hold 60 or more players, where 240 teams need 240 rosters, and widening the
+window in either direction improves neither score. A first pass scored it 86.8%
+on "purity" alone, a metric a field that shatters every team into singletons
+passes perfectly; measuring recall as well is what exposed it.
 
-But only 84 of its 512 buckets hold 60 or more players, where 240 teams need
-240 rosters, and widening the window in either direction does not improve
-either score. Something team-shaped is in there; a usable team id is not.
+**Any field with the right shape.** Scanning every bit offset and every width
+from 6 to 16 for a field that cuts the league into 180–340 groups of roughly
+equal size returns only 8-bit windows in the record's first bytes — slices of
+the unique object id, which naturally give 256 near-uniform groups. Nothing in
+the 192-byte record partitions the league into 240 rosters.
 
-A first attempt scored it at 86.8% "purity" and looked much better than it is.
-That metric counted, for each bucket, the share belonging to its majority team —
-which a field that shatters every team into singletons passes perfectly.
-Measuring recall as well, and checking bucket sizes against roster sizes, is
-what exposed it.
+**A roster list on the team.** If the link is stored the other way, a team holds
+an array of player indices. Searching the payload for every appearance of one
+player's index as a 16- or 32-bit value, then walking outward for a run of
+distinct in-range values, finds exactly one candidate: 8,902 entries reading
+8568, 8569, 8570… — a counter. "Distinct and in range" is passed trivially by
+consecutive integers.
+
+So the team link is not where any of the three obvious places would put it. What
+would settle it is the same thing that settled the ratings: a known set. A list
+of players confirmed to be on one school — a roster screenshot would do — gives
+enough anchors to find whatever structure holds exactly that set.
 
 ### Still unmapped
 

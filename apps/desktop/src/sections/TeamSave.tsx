@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
+import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
+
+const TABS = ['ROSTER', 'DEPTH', 'SCHEDULE', 'TRADE'] as const
+type TabName = (typeof TABS)[number]
 
 const GROUPS: [string, string[]][] = [
   ['OFFENCE', ['QB', 'HB', 'FB', 'WR', 'TE']],
@@ -16,17 +19,24 @@ const GROUPS: [string, string[]][] = [
 const ovrColour = (o: number) =>
   o >= 90 ? 'var(--accent)' : o >= 80 ? 'var(--good)' : o >= 70 ? 'var(--ink)' : 'var(--ink3)'
 
+const NEEDS_TEAM =
+  'Which school a player belongs to is not decoded yet. Nothing in the 192-byte player record ' +
+  'partitions the league into 240 rosters, and the id in a player’s asset name is where they ' +
+  'were generated rather than where they play now — so this cannot be scoped to one program yet.'
+
 /**
- * The dynasty's actual players, read out of the save.
+ * Team, driven by the save rather than the sample dynasty.
  *
- * Everything here comes from the file — nothing is generated, and nothing that
- * has not been decoded is shown. Team is the notable absence: the save's own
- * team field has not been pinned down, so players are not grouped by school.
+ * The design puts the roster inside Team behind a team picker, so that is where
+ * it lives. The picker is the piece that is missing: without the player→team
+ * link every list here is league-wide, and the screen says so plainly rather
+ * than implying these are your players.
  */
-export default function Roster() {
+export default function TeamSave() {
   const { save, patch } = useSave()
   const { dispatch } = useStore()
-  const { path, report, roster, rosterBusy } = save
+  const { path, roster, rosterBusy } = save
+  const [tab, setTab] = useState<TabName>('ROSTER')
   const [query, setQuery] = useState('')
   const [pos, setPos] = useState<string | null>(null)
   const [open, setOpen] = useState<number | null>(null)
@@ -57,34 +67,49 @@ export default function Roster() {
     return m
   }, [roster])
 
-  if (!report) {
-    return (
-      <>
-        <SectionHeader title="Roster" sub={<Meta>NO SAVE LOADED</Meta>} />
-        <Card className="card-pad">
-          <Empty>open your dynasty save in the Save section first</Empty>
-        </Card>
-      </>
-    )
-  }
-
   return (
     <>
       <SectionHeader
-        title="Roster"
-        sub={<Meta>{roster ? `${roster.count.toLocaleString()} PLAYERS — READ FROM YOUR SAVE` : 'NOT READ YET'}</Meta>}
-        right={roster ? undefined : <Btn variant="primary" onClick={load} disabled={rosterBusy}>{rosterBusy ? 'Reading…' : 'Read the roster'}</Btn>}
+        title="Team"
+        sub={<Meta>{roster ? `EVERY SCHOOL — ${roster.count.toLocaleString()} PLAYERS` : 'ROSTER NOT READ YET'}</Meta>}
+        right={<div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
 
-      <div className="col" style={{ gap: 12, maxWidth: 860 }}>
-        {!roster ? (
+      <div className="col" style={{ gap: 12, maxWidth: 900 }}>
+        <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
+          <Kicker>No team picker yet</Kicker>
+          <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
+            {NEEDS_TEAM} Everything below is the <strong>whole dynasty</strong>, all 240 programs
+            together — so the best players in it play for other schools, not yours.
+          </p>
+        </Card>
+
+        {tab !== 'ROSTER' ? (
           <Card className="card-pad">
-            <Empty>{rosterBusy ? 'reading the save…' : 'the roster has not been read yet'}</Empty>
+            <Kicker>Not decoded yet</Kicker>
+            <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
+              {tab === 'SCHEDULE'
+                ? 'Fixtures, results and rankings are not decoded. The player ratings gave themselves up to controlled edits; the equivalent for games has not been located yet.'
+                : tab === 'DEPTH'
+                  ? 'A depth chart is per-team and per-position. Position is decoded — all 21 of them — so this needs only the team link above.'
+                  : 'A trade needs two rosters, so it needs the team link above. Writing back to the save is also not attempted yet, deliberately.'}
+            </p>
+          </Card>
+        ) : !roster ? (
+          <Card className="card-pad">
+            <Kicker>Roster</Kicker>
+            <p className="body-serif" style={{ marginTop: 7 }}>
+              Names, hometowns, positions, overalls, redshirt status and all 53 ratings, read
+              straight out of your save.
+            </p>
+            <Btn variant="primary" onClick={load} disabled={rosterBusy}>
+              {rosterBusy ? 'Reading…' : 'Read the roster'}
+            </Btn>
           </Card>
         ) : (
           <>
             <Card className="card-pad">
-              <Input placeholder="search by name" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <Input placeholder="search every player by name" value={query} onChange={(e) => setQuery(e.target.value)} />
               <div className="col" style={{ gap: 6, marginTop: 10 }}>
                 {GROUPS.map(([label, list]) => (
                   <div key={label} className="row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -100,7 +125,7 @@ export default function Roster() {
             </Card>
 
             <Card className="card-pad">
-              <Kicker>{pos ? `${pos} — best first` : 'Best in the dynasty'}</Kicker>
+              <Kicker>{pos ? `${pos} — every school, best first` : 'Every school, best first'}</Kicker>
               {shown.length === 0 ? <Empty>nobody matches</Empty> : null}
               {shown.map((p) => (
                 <PlayerRow
@@ -112,18 +137,8 @@ export default function Roster() {
                 />
               ))}
               {shown.length === 60 ? (
-                <Meta size={9}>showing the top 60 — narrow it with a search or a position</Meta>
+                <Meta size={9}>showing 60 — narrow it with a search or a position</Meta>
               ) : null}
-            </Card>
-
-            <Card className="card-pad">
-              <Kicker>What is not here</Kicker>
-              <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
-                Players are not grouped by school: the save's own team field has not been pinned
-                down, and the id in a player's asset name is where they were generated rather than
-                where they play now. Class year is not decoded either. Both are still being worked
-                on, and nothing here is guessed to fill the gap.
-              </p>
             </Card>
           </>
         )}
@@ -137,10 +152,7 @@ function PlayerRow({ p, names, open, onToggle }: {
 }) {
   return (
     <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 8 }}>
-      <button
-        onClick={onToggle}
-        style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}
-      >
+      <button onClick={onToggle} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
         <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
           <span className="num" style={{ fontSize: 17, color: ovrColour(p.overall), width: 30 }}>{p.overall}</span>
           <Meta size={9}>{p.position}</Meta>

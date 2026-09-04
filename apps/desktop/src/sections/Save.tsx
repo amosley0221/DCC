@@ -237,7 +237,7 @@ export default function Save() {
                     <div><Meta size={9}>REDSHIRTED</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{roster.players.filter((p) => p.redshirt).length.toLocaleString()}</div></div>
                   </div>
                   <p className="body-serif" style={{ marginTop: 10, marginBottom: 0 }}>
-                    Browse them in the Roster section. Five rating pairs sit at known positions but
+                    Browse them in the Team section. Five rating pairs sit at known positions but
                     could be labelled the other way round — within each, the two behave almost
                     identically across the league, so nothing in the file separates them:{' '}
                     {roster.unverifiedPairs.map((p) => p.join(' / ')).join(', ')}.
