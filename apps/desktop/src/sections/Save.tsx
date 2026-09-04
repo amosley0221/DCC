@@ -176,11 +176,12 @@ export default function Save() {
                 <p className="body-serif" style={{ marginTop: 9 }}>
                   The game objects live inside these frames, and every one of them is compressed
                   against a shared dictionary that is not stored in the save. Without that
-                  dictionary the frames cannot be read. It should be somewhere in the game install.
+                  dictionary the frames cannot be read. Search the game install for it — or any
+                  other tool that already reads these saves, since it must carry the dictionary too.
                 </p>
                 <div className="row" style={{ gap: 8, marginTop: 10 }}>
                   <Btn variant="primary" disabled={scanning} onClick={hunt}>
-                    {scanning ? 'Scanning…' : 'Search game folder for it…'}
+                    {scanning ? 'Scanning…' : 'Search a folder for it…'}
                   </Btn>
                 </div>
                 {scan ? (

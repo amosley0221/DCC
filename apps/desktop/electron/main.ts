@@ -186,7 +186,7 @@ ipcMain.handle('save:analyze', (_e, path: string) => {
 
 ipcMain.handle('save:findDict', async (_e, { savePath, dictionaryId }: { savePath: string; dictionaryId: number }) => {
   const res = await dialog.showOpenDialog(win!, {
-    title: 'Choose your College Football install folder',
+    title: 'Choose a folder to search — the game install, or a tool that reads saves',
     properties: ['openDirectory'],
   })
   if (res.canceled || !res.filePaths[0]) return { ok: false as const, message: 'cancelled' }
