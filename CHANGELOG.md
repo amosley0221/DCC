@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.10.0] - 2026-09-04
+
 ### Added
 
 - **Team rosters and a depth chart.** The save's own team field is decoded, so
