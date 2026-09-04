@@ -1007,6 +1007,27 @@ export const RECORD_BASE = 65890
 export const REDSHIRT_BIT = 1088
 
 /**
+ * Set on a live recruit, and clear on a generated player who is in the pool
+ * for another reason — the two the game does not list as prospects in one Penn
+ * State save are Carter Landry at 89 and Dorian Exum at 86, both above the best
+ * real recruit.
+ *
+ * Provisional, and worth stating why. It was found by taking 28 players
+ * confirmed to be in the recruiting class and 2 confirmed not to be, then
+ * looking for a field that keeps all of the first and drops both of the second.
+ * Two counter-examples is thin evidence, so the corroboration matters more than
+ * the fit: it selects 4,108 where the game counts 4,100 prospects, and the
+ * eight best it keeps are the same eight the game lists, in the same ratings.
+ *
+ * It is not a bare "is a recruit" flag — it is also set on 6,682 rostered
+ * players, so it means something broader and only separates recruits once the
+ * player is already known to be unrostered and generated. No field in the
+ * record is on for recruits and off for the rostered; that was searched for
+ * exhaustively across every 1- to 4-bit position and there are none.
+ */
+export const RECRUIT_BIT = 658
+
+/**
  * Position, a 5-bit field. Its 21 values partition the league exactly the way
  * football does: value 0 averages 85 Throwing Power, 5–9 average 82 Strength
  * and 76 Pass Blocking, 19–20 average 82 Kicking Power and nothing else.
@@ -1091,6 +1112,8 @@ export interface RosterPlayer {
   /** The save's own team id. TEAM_UNASSIGNED means recruit or portal. */
   team: number
   redshirt: boolean
+  /** See RECRUIT_BIT — provisional, and only meaningful for the unrostered. */
+  recruitFlag: boolean
   ratings: Record<string, number>
 }
 
@@ -1144,6 +1167,7 @@ export function readRoster(payload: Buffer): RosterPlayer[] {
       team: bits(payload, base, TEAM_BIT, TEAM_WIDTH),
       overall: bits(payload, base, OVERALL_BIT, 7),
       redshirt: bits(payload, base, REDSHIRT_BIT, 1) === 1,
+      recruitFlag: bits(payload, base, RECRUIT_BIT, 1) === 1,
       ratings,
     })
   }

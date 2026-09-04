@@ -632,13 +632,39 @@ A residual remains. Two generated players in that save rate 89 and 86 against a
 best real recruit of 83, and the generated pool is 4,528 where the class list
 counts 4,100.
 
-### A prospect flag: looked for, not found
+### Bit 658, provisional
 
-Searched every 1-, 2- and 3-bit field in the 192-byte record for one that
-selects the generated pool while excluding the players who plainly are not
-prospects. Fifty-six fields fit. All of them failed on data they were not
-fitted to: the best, bit 1306, is also set on 6,682 of 11,730 **rostered**
-players, so it marks something else entirely.
+Once a player is known to be unrostered and generated, bit 658 separates the
+recruits from the rest. Against a class list for the same save:
+
+| | |
+| --- | --- |
+| Selected | 4,108 (the game counts 4,100 prospects) |
+| Dropped | 420, including Carter Landry 89 and Dorian Exum 86 |
+| Best eight kept | the same eight the game lists, at the same ratings |
+| Known recruits kept | 28 of 28 |
+
+It is **not** an "is a recruit" flag on its own: it is also set on 6,682 of
+11,730 rostered players, so it means something broader and only does this job
+in combination with the other two conditions. It was found from 28 positive and
+2 negative examples, which is thin, so the corroboration above matters more
+than the fit — and it stays labelled provisional until a full class export
+confirms it.
+
+### A standalone prospect flag: looked for, not found
+
+No field in the record is set for recruits and clear for rostered players.
+Every 1- to 4-bit position was tested against that condition directly and
+**none** passed, which is why bit 658 has to be combined with the roster and
+asset-id tests rather than used alone.
+
+Earlier attempts fitted the outliers and failed on data they were not fitted
+to — bit 1306 among them, also set on 6,682 rostered players.
+
+Searching for the recruiting table itself, by looking for a prospect's record
+index repeated at a constant stride, found nothing at 16- or 32-bit alignment.
+It is probably bit-packed, like everything else in this record, which that
+scan would not see.
 
 The search was worthless by construction — two outliers is not enough
 constraint to distinguish a real field from thousands of coincidences. Ten
