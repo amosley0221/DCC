@@ -805,6 +805,35 @@ between the two confirmed rows that holds up), spanning roughly `0x12271ea` to
 `0x123f7ea`, where 47% of slots hold a prospect record index against a 4%
 chance rate. 2,002 of 2,718 resolvable prospects are found there.
 
+### Recruiting hours
+
+A second pair of saves — one scholarship offer, then hours spent on one recruit
+— moved 28 bytes, and one of them is a counter that reads the same way the game
+does:
+
+| Save | Counter at `0x11c190a` | Change |
+| --- | --- | --- |
+| before | 65 | |
+| after a scholarship offer | 70 | +5 |
+| after spending hours on a recruit | 120 | +50 |
+
+Five hours for an offer and fifty for a recruiting session are the game's own
+costs, which is what confirms the reading. The counter sits inside a record
+tagged `2d ce 00 4a`.
+
+The rest of that diff is an action log rather than prospect state. Spending
+hours appends a handle to a `0x209a` list and writes a record built from
+`0x2172` and `0x2d5c` handles in the region around `0x1da400`. **No prospect's
+row changed at all.**
+
+That is worth taking seriously as a structural hint. Spending hours on a
+recruit changes nothing about the recruit until the week advances, and commit
+score did not move for a single one of 4,100 prospects across a week either.
+Both are consistent with stage and commit score being **derived** at read time
+from the action log and the prospect's static attributes, rather than stored
+per prospect — which would explain why no column for them exists to be found.
+That is a hypothesis, not a reading, and it is not settled.
+
 ### What is still open
 
 No column solved yet — stage, offers, gem/bust and commit score all fail the
