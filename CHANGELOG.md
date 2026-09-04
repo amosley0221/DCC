@@ -8,7 +8,15 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **The roster has its own panel.** It was rendering inside the compression
+  dictionary card, wedged between that card's description and its buttons, which
+  made the most useful thing in the section look like a footnote to the least.
+  It now sits above the dictionary, where it belongs.
+- **The status line stops saying the fields are unmapped.** With a roster read,
+  the title bar gives the player count and the sidebar reads `ROSTER READ`. It
+  still claimed `FIELDS NOT MAPPED YET` while showing 53 mapped ratings.
 
 ## [0.8.3] - 2026-09-04
 

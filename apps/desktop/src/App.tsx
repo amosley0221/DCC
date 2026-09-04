@@ -61,7 +61,7 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
         <div className="agent-strip">
           <div className="agent-row">
             <span className="dot" style={{ background: save.report ? 'var(--good)' : d ? 'var(--warn)' : 'var(--ink4)' }} />
-            {save.report ? 'SAVE ANALYSED' : d ? 'SAVE NOT READ' : 'NO SAVE'}
+            {save.roster ? 'ROSTER READ' : save.report ? 'SAVE ANALYSED' : d ? 'SAVE NOT READ' : 'NO SAVE'}
           </div>
           <div className="agent-row">
             <span className="dot" style={{ background: 'var(--ink4)' }} />AGENT OFFLINE
@@ -94,9 +94,14 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
               <Meta size={9}>{d.userTeam.wins}–{d.userTeam.losses} · WK {state.week}</Meta>
             </>
           ) : save.report ? (
-            // A save has been read, even though its fields are not mapped yet.
-            // Saying "no dynasty loaded" here read as if nothing had happened.
-            <Meta size={9}>{save.report.name} · ANALYSED · FIELDS NOT MAPPED YET</Meta>
+            // A save has been read. Once the roster has been pulled out of it,
+            // say so with the player count rather than repeating "analysed".
+            <Meta size={9}>
+              {save.report.name}
+              {save.roster
+                ? ` · ${save.roster.count.toLocaleString()} PLAYERS`
+                : ' · ANALYSED'}
+            </Meta>
           ) : (
             <Meta size={9}>NO SAVE LOADED</Meta>
           )}
