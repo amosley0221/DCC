@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SchoolArt, SectionHeader, Tab, Track } from '../ui'
+import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 
 const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
@@ -290,6 +290,7 @@ export default function TeamSave() {
                   p={p}
                   names={roster.ratingNames}
                   open={open === p.index}
+                  face={save.facePaths[p.assetId]}
                   onToggle={() => setOpen(open === p.index ? null : p.index)}
                 />
               ))}
@@ -304,13 +305,14 @@ export default function TeamSave() {
   )
 }
 
-function PlayerRow({ p, names, open, onToggle }: {
-  p: RosterPlayer; names: string[]; open: boolean; onToggle: () => void
+function PlayerRow({ p, names, open, onToggle, face }: {
+  p: RosterPlayer; names: string[]; open: boolean; onToggle: () => void; face?: string
 }) {
   return (
     <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 8 }}>
       <button onClick={onToggle} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
-        <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+        <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+          <PlayerFace file={face} first={p.first} last={p.last} size={28} />
           <span className="num" style={{ fontSize: 17, color: ovrColour(p.overall), width: 30 }}>{p.overall}</span>
           <Meta size={9}>{p.position}</Meta>
           <strong style={{ color: 'var(--ink)' }}>{p.first} {p.last}</strong>

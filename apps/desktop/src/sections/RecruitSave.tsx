@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
-import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SectionHeader, Tab } from '../ui'
+import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SectionHeader, Tab } from '../ui'
 import { useStore } from '../store'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 
@@ -52,24 +52,6 @@ const GROUPS: [string, string[]][] = [
 
 const ovrColour = (o: number) =>
   o >= 90 ? 'var(--accent)' : o >= 80 ? 'var(--good)' : o >= 70 ? 'var(--ink)' : 'var(--ink3)'
-
-/** A face from the chosen art folder, or the initials while there is none. */
-function Face({ file, first, last }: { file?: string; first: string; last: string }) {
-  const initials = (first[0] ?? '') + (last[0] ?? '')
-  const box: React.CSSProperties = {
-    width: 30, height: 30, borderRadius: 4, flex: '0 0 auto',
-    background: 'var(--rule)', objectFit: 'cover',
-  }
-  if (!file) {
-    return (
-      <span style={{ ...box, display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--ink3)' }}>
-        {initials}
-      </span>
-    )
-  }
-  return <img style={box} alt="" loading="lazy"
-    src={'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')} />
-}
 
 export default function RecruitSave() {
   const { save, patch } = useSave()
@@ -275,7 +257,7 @@ function RecruitRow(
           background: open ? 'var(--rule)' : 'transparent',
           border: 0, borderRadius: 4, cursor: 'pointer', alignItems: 'center',
         }}>
-        <Face file={face} first={p.first} last={p.last} />
+        <PlayerFace file={face} first={p.first} last={p.last} />
         <span style={{ width: 34, color: 'var(--ink3)', fontSize: 12 }}>{p.position}</span>
         <span style={{ width: 46, color: 'var(--accent)', fontSize: 11, letterSpacing: -1 }}>
           {'★'.repeat(p.stars)}

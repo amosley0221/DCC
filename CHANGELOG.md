@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.18.1] - 2026-09-04
+
+### Added
+
+- **Portraits on the Team roster.** They were being matched all along — 7,668
+  distinct faces for the 11,730 players on rosters — but only Recruit displayed
+  them. Choosing the art folder once now shows faces everywhere.
+
+- **The game's own player id is readable** (bit 191, 14 bits), exact against all
+  4,026 unambiguous recruits in the class export. This is the key that tables
+  outside the player record use to name a player, so it is the way in to
+  recruiting stage, commit score, offers and school interest — none of which are
+  in the player record. Earlier searches for those tables failed because they
+  traced the record index, which nothing outside the record refers to.
+
+
 ## [0.18.0] - 2026-09-04
 
 ### Added

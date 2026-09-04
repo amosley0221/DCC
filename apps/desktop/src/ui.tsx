@@ -275,3 +275,25 @@ export function SchoolArt(
     />
   )
 }
+
+/**
+ * A player's portrait from the chosen art folder, falling back to initials.
+ * Never another player's face: a gap is better than a wrong answer.
+ */
+export function PlayerFace(
+  { file, first, last, size = 30 }: { file?: string; first: string; last: string; size?: number },
+) {
+  const box: React.CSSProperties = {
+    width: size, height: size, borderRadius: 4, flex: '0 0 auto',
+    background: 'var(--rule)', objectFit: 'cover',
+  }
+  if (!file) {
+    return (
+      <span style={{ ...box, display: 'grid', placeItems: 'center', fontSize: size * 0.36, color: 'var(--ink3)' }}>
+        {(first[0] ?? '') + (last[0] ?? '')}
+      </span>
+    )
+  }
+  return <img style={box} alt="" loading="lazy"
+    src={'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')} />
+}

@@ -707,10 +707,30 @@ Overall, position, hometown and every rating the export carries — Speed,
 Acceleration, Agility, Strength, Awareness, Jumping — agree on 4,068 of 4,100,
 the 32 exceptions being duplicate names paired to the wrong record.
 
-### Still missing
+### Still missing, and how to get it
 
-Recruiting **stage**, **gem/bust**, **commit score** and **total offers** are
-not in the player record. They change while recruiting happens, and they live
-in a table DCC has not found. Searching for that table by tracing a prospect's
-record index at a constant stride found nothing byte-aligned; it is presumably
-bit-packed like the rest of this format.
+Recruiting **stage**, **gem/bust**, **commit score**, **total offers** and
+**school interest** are not in the player record. They change while recruiting
+happens and belong to a table elsewhere in the save.
+
+Two things now point at it.
+
+**The join key is known.** Bit 191, 14 bits, is the game's own player id — the
+same id the class export prints, exact on all 4,026 unambiguous recruits.
+Earlier searches failed because they traced the *record index*, which nothing
+outside the record uses.
+
+**Two candidate regions.** Scanning the payload for 16-bit values that are
+valid prospect ids, against a 6.3% chance rate:
+
+| Offset | Density | Row stride |
+| --- | --- | --- |
+| `0x0186a000` big-endian | 47.3% | 4 bytes, 1,830 consecutive |
+| `0x01580000` little-endian | 37.4% | 4 bytes, 1,529 consecutive |
+
+A run of 1,830 entries at a fixed stride is a table, not a coincidence.
+
+What settles the meaning of its columns is a controlled diff, the method that
+solved the ratings: two saves differing by one deliberate recruiting change.
+Spend hours on a single recruit and their commit score moves; the bytes that
+move with it are the column.

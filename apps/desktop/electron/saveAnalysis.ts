@@ -1051,6 +1051,17 @@ export const DEALBREAKER_BIT = 867   // 4 bits
 export const PITCH_BIT = 1109        // 5 bits
 export const ARCHETYPE_BIT = 511     // 3 bits, read against the position
 
+/**
+ * The game's own id for a player, and the key that everything outside the
+ * player record refers to them by. Exact against all 4,026 unambiguously named
+ * recruits in the class export, which prints the same id.
+ *
+ * This is the join into the tables DCC has not read yet — recruiting stage,
+ * commit score, offers and school interest are not in the player record, and
+ * whatever holds them has to name the player somehow.
+ */
+export const PLAYER_ID_BIT = 191     // 14 bits
+
 export const CLASS_YEARS: (string | null)[] = ["HighSchool", "JuniorCollege_Sophomore", "JuniorCollege_Junior"]
 export const DEV_TRAITS: (string | null)[] = ["Normal", "Impact", "Star", "Elite"]
 export const HOME_STATES: (string | null)[] = ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "NewHampshire", "NewJersey", "NewMexico", "NewYork", "NorthCarolina", "NorthDakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "RhodeIsland", "SouthCarolina", null, "Tennessee", "Texas", "Utah", null, "Virginia", "Washington", "WestVirginia", "Wisconsin", "Wyoming"]
@@ -1169,6 +1180,8 @@ export interface RosterPlayer {
   /** The save's own team id. TEAM_UNASSIGNED means recruit or portal. */
   team: number
   redshirt: boolean
+  /** The game's own id — how tables outside the player record refer to them. */
+  playerId: number
   /** See RECRUIT_BIT — only meaningful for the unrostered. */
   recruitFlag: boolean
   heightIn: number
@@ -1235,6 +1248,7 @@ export function readRoster(payload: Buffer): RosterPlayer[] {
       team: bits(payload, base, TEAM_BIT, TEAM_WIDTH),
       overall: bits(payload, base, OVERALL_BIT, 7),
       redshirt: bits(payload, base, REDSHIRT_BIT, 1) === 1,
+      playerId: bits(payload, base, PLAYER_ID_BIT, 14),
       recruitFlag: bits(payload, base, RECRUIT_BIT, 1) === 1,
       heightIn: bits(payload, base, HEIGHT_BIT, 7),
       weightLb: bits(payload, base, WEIGHT_BIT, 8) + 160,
