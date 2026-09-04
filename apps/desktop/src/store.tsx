@@ -14,7 +14,7 @@ export const blankPersisted = (): Persisted => ({
   dynastySource: 'none',
   savePath: null,
   teamId: null,
-  teamName: null,
+  teamNames: {},
   relayUrl: '',
   relayToken: '',
   theme: 'night',
@@ -81,7 +81,8 @@ export type Action =
   | { type: 'clearDynasty' }
   | { type: 'relay'; url: string; token: string }
   | { type: 'savePath'; path: string | null }
-  | { type: 'teamId'; id: number | null; name?: string | null }
+  | { type: 'teamId'; id: number | null }
+  | { type: 'teamName'; id: number; name: string | null }
 
 let seq = 0
 const nextId = () => `q${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -180,17 +181,23 @@ export function reducer(state: Persisted, action: Action): Persisted {
     case 'log':
       return { ...state, log: log(state, action.line.text, action.line.kind) }
     case 'reset':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamName: state.teamName, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'loadSample':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamName: state.teamName, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'clearDynasty':
-      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamName: state.teamName, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'relay':
       return { ...state, relayUrl: action.url, relayToken: action.token }
     case 'savePath':
       return { ...state, savePath: action.path }
     case 'teamId':
-      return { ...state, teamId: action.id, teamName: action.id === null ? null : action.name ?? state.teamName }
+      return { ...state, teamId: action.id }
+    case 'teamName': {
+      const next = { ...state.teamNames }
+      if (action.name) next[action.id] = action.name
+      else delete next[action.id]
+      return { ...state, teamNames: next }
+    }
     default:
       return state
   }

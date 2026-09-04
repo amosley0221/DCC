@@ -131,8 +131,11 @@ export interface Persisted {
    * chosen once and remembered.
    */
   teamId: number | null
-  /** The school name chosen for that team, from the save's own list. */
-  teamName: string | null
+  /**
+   * School names the user has attached to team ids, from the save's own list.
+   * The save groups rosters but never names them, so these are chosen.
+   */
+  teamNames: Record<number, string>
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string

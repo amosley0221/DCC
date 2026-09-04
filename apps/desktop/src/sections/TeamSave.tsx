@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 
-const TABS = ['ROSTER', 'DEPTH', 'SCHEDULE', 'TRADE'] as const
+const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
 
 const GROUPS: [string, string[]][] = [
@@ -34,6 +34,7 @@ export default function TeamSave() {
   const { state, dispatch } = useStore()
   const { path, roster, rosterBusy } = save
   const myTeam = state.teamId
+  const names = state.teamNames
   const [naming, setNaming] = useState<number | null>(null)
   const [schoolQuery, setSchoolQuery] = useState('')
   const [tab, setTab] = useState<TabName>('ROSTER')
@@ -92,7 +93,7 @@ export default function TeamSave() {
       <SectionHeader
         title="Team"
         sub={<Meta>{!roster ? 'ROSTER NOT READ YET'
-          : mine ? `${(state.teamName ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
+          : mine ? `${(names[mine.id] ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
           : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
         right={<div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
@@ -112,13 +113,17 @@ export default function TeamSave() {
                 .slice(0, 24)
                 .map((sc) => (
                   <Chip key={sc.slug} on={false}
-                    onClick={() => { dispatch({ type: 'teamId', id: naming, name: sc.name }); setNaming(null); setSchoolQuery('') }}>
+                    onClick={() => {
+                      dispatch({ type: 'teamName', id: naming, name: sc.name })
+                      if (myTeam === null) dispatch({ type: 'teamId', id: naming })
+                      setNaming(null); setSchoolQuery('')
+                    }}>
                     {sc.name}
                   </Chip>
                 ))}
             </div>
             <div className="row" style={{ gap: 8, marginTop: 10 }}>
-              <Btn onClick={() => { dispatch({ type: 'teamId', id: naming, name: null }); setNaming(null) }}>
+              <Btn onClick={() => { if (myTeam === null) dispatch({ type: 'teamId', id: naming }); setNaming(null) }}>
                 Skip — just call it team {naming}
               </Btn>
             </div>
@@ -160,7 +165,43 @@ export default function TeamSave() {
           </Card>
         ) : null}
 
-        {tab === 'DEPTH' && mine ? (
+        {tab === 'TEAMS' && roster ? (
+          <Card className="card-pad">
+            <Kicker>All {teams.length} programmes</Kicker>
+            <p className="body-serif" style={{ marginTop: 7 }}>
+              The save sorts every player into one of these, 85 to a roster, but never records
+              which school each one is. Name any of them and it sticks — they are listed by their
+              best players so you can tell them apart.
+            </p>
+            <Input placeholder="search by player or school name" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <div className="col" style={{ gap: 0, marginTop: 10 }}>
+              {teams
+                .filter((t) => {
+                  const q = query.trim().toLowerCase()
+                  if (!q) return true
+                  return (names[t.id] ?? '').toLowerCase().includes(q) ||
+                    t.list.some((p) => (p.first + ' ' + p.last).toLowerCase().includes(q))
+                })
+                .slice(0, 40)
+                .map((t) => (
+                  <div key={t.id} className="row"
+                    style={{ gap: 10, alignItems: 'baseline', borderTop: '1px solid var(--line)', padding: '6px 0' }}>
+                    <span className="num" style={{ color: 'var(--ink)', width: 26 }}>{t.top}</span>
+                    <button onClick={() => setNaming(t.id)} style={{ all: 'unset', cursor: 'pointer', minWidth: 150 }}>
+                      <strong style={{ color: names[t.id] ? 'var(--ink)' : 'var(--ink3)' }}>
+                        {names[t.id] ?? `Team ${t.id} — name it`}
+                      </strong>
+                    </button>
+                    {t.id === myTeam ? <Meta size={9} color="var(--accent)">YOURS</Meta> : null}
+                    <span style={{ color: 'var(--ink3)', fontSize: 11 }}>
+                      {t.list.slice(0, 3).map((p) => p.first + ' ' + p.last).join(' · ')}
+                    </span>
+                  </div>
+                ))}
+            </div>
+            <Meta size={9}>{Object.keys(names).length} of {teams.length} named</Meta>
+          </Card>
+        ) : tab === 'DEPTH' && mine ? (
           <Card className="card-pad">
             <Kicker>Depth chart</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
@@ -225,7 +266,7 @@ export default function TeamSave() {
 
             <Card className="card-pad">
               <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
-                <Kicker>{mine ? (state.teamName ?? `Team ${mine.id}`) : 'Every school'}{pos ? ` — ${pos}` : ''}, best first</Kicker>
+                <Kicker>{mine ? (names[mine.id] ?? `Team ${mine.id}`) : 'Every school'}{pos ? ` — ${pos}` : ''}, best first</Kicker>
                 {mine ? (
                   <button onClick={() => dispatch({ type: 'teamId', id: null })}
                     style={{ all: 'unset', cursor: 'pointer' }}>

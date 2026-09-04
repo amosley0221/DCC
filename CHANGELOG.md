@@ -8,7 +8,14 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **A Teams tab, and any team can be named.** All 138 programmes in one list,
+  strongest first, each shown by its best players so you can tell them apart.
+  Name any of them from the 143 schools your save carries and it sticks, with a
+  count of how many you have done. Naming is manual because the save groups
+  rosters but never records which school each one is — eight ways of finding
+  that link have now been tried and are written up in `docs/SAVE-FORMAT.md`.
 
 ## [0.10.1] - 2026-09-04
 

@@ -488,26 +488,27 @@ pass.
 ### Team names: present, but not linked to rosters
 
 The save carries all 143 schools — a table of 503-byte records holding a slug
-(`teamdb_psu`), a full name, a nickname, hashtags and chants. What it does not
-carry, anywhere found so far, is the join between those records and the roster
-team ids. Five approaches came up empty:
+(`teamdb_psu`), a full name, a nickname, hashtags, chants and a motto. What it
+does not carry, anywhere yet found, is the join between those records and the
+roster team ids. Eight approaches came up empty:
 
-- **Order.** The table is alphabetical. Penn State is entry 95 there and team 74
-  on the rosters.
-- **A field in the record.** No byte or bit field anywhere in the 503-byte
-  record yields 74, 41 and 112 for Penn State, Ohio State and Michigan together.
-- **The generation id.** A generated player's asset name carries a team number,
-  but it is unrelated to where they play: across all 138 rosters the modal
-  generation id accounts for a mean of 4.7% of a roster, and only 94 distinct
-  values cover 138 teams. It is not a stale team, it is a different thing.
-- **Rivalry records.** `Maryland_Penn_State_Game` and its siblings are pure
-  strings with nothing numeric within ±160 bytes.
-- **Any name table in roster order.** Testing 29,302 base-and-stride windows for
-  a table with Penn State at 74, Ohio State at 41 and Michigan at 112 found
-  none.
+| Approach | Result |
+| --- | --- |
+| Table order | Alphabetical. Penn State is entry 95 there, team 74 on rosters |
+| A field in the team record | The record is **entirely strings** — not one non-text byte in it |
+| The generation id in a player's asset name | Unrelated to where they play: mean 4.7% of a roster, 94 values for 138 teams |
+| Rivalry records | Pure strings, nothing numeric within ±160 bytes |
+| A name table in roster order | 29,302 base-and-stride windows tested, none |
+| The 8-byte abbreviation arrays | 336 entries with repeats, no ids — a reference list, not a table |
+| A per-team standings array | Every candidate with 9 at index 74 was an incrementing counter |
+| The decoded zstd frames | 6.8 MB of object data containing no school-name strings at all |
 
-So the app has the user pick their school once, from the save's own list. That
-is one click and exactly right, where a guess would be neither.
+The team record being pure text is the decisive one: whatever numbers link teams
+to rosters, they are not stored beside the names.
+
+So the app has the user name teams from the save's own list. Their own
+programme is one click; the rest can be named as they are browsed, and each
+name sticks.
 
 ### Still unmapped
 
