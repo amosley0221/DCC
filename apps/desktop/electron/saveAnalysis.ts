@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { inflateSync, inflateRawSync, gunzipSync } from 'node:zlib'
-import { statSync, readFileSync } from 'node:fs'
-import { basename } from 'node:path'
+import { statSync, readFileSync, readdirSync } from 'node:fs'
+import { basename, join } from 'node:path'
 
 /**
  * First-pass analysis of a dynasty save file.
@@ -36,6 +36,8 @@ export interface FrostbiteHeader {
 
 export interface SaveReport {
   frostbite?: FrostbiteHeader
+  /** Dictionary-compressed zstd frames inside the payload. */
+  zstd?: { frames: number; dictionaryId: string; dictionaryInSave: boolean; meanContentBytes: number }
   name: string
   bytes: number
   sha256: string
@@ -297,8 +299,46 @@ export function analyzeSave(path: string): SaveReport {
     )
   }
 
+  // The object data sits in dictionary-compressed zstd frames; count them and
+  // read the dictionary id they all point at.
+  let zstd: SaveReport['zstd']
+  if (inflated.length > 0) {
+    const magic = Buffer.from([0x28, 0xb5, 0x2f, 0xfd])
+    let i = 0, frames = 0, sized = 0, sizeSum = 0, dictId = 0
+    while ((i = inflated.indexOf(magic, i)) !== -1) {
+      const fhd = inflated[i + 4]
+      const didLen = [0, 1, 2, 4][fhd & 3]
+      const fcsLen = [(fhd >> 5) & 1 ? 1 : 0, 2, 4, 8][(fhd >> 6) & 3]
+      if (didLen && i + 5 + didLen <= inflated.length) {
+        dictId = didLen === 4 ? inflated.readUInt32LE(i + 5)
+          : didLen === 2 ? inflated.readUInt16LE(i + 5) : inflated[i + 5]
+      }
+      if (fcsLen && i + 5 + didLen + fcsLen <= inflated.length) {
+        sizeSum += fcsLen === 1 ? inflated[i + 5 + didLen] : inflated.readUInt16LE(i + 5 + didLen)
+        sized++
+      }
+      frames++
+      i += 4
+    }
+    if (frames > 0) {
+      zstd = {
+        frames,
+        dictionaryId: `0x${(dictId >>> 0).toString(16)}`,
+        dictionaryInSave: inflated.includes(Buffer.from([0x37, 0xa4, 0x30, 0xec])),
+        meanContentBytes: sized ? Math.round(sizeSum / sized) : 0,
+      }
+      notes.push(
+        `${frames.toLocaleString()} zstd frames, all using dictionary ` +
+          `0x${(dictId >>> 0).toString(16)}. That dictionary is ` +
+          `${zstd.dictionaryInSave ? 'in the save' : 'NOT in the save — it must come from the game install'}, ` +
+          'and without it these frames cannot be decompressed.',
+      )
+    }
+  }
+
   return {
     frostbite: frostbite?.header,
+    zstd,
     name: basename(path),
     bytes,
     sha256: createHash('sha256').update(buf).digest('hex'),
@@ -408,4 +448,103 @@ export function diffSaves(pathA: string, pathB: string): SaveDiff {
     runs: runs.slice(0, 400),
     notes,
   }
+}
+
+// ── finding the compression dictionary ────────────────────────────────────────
+
+export interface DictHit {
+  file: string
+  bytes: number
+  /** Why this file is a candidate. */
+  reason: string
+  offset: number
+}
+
+export interface DictScan {
+  root: string
+  filesScanned: number
+  bytesScanned: number
+  hits: DictHit[]
+  notes: string[]
+}
+
+/** zstd dictionary magic, little-endian 0xEC30A437. */
+const ZSTD_DICT_MAGIC = Buffer.from([0x37, 0xa4, 0x30, 0xec])
+
+/**
+ * Hunts the game install for the zstd dictionary the save's frames were
+ * compressed with.
+ *
+ * Every frame in the save declares the same dictionary id and the dictionary
+ * itself is not in the save, so without it those frames cannot be read. A
+ * dictionary either starts with the zstd dictionary magic followed by its id,
+ * or is embedded in a larger archive — so the id is searched for on its own too.
+ */
+export function findDictionary(root: string, dictionaryId: number, budgetBytes = 6 * 1024 ** 3): DictScan {
+  const idLE = Buffer.alloc(4)
+  idLE.writeUInt32LE(dictionaryId >>> 0)
+
+  const hits: DictHit[] = []
+  const notes: string[] = []
+  let filesScanned = 0
+  let bytesScanned = 0
+
+  const walk = (dir: string, depth: number) => {
+    if (depth > 8 || bytesScanned > budgetBytes) return
+    let entries: import('node:fs').Dirent[]
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      if (bytesScanned > budgetBytes) return
+      const full = join(dir, e.name)
+      if (e.isDirectory()) { walk(full, depth + 1); continue }
+      if (!e.isFile()) continue
+
+      let size = 0
+      try { size = statSync(full).size } catch { continue }
+      // Dictionaries are small; the archives that embed them are not, so the
+      // ceiling is generous rather than tight.
+      if (size === 0 || size > 512 * 1024 * 1024) continue
+
+      let buf: Buffer
+      try { buf = readFileSync(full) } catch { continue }
+      filesScanned++
+      bytesScanned += buf.length
+
+      const magicAt = buf.indexOf(ZSTD_DICT_MAGIC)
+      if (magicAt >= 0) {
+        const declared = buf.length >= magicAt + 8 ? buf.readUInt32LE(magicAt + 4) : 0
+        hits.push({
+          file: full,
+          bytes: size,
+          offset: magicAt,
+          reason: declared === (dictionaryId >>> 0)
+            ? `zstd dictionary with the matching id 0x${declared.toString(16)}`
+            : `zstd dictionary, id 0x${declared.toString(16)} (not the one the save uses)`,
+        })
+        continue
+      }
+      const idAt = buf.indexOf(idLE)
+      if (idAt >= 0) {
+        hits.push({
+          file: full,
+          bytes: size,
+          offset: idAt,
+          reason: 'contains the dictionary id, but no dictionary magic — may embed it',
+        })
+      }
+    }
+  }
+
+  walk(root, 0)
+
+  const exact = hits.filter((h) => h.reason.startsWith('zstd dictionary with the matching'))
+  if (exact.length) notes.push(`Found the dictionary in ${exact.length} file(s).`)
+  else if (hits.length) notes.push('No exact dictionary, but these files mention its id and are worth a look.')
+  else notes.push('Nothing found. The dictionary may be inside a packed archive that has to be unpacked first.')
+
+  return { root, filesScanned, bytesScanned, hits: hits.slice(0, 60), notes }
 }

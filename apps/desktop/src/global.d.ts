@@ -1,5 +1,5 @@
 import type { UpdateStatus } from './updates'
-import type { SaveReport, SaveDiff } from '../electron/saveAnalysis'
+import type { SaveReport, SaveDiff, DictScan } from '../electron/saveAnalysis'
 
 declare global {
   interface Window {
@@ -14,6 +14,7 @@ declare global {
       analyzeSave(path: string): Promise<{ ok: true; report: SaveReport } | { ok: false; message: string }>
       backupSave(path: string): Promise<{ ok: true; dest: string } | { ok: false; message: string }>
       diffSaves(a: string, b: string): Promise<{ ok: true; diff: SaveDiff } | { ok: false; message: string }>
+      findDictionary(id: number): Promise<{ ok: true; scan: DictScan } | { ok: false; message: string }>
       checkForUpdate(): Promise<unknown>
       downloadUpdate(): Promise<{ ok: boolean; message?: string }>
       installUpdate(): Promise<boolean>

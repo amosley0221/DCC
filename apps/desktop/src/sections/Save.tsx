@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
-import type { SaveReport, SaveDiff } from '../../electron/saveAnalysis'
+import type { SaveReport, SaveDiff, DictScan } from '../../electron/saveAnalysis'
 
 /**
  * Dissects the dynasty save so the format can be worked out. Nothing here
@@ -16,6 +16,18 @@ export default function Save() {
   const [backup, setBackup] = useState<string | null>(null)
   const [diff, setDiff] = useState<SaveDiff | null>(null)
   const [diffing, setDiffing] = useState(false)
+  const [scan, setScan] = useState<DictScan | null>(null)
+  const [scanning, setScanning] = useState(false)
+
+  const hunt = async () => {
+    if (!report?.zstd) return
+    setScanning(true)
+    setScan(null)
+    const res = await window.dcc.findDictionary(Number(report.zstd.dictionaryId))
+    setScanning(false)
+    if (res.ok) setScan(res.scan)
+    else if (res.message !== 'cancelled') setError(res.message)
+  }
 
   const compare = async () => {
     if (!path) return
@@ -152,6 +164,42 @@ export default function Save() {
               </div>
               {backup ? <div className="effect" style={{ marginTop: 10 }}>BACKED UP TO {backup}</div> : null}
             </Card>
+
+            {report.zstd ? (
+              <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
+                <Kicker>Compression dictionary</Kicker>
+                <div className="grid-3" style={{ marginTop: 10 }}>
+                  <div><Meta size={9}>ZSTD FRAMES</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{report.zstd.frames.toLocaleString()}</div></div>
+                  <div><Meta size={9}>DICTIONARY</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{report.zstd.dictionaryId}</div></div>
+                  <div><Meta size={9}>IN THE SAVE</Meta><div className="num" style={{ fontSize: 15, color: report.zstd.dictionaryInSave ? 'var(--good)' : 'var(--accent)' }}>{report.zstd.dictionaryInSave ? 'yes' : 'no'}</div></div>
+                </div>
+                <p className="body-serif" style={{ marginTop: 9 }}>
+                  The game objects live inside these frames, and every one of them is compressed
+                  against a shared dictionary that is not stored in the save. Without that
+                  dictionary the frames cannot be read. It should be somewhere in the game install.
+                </p>
+                <div className="row" style={{ gap: 8, marginTop: 10 }}>
+                  <Btn variant="primary" disabled={scanning} onClick={hunt}>
+                    {scanning ? 'Scanning…' : 'Search game folder for it…'}
+                  </Btn>
+                </div>
+                {scan ? (
+                  <div className="col" style={{ gap: 7, marginTop: 12 }}>
+                    <Meta size={10}>
+                      {scan.filesScanned.toLocaleString()} files ·{' '}
+                      {(scan.bytesScanned / 1024 ** 3).toFixed(2)} GB scanned
+                    </Meta>
+                    {scan.notes.map((n, i) => <span key={i} className="body-serif">{n}</span>)}
+                    {scan.hits.map((h) => (
+                      <div key={h.file + h.offset} className="col" style={{ gap: 2 }}>
+                        <span className="mono" style={{ fontSize: 10.5, color: 'var(--ink)', wordBreak: 'break-all' }}>{h.file}</span>
+                        <Meta size={9}>0x{h.offset.toString(16)} · {h.reason}</Meta>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </Card>
+            ) : null}
 
             {diffing ? <Card className="card-pad"><Meta color="var(--warn)">COMPARING…</Meta></Card> : null}
 

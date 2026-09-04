@@ -23,6 +23,7 @@ const api = {
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
   diffSaves: (a: string, b: string) => ipcRenderer.invoke('save:diff', { a, b }),
+  findDictionary: (id: number) => ipcRenderer.invoke('save:findDict', id),
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),

@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { autoUpdater } from 'electron-updater'
-import { analyzeSave, diffSaves } from './saveAnalysis'
+import { analyzeSave, diffSaves, findDictionary } from './saveAnalysis'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -161,6 +161,19 @@ ipcMain.handle('save:pick', async () => {
 ipcMain.handle('save:analyze', (_e, path: string) => {
   try {
     return { ok: true as const, report: analyzeSave(path) }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:findDict', async (_e, dictionaryId: number) => {
+  const res = await dialog.showOpenDialog(win!, {
+    title: 'Choose your College Football install folder',
+    properties: ['openDirectory'],
+  })
+  if (res.canceled || !res.filePaths[0]) return { ok: false as const, message: 'cancelled' }
+  try {
+    return { ok: true as const, scan: findDictionary(res.filePaths[0], dictionaryId) }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

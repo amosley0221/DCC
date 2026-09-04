@@ -10,6 +10,18 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.6.0] - 2026-09-04
+
+### Added
+
+- The save report now counts the **zstd frames** inside the payload and names
+  the dictionary they were compressed against, and says whether that dictionary
+  is present in the save. For a real College Football save it is not: 15,408
+  frames all point at dictionary `0x65fc508b`, which ships with the game.
+- **Search game folder for it…** walks a chosen install directory looking for
+  that dictionary, either as a file starting with the zstd dictionary magic or
+  as any file containing the id.
+
 ## [0.5.0] - 2026-09-04
 
 ### Added

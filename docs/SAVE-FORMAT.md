@@ -137,6 +137,56 @@ cannot recover the pitch. Two more will:
 | One player's **rating** ±1 | Where ratings live and how wide they are |
 | The **same** player's rating | Ties the ratings block to the flags block for one record |
 
+### Five controlled saves
+
+| Pair | Change | Bytes differing |
+| --- | --- | --- |
+| T1 → T2 | redshirt removed, player A | **1** — `0x00f31dc8`, bit 7 |
+| T2 → T3 | redshirt removed, player B | **1** — `0x00d112c8`, bit 7 |
+| T3 → T4 | a rating | 150, in 4 runs |
+| T4 → T5 | a rating | 149, in 3 runs |
+
+Redshirt is settled: **bit 7 of a flag byte**, confirmed on two independent
+players. Player B's byte was `0x92 → 0x12`, so the other bits in that byte are
+further per-player booleans. The two players' bytes are 2,231,040 bytes apart,
+which is not a whole number of any small record size — they are in separate
+blocks rather than adjacent rows.
+
+The rating edits are not one clean byte, and the reason turns out to matter
+more than the edits do.
+
+## The real obstacle: a dictionary that is not in the save
+
+The payload contains **15,408 zstd frames**, mean content 209 bytes. Every one
+declares the same dictionary:
+
+```
+28 b5 2f fd   zstd magic
+63            frame header: single segment, 4-byte dictionary id
+8b 50 fc 65   dictionary id 0x65fc508b
+a2 00         content size, 162 bytes
+```
+
+Decoding one without it returns exactly `Dictionary mismatch`, and the zstd
+dictionary magic (`37 a4 30 ec`) appears **nowhere in the save**. So the game
+objects — ratings, positions, the player-to-team link — sit inside frames that
+cannot be opened without a dictionary that ships with the game rather than the
+save.
+
+That also explains the noisy rating diffs: part of what changed was a frame
+being recompressed, not the field itself.
+
+**This is the blocker now.** The flags that live outside the frames (redshirt,
+and whatever shares that byte) are readable today. Everything inside them waits
+on the dictionary.
+
+### Where the dictionary might be
+
+The Save section's **Search game folder for it…** walks the install looking for
+a file starting with the zstd dictionary magic, or any file containing the id
+`0x65fc508b`. If it is packed inside a game archive, that archive has to be
+unpacked first.
+
 ### Saves seen so far
 
 | Saved | SHA-256 (first 8) | Inflated |
