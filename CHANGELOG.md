@@ -10,6 +10,25 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.17.1] - 2026-09-04
+
+### Fixed
+
+- **Recruit no longer calls anything a prospect.** Splitting the unrostered
+  pool by authored versus generated faces removed the real players — Toney,
+  Baugh — but not generated players who have left, and those rate above every
+  real recruit: 89 and 86 in one save against a best prospect of 83. The tabs
+  now say what is actually being read, `GENERATED` and `REAL PLAYERS`, and the
+  screen states plainly that the second group still contains players who are
+  gone.
+
+  A field marking a live recruit was searched for across every 1-, 2- and
+  3-bit position in the player record. Fifty-six fitted the known outliers and
+  every one failed on data it was not fitted to — the best, bit 1306, is also
+  set on 6,682 of 11,730 rostered players. Recorded in `docs/SAVE-FORMAT.md`
+  as a negative result rather than shipped as a guess.
+
+
 ## [0.17.0] - 2026-09-04
 
 ### Added

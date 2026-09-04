@@ -20,22 +20,23 @@ import type { RosterPlayer } from '../../electron/saveAnalysis'
 const UNASSIGNED = 255
 
 /**
- * Who is actually a recruit.
+ * Everyone off a roster lands in one pool, and that pool is not the recruiting
+ * class. It also holds players who have left — transferred, graduated, drafted.
  *
- * Everyone off a roster lands in one pool, and that pool is not all prospects:
- * it also holds real players who left — transferred, graduated, drafted. The
- * two are told apart by the art the save names for them. Recruits are
- * generated, so they carry a `Generic_` face; real players carry an authored
- * `Unique_` one. In a Penn State save that splits 4,527 generated from 180
- * real, and the real ones are why Malachi Toney at 99 and Jadan Baugh at 95
- * were sitting on top of a recruiting list.
+ * The art the save names for each player separates most of them: real players
+ * carry an authored `Unique_` face, generated players a `Generic_` one, which
+ * is why Malachi Toney at 99 and Jadan Baugh at 95 were on top of a list of
+ * supposed recruits. It does not separate all of them. Generated players who
+ * have left keep their generated face, and they show up here rated above any
+ * real prospect — 89 and 86 in one Penn State save against a best recruit of 83.
  *
- * This is an inference from the asset id, not a class field read from the save
- * — the save's own class and recruiting stage are still unmapped — so the
- * screen says which group it is showing rather than presenting one as the
- * whole truth.
+ * So this splits the pool on what can actually be read and says so, rather than
+ * calling one side "prospects". A field that marks a live recruit has been
+ * looked for and not found: candidates that fit the handful of known outliers
+ * all failed on data they were not fitted to — the best of them, bit 1306, is
+ * also set on 6,682 rostered players.
  */
-const KINDS = ['PROSPECTS', 'LEFT THE ROSTER', 'EVERYONE'] as const
+const KINDS = ['GENERATED', 'REAL PLAYERS', 'EVERYONE'] as const
 type Kind = (typeof KINDS)[number]
 const isGenerated = (p: RosterPlayer) => p.assetId.startsWith('Generic_')
 const GROUPS: [string, string[]][] = [
@@ -103,7 +104,7 @@ export default function RecruitSave() {
     } })
   }
   const [group, setGroup] = useState('ALL')
-  const [kind, setKind] = useState<Kind>('PROSPECTS')
+  const [kind, setKind] = useState<Kind>('GENERATED')
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<number | null>(null)
 
@@ -116,8 +117,8 @@ export default function RecruitSave() {
     return { gen, real: unrostered.length - gen }
   }, [unrostered])
   const pool = useMemo(() => (
-    kind === 'PROSPECTS' ? unrostered.filter(isGenerated)
-    : kind === 'LEFT THE ROSTER' ? unrostered.filter((p) => !isGenerated(p))
+    kind === 'GENERATED' ? unrostered.filter(isGenerated)
+    : kind === 'REAL PLAYERS' ? unrostered.filter((p) => !isGenerated(p))
     : unrostered
   ), [unrostered, kind])
 
@@ -185,13 +186,14 @@ export default function RecruitSave() {
     <Card className="card-pad">
       <Kicker>Recruiting pool — from your save</Kicker>
       <p className="body-serif" style={{ marginTop: 7 }}>
-        {unrostered.length.toLocaleString()} players are on none of the 138 rosters, and they are
-        not all prospects. {counts.gen.toLocaleString()} are generated players — the recruits —
-        and {counts.real.toLocaleString()} are real players who left your rosters, which is why
-        names like Malachi Toney and Jadan Baugh turn up here. They are told apart by the face the
-        save names for each: generated players get a <code>Generic_</code> one, real players an
-        authored <code>Unique_</code> one. The save's own class and recruiting stage are still
-        unmapped, so nothing here is a reading of them.
+        {unrostered.length.toLocaleString()} players are on none of the 138 rosters. That is not
+        the same as the recruiting class: it also holds players who have left.
+        {' '}{counts.real.toLocaleString()} carry an authored <code>Unique_</code> face, so they are
+        real players — Malachi Toney and Jadan Baugh among them — and{' '}
+        {counts.gen.toLocaleString()} carry a generated <code>Generic_</code> one. Most of that
+        second group are recruits, but not all: a generated player who has left keeps a generated
+        face, and those sit above every real prospect. The save marks the difference somewhere DCC
+        cannot yet read, so nothing here is labelled "prospect" as though it were certain.
       </p>
 
       <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>

@@ -605,3 +605,37 @@ exports the report, so the save itself never has to be sent anywhere.
 saves and it lists every byte that changed, with the bit that moved. Since the
 payload is deterministic, the workflow is: save, change one thing in-game, save
 again, compare — and read the field straight off.
+
+## The unrostered pool is not the recruiting class
+
+Every player the save leaves off a roster — the 138 schools hold exactly 85
+each — lands in one pool of about 4,700. It contains three kinds of people:
+recruits, players in the portal, and players who have left.
+
+The asset id separates most of them. Real players carry an authored `Unique_`
+face and generated players a `Generic_` one, which in one Penn State save is
+180 against 4,528. That is what put Malachi Toney at 99 and Jadan Baugh at 95
+on top of a list of supposed recruits.
+
+It does not separate all of them. A generated player who has left keeps a
+generated face, and those rate above any real prospect: 89 and 86 in that save
+against a best recruit of 83.
+
+### A prospect flag: looked for, not found
+
+Searched every 1-, 2- and 3-bit field in the 192-byte record for one that
+selects the generated pool while excluding the players who plainly are not
+prospects. Fifty-six fields fit. All of them failed on data they were not
+fitted to: the best, bit 1306, is also set on 6,682 of 11,730 **rostered**
+players, so it marks something else entirely.
+
+The search was worthless by construction — two outliers is not enough
+constraint to distinguish a real field from thousands of coincidences. Ten
+fields shaped like a star rating (five consecutive values, monotone in overall)
+turned up the same way, and none matched the known distribution of a real
+recruiting class.
+
+What this needs is ground truth from a single save: the list of who is actually
+a prospect, with stars and class, alongside the save itself. That is how the 53
+ratings were solved, and guessing has been worse than useless everywhere it has
+been tried here.
