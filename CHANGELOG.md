@@ -8,7 +8,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- **The analysis notes no longer warn about a dictionary you already have.**
+  The line about the frames stated that they could not be decompressed without
+  the dictionary, which kept reading as a problem after the dictionary was found
+  and loaded. It now just says where the dictionary lives; whether DCC has it is
+  the dictionary panel's job to report, and it does.
 
 ## [0.8.2] - 2026-09-04
 

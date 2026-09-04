@@ -352,11 +352,13 @@ export function analyzeSave(path: string): SaveReport {
         dictionaryInSave: inflated.includes(Buffer.from([0x37, 0xa4, 0x30, 0xec])),
         meanContentBytes: sized ? Math.round(sizeSum / sized) : 0,
       }
+      // A statement about the file, not about whether DCC has the dictionary —
+      // the dictionary panel owns that, and it used to read as a warning even
+      // once the dictionary was loaded and the frames were readable.
       notes.push(
         `${frames.toLocaleString()} zstd frames, all using dictionary ` +
-          `0x${(dictId >>> 0).toString(16)}. That dictionary is ` +
-          `${zstd.dictionaryInSave ? 'in the save' : 'NOT in the save — it must come from the game install'}, ` +
-          'and without it these frames cannot be decompressed.',
+          `0x${(dictId >>> 0).toString(16)}, which is ` +
+          `${zstd.dictionaryInSave ? 'carried in the save itself' : 'not stored in the save'}.`,
       )
     }
   }
