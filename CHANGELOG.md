@@ -10,6 +10,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.21.1] - 2026-09-04
+
+### Fixed
+
+- **0.21.0 did not build.** Importing the team-name table from the save reader
+  pulled `node:zlib` into the browser bundle with it, and the renderer build
+  failed. The table now lives in its own module with no imports at all, which
+  is what a shared constant should have been from the start.
+
+
 ## [0.21.0] - 2026-09-04
 
 ### Added

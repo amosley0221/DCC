@@ -3,7 +3,7 @@ import { useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
-import { TEAM_ID_NAMES } from '../../electron/saveAnalysis'
+import { TEAM_ID_NAMES } from '../../electron/teamIds'
 
 const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
