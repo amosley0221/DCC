@@ -1026,6 +1026,23 @@ export const POSITIONS = [
 export const OVERALL_BIT = 561
 
 /**
+ * The team a player is actually on: an 8-bit field. It cuts the league into 138
+ * rosters of 60–105 plus one bucket of 4,718 — recruits and the portal, who are
+ * on nobody's roster yet.
+ *
+ * It was found by taking 41 players named on one program's roster screen and
+ * asking which field they all share. They share this one, and exactly 85 players
+ * in the entire save carry that value: the scholarship limit. Three earlier
+ * attempts failed because they scored candidates against the team id in a
+ * player's asset name, which agrees with this field only 3.2% of the time — it
+ * records where a generated player started, in a different numbering entirely.
+ */
+export const TEAM_BIT = 431
+export const TEAM_WIDTH = 8
+/** Players on no roster: recruits and the transfer portal. */
+export const TEAM_UNASSIGNED = 255
+
+/**
  * Ratings are 7-bit fields packed most-significant-bit first; the number here
  * is the bit the field ends on. Every one was checked against a real rating
  * card, and no player in the file falls outside 1–99 on any of them.
@@ -1071,6 +1088,8 @@ export interface RosterPlayer {
   teamId: string | null
   position: string
   overall: number
+  /** The save's own team id. TEAM_UNASSIGNED means recruit or portal. */
+  team: number
   redshirt: boolean
   ratings: Record<string, number>
 }
@@ -1122,6 +1141,7 @@ export function readRoster(payload: Buffer): RosterPlayer[] {
       assetId,
       teamId: team ? team[1] : null,
       position: POSITIONS[bits(payload, base, POSITION_BIT, 5)] ?? '—',
+      team: bits(payload, base, TEAM_BIT, TEAM_WIDTH),
       overall: bits(payload, base, OVERALL_BIT, 7),
       redshirt: bits(payload, base, REDSHIRT_BIT, 1) === 1,
       ratings,

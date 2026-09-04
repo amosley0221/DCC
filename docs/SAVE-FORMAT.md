@@ -458,33 +458,43 @@ real, correctly-ranked players at their real positions and hometowns — Keelon
 Russell QB Duncanville, CJ Carr QB Saline, Bryce Underwood QB Detroit, Malachi
 Toney WR. None of that went into deriving either field.
 
-### Tried and rejected: three ways to find the team
+### The team
 
-**A team field on the player.** A 9-bit field ending at bit 235 scores 85.8%
-precision and 77.1% recall against the team in the asset id, and its big buckets
-really are rosters — bucket 4 is 99% one team. But only 84 of its 512 buckets
-hold 60 or more players, where 240 teams need 240 rosters, and widening the
-window in either direction improves neither score. A first pass scored it 86.8%
-on "purity" alone, a metric a field that shatters every team into singletons
-passes perfectly; measuring recall as well is what exposed it.
+An **8-bit field ending at bit 431**. It cuts the league into **138 rosters of
+exactly 85** — the scholarship limit — plus one bucket of 4,718 players with
+value 255, who are on nobody's roster: recruits and the transfer portal.
 
-**Any field with the right shape.** Scanning every bit offset and every width
-from 6 to 16 for a field that cuts the league into 180–340 groups of roughly
-equal size returns only 8-bit windows in the record's first bytes — slices of
-the unique object id, which naturally give 256 near-uniform groups. Nothing in
-the 192-byte record partitions the league into 240 rosters.
+It was found by taking 41 players named on one programme's in-game roster screen
+and asking which field they all share. They share this one, at value 74, and
+exactly 85 players in the whole save carry it. Every other team came out at 85
+too.
 
-**A roster list on the team.** If the link is stored the other way, a team holds
-an array of player indices. Searching the payload for every appearance of one
-player's index as a 16- or 32-bit value, then walking outward for a run of
-distinct in-range values, finds exactly one candidate: 8,902 entries reading
-8568, 8569, 8570… — a counter. "Distinct and in range" is passed trivially by
-consecutive integers.
+Two independent confirmations, neither used to derive it. Team 74's depth chart
+reproduces the roster screen position by position. And both players whose
+redshirts were toggled in the very first controlled saves — Damien Priester and
+Jabari Scroggins — are on team 74, which is what you would expect of edits made
+by the person coaching that programme.
 
-So the team link is not where any of the three obvious places would put it. What
-would settle it is the same thing that settled the ratings: a known set. A list
-of players confirmed to be on one school — a roster screenshot would do — gives
-enough anchors to find whatever structure holds exactly that set.
+**Why three earlier attempts failed.** All three scored candidates against the
+team id in a player's asset name. That id agrees with the real team field
+**3.2% of the time**: it records the programme a generated player was created
+for, in an entirely different numbering. Any correct answer would have scored
+near zero against it, and the field that scored 86% was matching something else.
+The ground truth was wrong, so every test built on it was measuring the wrong
+thing — which no amount of care with precision, recall or bucket shape could
+have rescued. A list of players known to be on one roster settled it in a single
+pass.
+
+### Team names, not yet linked
+
+The save carries a team table: 143 records at a 503-byte stride, each holding a
+slug (`teamdb_psu`), a full name, a nickname, hashtags and chants. It is in
+alphabetical order, and nothing in it is the team id — Penn State is entry 95
+there and team 74 on the rosters, and no byte or bit field in the record
+reproduces 74, 41 and 112 for Penn State, Ohio State and Michigan together.
+
+So rosters group correctly but are not named. Until the link is found the app
+has the user identify their own programme once, by a player on it.
 
 ### Still unmapped
 

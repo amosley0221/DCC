@@ -19,10 +19,7 @@ const GROUPS: [string, string[]][] = [
 const ovrColour = (o: number) =>
   o >= 90 ? 'var(--accent)' : o >= 80 ? 'var(--good)' : o >= 70 ? 'var(--ink)' : 'var(--ink3)'
 
-const NEEDS_TEAM =
-  'Which school a player belongs to is not decoded yet. Nothing in the 192-byte player record ' +
-  'partitions the league into 240 rosters, and the id in a player’s asset name is where they ' +
-  'were generated rather than where they play now — so this cannot be scoped to one program yet.'
+const UNASSIGNED = 255
 
 /**
  * Team, driven by the save rather than the sample dynasty.
@@ -34,8 +31,9 @@ const NEEDS_TEAM =
  */
 export default function TeamSave() {
   const { save, patch } = useSave()
-  const { dispatch } = useStore()
+  const { state, dispatch } = useStore()
   const { path, roster, rosterBusy } = save
+  const myTeam = state.teamId
   const [tab, setTab] = useState<TabName>('ROSTER')
   const [query, setQuery] = useState('')
   const [pos, setPos] = useState<string | null>(null)
@@ -52,47 +50,121 @@ export default function TeamSave() {
     }
   }
 
+
+  /** Rosters, strongest first. Team 255 is the recruit and portal pool. */
+  const teams = useMemo(() => {
+    const m = new Map<number, RosterPlayer[]>()
+    for (const p of roster?.players ?? []) {
+      if (p.team === UNASSIGNED) continue
+      const l = m.get(p.team); if (l) l.push(p); else m.set(p.team, [p])
+    }
+    return [...m.entries()]
+      .map(([id, list]) => ({
+        id,
+        list: list.sort((a, b) => b.overall - a.overall),
+        top: Math.round(list.slice(0, 25).reduce((s2, p) => s2 + p.overall, 0) / Math.min(25, list.length)),
+      }))
+      .sort((a, b) => b.top - a.top)
+  }, [roster])
+
+  const mine = useMemo(() => teams.find((t) => t.id === myTeam) ?? null, [teams, myTeam])
+
+  const pool = useMemo(() => (mine ? mine.list : roster?.players ?? []), [mine, roster])
+
   const shown = useMemo(() => {
-    if (!roster) return []
     const q = query.trim().toLowerCase()
-    return roster.players
+    return pool
       .filter((p) => (!pos || p.position === pos) && (!q || (p.first + ' ' + p.last).toLowerCase().includes(q)))
       .sort((a, b) => b.overall - a.overall)
-      .slice(0, 60)
-  }, [roster, query, pos])
+      .slice(0, mine ? 100 : 60)
+  }, [pool, query, pos, mine])
 
   const counts = useMemo(() => {
     const m = new Map<string, number>()
-    for (const p of roster?.players ?? []) m.set(p.position, (m.get(p.position) ?? 0) + 1)
+    for (const p of pool) m.set(p.position, (m.get(p.position) ?? 0) + 1)
     return m
-  }, [roster])
+  }, [pool])
 
   return (
     <>
       <SectionHeader
         title="Team"
-        sub={<Meta>{roster ? `EVERY SCHOOL — ${roster.count.toLocaleString()} PLAYERS` : 'ROSTER NOT READ YET'}</Meta>}
+        sub={<Meta>{!roster ? 'ROSTER NOT READ YET'
+          : mine ? `YOUR PROGRAMME — ${mine.list.length} PLAYERS`
+          : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
         right={<div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
 
       <div className="col" style={{ gap: 12, maxWidth: 900 }}>
-        <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
-          <Kicker>No team picker yet</Kicker>
-          <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
-            {NEEDS_TEAM} Everything below is the <strong>whole dynasty</strong>, all 240 programs
-            together — so the best players in it play for other schools, not yours.
-          </p>
-        </Card>
+        {roster && !mine ? (
+          <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
+            <Kicker>Which one is yours?</Kicker>
+            <p className="body-serif" style={{ marginTop: 7 }}>
+              The save groups players into {teams.length} rosters of 85 — the scholarship limit —
+              but it does not record school names against them anywhere DCC can read yet. Find
+              yours by its players and it will be remembered.
+            </p>
+            <Input
+              placeholder="type a player on your team"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <div className="col" style={{ gap: 4, marginTop: 10 }}>
+              {teams
+                .filter((t) => !query.trim() || t.list.some((p) =>
+                  (p.first + ' ' + p.last).toLowerCase().includes(query.trim().toLowerCase())))
+                .slice(0, 8)
+                .map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { dispatch({ type: 'teamId', id: t.id }); setQuery('') }}
+                    style={{ all: 'unset', cursor: 'pointer', padding: '6px 0', borderTop: '1px solid var(--line)' }}
+                  >
+                    <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+                      <Meta size={9}>TEAM {t.id}</Meta>
+                      <span className="num" style={{ color: 'var(--ink)' }}>{t.top}</span>
+                      <span style={{ color: 'var(--ink2)', fontSize: 12 }}>
+                        {t.list.slice(0, 4).map((p) => p.first + ' ' + p.last).join(' · ')}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+            </div>
+          </Card>
+        ) : null}
 
-        {tab !== 'ROSTER' ? (
+        {tab === 'DEPTH' && mine ? (
+          <Card className="card-pad">
+            <Kicker>Depth chart</Kicker>
+            <p className="body-serif" style={{ marginTop: 7 }}>
+              Ordered by overall within each position, which is how the game seeds a depth chart
+              before anyone reorders it. DCC cannot yet read your actual ordering.
+            </p>
+            {GROUPS.map(([label, list]) => (
+              <div key={label} style={{ marginTop: 12 }}>
+                <Meta size={9}>{label}</Meta>
+                {list.map((posName) => {
+                  const at = mine.list.filter((p) => p.position === posName)
+                  if (!at.length) return null
+                  return (
+                    <div key={posName} className="row" style={{ gap: 10, alignItems: 'baseline', marginTop: 4 }}>
+                      <Meta size={9}>{posName}</Meta>
+                      <span style={{ color: 'var(--ink2)', fontSize: 12 }}>
+                        {at.map((p) => `${p.first} ${p.last} ${p.overall}`).join('  ·  ')}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </Card>
+        ) : tab !== 'ROSTER' ? (
           <Card className="card-pad">
             <Kicker>Not decoded yet</Kicker>
             <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
               {tab === 'SCHEDULE'
                 ? 'Fixtures, results and rankings are not decoded. The player ratings gave themselves up to controlled edits; the equivalent for games has not been located yet.'
-                : tab === 'DEPTH'
-                  ? 'A depth chart is per-team and per-position. Position is decoded — all 21 of them — so this needs only the team link above.'
-                  : 'A trade needs two rosters, so it needs the team link above. Writing back to the save is also not attempted yet, deliberately.'}
+                : 'A trade needs writing back to the save, which is deliberately not attempted yet — reading is solved, and a wrong byte in a 31 MB save is a lost dynasty.'}
             </p>
           </Card>
         ) : !roster ? (
@@ -125,7 +197,15 @@ export default function TeamSave() {
             </Card>
 
             <Card className="card-pad">
-              <Kicker>{pos ? `${pos} — every school, best first` : 'Every school, best first'}</Kicker>
+              <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+                <Kicker>{mine ? `Team ${mine.id}` : 'Every school'}{pos ? ` — ${pos}` : ''}, best first</Kicker>
+                {mine ? (
+                  <button onClick={() => dispatch({ type: 'teamId', id: null })}
+                    style={{ all: 'unset', cursor: 'pointer' }}>
+                    <Meta size={9} color="var(--accent)">CHANGE TEAM</Meta>
+                  </button>
+                ) : null}
+              </div>
               {shown.length === 0 ? <Empty>nobody matches</Empty> : null}
               {shown.map((p) => (
                 <PlayerRow

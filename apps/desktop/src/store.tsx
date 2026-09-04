@@ -13,6 +13,7 @@ import { SEMANTICS } from './theme'
 export const blankPersisted = (): Persisted => ({
   dynastySource: 'none',
   savePath: null,
+  teamId: null,
   relayUrl: '',
   relayToken: '',
   theme: 'night',
@@ -79,6 +80,7 @@ export type Action =
   | { type: 'clearDynasty' }
   | { type: 'relay'; url: string; token: string }
   | { type: 'savePath'; path: string | null }
+  | { type: 'teamId'; id: number | null }
 
 let seq = 0
 const nextId = () => `q${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -177,15 +179,17 @@ export function reducer(state: Persisted, action: Action): Persisted {
     case 'log':
       return { ...state, log: log(state, action.line.text, action.line.kind) }
     case 'reset':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'loadSample':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'clearDynasty':
-      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, teamId: state.teamId, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'relay':
       return { ...state, relayUrl: action.url, relayToken: action.token }
     case 'savePath':
       return { ...state, savePath: action.path }
+    case 'teamId':
+      return { ...state, teamId: action.id }
     default:
       return state
   }

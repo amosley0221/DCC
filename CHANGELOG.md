@@ -8,7 +8,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Team rosters and a depth chart.** The save's own team field is decoded, so
+  Team now shows one programme instead of the whole country: 138 rosters of
+  exactly 85 players, the scholarship limit, plus the 4,718 recruits and portal
+  players who are on nobody's roster. The depth chart lists every position group
+  in overall order.
+- **Pick your programme once.** The save groups rosters but does not name them
+  anywhere DCC can read yet, so you find yours by typing a player on it. It is
+  remembered from then on.
 
 ## [0.9.2] - 2026-09-04
 

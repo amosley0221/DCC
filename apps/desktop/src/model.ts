@@ -125,6 +125,12 @@ export interface Persisted {
    * Null when none has been chosen, or when the remembered one has gone.
    */
   savePath: string | null
+  /**
+   * The save's id for the team the user follows. The save does not say which
+   * team is theirs and the ids are not linked to school names yet, so this is
+   * chosen once and remembered.
+   */
+  teamId: number | null
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string
