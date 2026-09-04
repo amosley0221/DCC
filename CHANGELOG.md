@@ -8,12 +8,20 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.8.0] - 2026-09-04
+
 ### Added
 
-- **The save's compressed frames can now be read.** Load the compression
-  dictionary once (Save → Load dictionary file…) and it is kept with the app's
-  settings. Every one of the 15,408 frames in a real save decodes with it —
-  6.8 MB of object data that was previously opaque.
+- **The save's compressed frames can now be read.** All 15,408 frames in a real
+  College Football 27 save decode — 6.8 MB of object data that was previously
+  opaque — using the game's zstd dictionary.
+- **The dictionary is found automatically.** Opening a save searches the likely
+  places for it, verifies each candidate against that save so a wrong one is
+  never adopted, and keeps the right one with the app's settings. In testing it
+  picked the correct dictionary out of three siblings in 47 ms. There is still a
+  manual picker for the case where it is somewhere unusual.
 - Comparing two saves now diffs the **decoded** frames as well as the raw
   payload, which is far sharper: one rating edit went from 150 scattered bytes
   to four bytes inside a single frame.

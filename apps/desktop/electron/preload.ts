@@ -25,6 +25,7 @@ const api = {
   diffSaves: (a: string, b: string) => ipcRenderer.invoke('save:diff', { a, b }),
   dictionaryState: () => ipcRenderer.invoke('save:dictionaryState'),
   setDictionary: (savePath: string) => ipcRenderer.invoke('save:setDictionary', savePath),
+  autoDictionary: (savePath: string) => ipcRenderer.invoke('save:autoDictionary', savePath),
   findDictionary: (savePath: string, dictionaryId: number) =>
     ipcRenderer.invoke('save:findDict', { savePath, dictionaryId }),
   checkForUpdate: () => ipcRenderer.invoke('update:check'),

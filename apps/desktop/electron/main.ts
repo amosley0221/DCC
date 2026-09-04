@@ -4,7 +4,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from
 import { autoUpdater } from 'electron-updater'
 import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
-  checkDictionary, decodeFrames,
+  checkDictionary, decodeFrames, autoFindDictionary,
 } from './saveAnalysis'
 
 const isDev = !app.isPackaged
@@ -218,6 +218,38 @@ function storedDictionary(): Buffer | null {
 ipcMain.handle('save:dictionaryState', () => {
   const d = storedDictionary()
   return d ? { present: true, bytes: d.length, id: `0x${d.readUInt32LE(4).toString(16)}` } : { present: false }
+})
+
+/** Places worth looking before asking the user to hunt for the dictionary. */
+function dictionaryRoots(): string[] {
+  const roots = new Set<string>()
+  const env = process.env
+  for (const p of [env.LOCALAPPDATA && join(env.LOCALAPPDATA, 'Programs'), env.ProgramFiles, env['ProgramFiles(x86)']]) {
+    if (p && existsSync(p)) roots.add(p)
+  }
+  // Game libraries commonly sit at the root of a secondary drive.
+  for (const letter of 'CDEFGH') {
+    for (const name of ['Games', 'SteamLibrary', 'Program Files', 'Mods']) {
+      const p = `${letter}:\\${name}`
+      if (existsSync(p)) roots.add(p)
+    }
+  }
+  return [...roots]
+}
+
+ipcMain.handle('save:autoDictionary', (_e, savePath: string) => {
+  try {
+    const payload = readSavePayload(savePath)
+    if (!payload) return { found: false, searched: 0, message: 'That save could not be read.' }
+    const res = autoFindDictionary(payload, dictionaryRoots())
+    if (res.found && res.file) {
+      mkdirSync(app.getPath('userData'), { recursive: true })
+      writeFileSync(dictionaryPath(), readFileSync(res.file))
+    }
+    return res
+  } catch (err) {
+    return { found: false, searched: 0, message: String((err as Error)?.message ?? err) }
+  }
 })
 
 ipcMain.handle('save:setDictionary', async (_e, savePath: string) => {

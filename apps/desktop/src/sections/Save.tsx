@@ -66,10 +66,23 @@ export default function Save() {
     setBusy(true)
     const res = await window.dcc.analyzeSave(chosen)
     setBusy(false)
-    if (res.ok) {
-      setReport(res.report)
-      dispatch({ type: 'log', line: { text: `analysed ${chosen}`, kind: 'info' } })
-    } else setError(res.message)
+    if (!res.ok) { setError(res.message); return }
+    setReport(res.report)
+    dispatch({ type: 'log', line: { text: `analysed ${chosen}`, kind: 'info' } })
+
+    // Find the dictionary without making the user hunt for it.
+    const have = await window.dcc.dictionaryState()
+    setDict(have)
+    if (!have.present && res.report.zstd) {
+      setDictResult('Looking for the compression dictionary…')
+      const auto = await window.dcc.autoDictionary(chosen)
+      setDictResult(
+        auto.found
+          ? `${auto.message} ${auto.file}`
+          : `${auto.message} Use “Load dictionary file…” if you know where it is.`,
+      )
+      void window.dcc.dictionaryState().then(setDict)
+    }
   }
 
   const makeBackup = async () => {
@@ -201,6 +214,17 @@ export default function Save() {
                   </div>
                 ) : null}
                 <div className="row" style={{ gap: 8, marginTop: 10 }}>
+                  <Btn
+                    onClick={async () => {
+                      if (!path) return
+                      setDictResult('Looking for the compression dictionary…')
+                      const auto = await window.dcc.autoDictionary(path)
+                      setDictResult(auto.found ? `${auto.message} ${auto.file}` : auto.message)
+                      void window.dcc.dictionaryState().then(setDict)
+                    }}
+                  >
+                    Find it automatically
+                  </Btn>
                   <Btn variant="primary" onClick={chooseDictionary}>
                     {dict?.present ? 'Replace dictionary…' : 'Load dictionary file…'}
                   </Btn>

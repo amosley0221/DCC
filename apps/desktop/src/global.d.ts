@@ -19,6 +19,10 @@ declare global {
         | { ok: true; bytes: number; id: string; frames: number; failed: number; objectBytes: number }
         | { ok: false; message: string }
       >
+      autoDictionary(savePath: string): Promise<{
+        found: boolean; file?: string; bytes?: number; id?: string; frames?: number
+        searched: number; message: string
+      }>
       findDictionary(savePath: string, dictionaryId: number): Promise<{ ok: true; scan: DictScan } | { ok: false; message: string }>
       checkForUpdate(): Promise<unknown>
       lastUpdateStatus(): Promise<UpdateStatus | null>

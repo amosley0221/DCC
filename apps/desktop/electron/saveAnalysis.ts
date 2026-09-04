@@ -878,3 +878,88 @@ export function checkDictionary(payload: Buffer, dictionary: Buffer): {
       : `Dictionary 0x${id.toString(16)} did not decode this save (${failed} failures).`,
   }
 }
+
+
+// ── locating the dictionary automatically ─────────────────────────────────────
+
+export interface AutoDictResult {
+  found: boolean
+  file?: string
+  bytes?: number
+  id?: string
+  frames?: number
+  searched: number
+  message: string
+}
+
+/**
+ * Looks for the game's zstd dictionary without asking the user to find it.
+ *
+ * It ships inside the `madden-franchise` package — a library for EA franchise
+ * saves extended to College Football — as `data/zstd-dicts/<game>/dict.bin`.
+ * Rather than scanning whole drives, this walks a handful of likely roots
+ * looking for that directory by name, then verifies each candidate against the
+ * save itself, so a wrong dictionary is never adopted.
+ */
+export function autoFindDictionary(payload: Buffer, roots: string[]): AutoDictResult {
+  const candidates: string[] = []
+  let searched = 0
+
+  const walk = (dir: string, depth: number) => {
+    if (depth > 9 || candidates.length > 40 || searched > 250_000) return
+    let entries: import('node:fs').Dirent[]
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue
+      searched++
+      const full = join(dir, e.name)
+      if (e.name === 'zstd-dicts') {
+        // Every per-game subdirectory holds a dict.bin; try them all.
+        try {
+          for (const g of readdirSync(full, { withFileTypes: true })) {
+            if (g.isDirectory()) candidates.push(join(full, g.name, 'dict.bin'))
+          }
+        } catch { /* unreadable */ }
+        continue
+      }
+      // Skip trees that never contain game installs but are enormous.
+      if (/^(Windows|\$Recycle\.Bin|System Volume Information|node_modules\.cache)$/i.test(e.name)) continue
+      walk(full, depth + 1)
+    }
+  }
+
+  for (const r of roots) walk(r, 0)
+
+  for (const file of candidates) {
+    let dict: Buffer
+    try {
+      dict = readFileSync(file)
+    } catch {
+      continue
+    }
+    const check = checkDictionary(payload, dict)
+    if (check.ok) {
+      return {
+        found: true,
+        file,
+        bytes: dict.length,
+        id: `0x${dict.readUInt32LE(4).toString(16)}`,
+        frames: check.frames,
+        searched,
+        message: `Found the dictionary and verified it against this save.`,
+      }
+    }
+  }
+
+  return {
+    found: false,
+    searched,
+    message: candidates.length
+      ? `Checked ${candidates.length} dictionary file(s); none decoded this save.`
+      : 'No zstd-dicts directory found. The dictionary ships with tools that read these saves.',
+  }
+}
