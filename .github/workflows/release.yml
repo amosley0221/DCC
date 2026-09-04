@@ -160,12 +160,20 @@ jobs:
             echo "### Install"
             echo
             echo "**Windows** — download \`DCC-Setup-$VERSION.exe\` and run it."
-            echo "It installs over any previous version; you never have to uninstall first."
-            echo "The app also checks for updates on launch and can install them itself."
+            echo "It installs over any previous version, so you never have to uninstall first,"
+            echo "and it keeps your queue, board, theme and settings. The app checks for updates"
+            echo "on launch and can install the next one itself."
+            echo
+            echo "The installer is not code-signed, so the first run shows"
+            echo "*Windows protected your PC* — choose **More info → Run anyway**."
             echo
             echo "**Android** — download \`DCC-$VERSION.apk\` and open it."
             echo "It installs over any previous version and keeps your data, because every"
             echo "release is signed with the same key. Settings → Updates checks for the next one."
+            echo
+            echo "The first install asks you to allow your browser or file manager to install"
+            echo "apps — a one-time Android setting. To let the app update itself later, grant"
+            echo "the same permission to Dynasty Command Center when it asks."
           } > NOTES.md
           cat NOTES.md
 

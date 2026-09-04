@@ -15,6 +15,14 @@ Neither update ever asks you to uninstall first, and neither loses your queue,
 board, theme or settings. Both apps can check for the next release themselves:
 Windows on launch, Android from Settings → Updates.
 
+Two one-time prompts on first install, both expected:
+
+- **Windows** — the installer is not code-signed, so SmartScreen shows
+  *Windows protected your PC*. Choose **More info → Run anyway**.
+- **Android** — you have to allow your browser or file manager to install apps.
+  Grant the same permission to Dynasty Command Center itself so it can install
+  its own updates later.
+
 ## What it does
 
 Both apps are full workspaces. The only asymmetry is who writes the save file:
