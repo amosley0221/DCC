@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.13.1] - 2026-09-04
+
 ### Fixed
 
 - **The table unscrambler was reporting success on noise.** v0.13.0 said it had
