@@ -1149,3 +1149,27 @@ export function readRoster(payload: Buffer): RosterPlayer[] {
   }
   return out
 }
+
+/**
+ * The school names the save carries.
+ *
+ * They sit in a table of 503-byte records, each holding a slug (`teamdb_psu`),
+ * a full name, a nickname and chants. The table is alphabetical and carries
+ * nothing that reproduces the roster team ids, so it cannot label rosters on its
+ * own — but it is the game's own list of schools, so it is the right thing to
+ * choose a name from rather than typing one.
+ */
+export function readTeamNames(payload: Buffer): { slug: string; name: string }[] {
+  const tag = Buffer.from('teamdb_', 'latin1')
+  const hits: number[] = []
+  let i = 0
+  while ((i = payload.indexOf(tag, i)) !== -1) { hits.push(i); i++ }
+  const out: { slug: string; name: string }[] = []
+  for (let k = 0; k < hits.length; k++) {
+    if (k > 0 && hits[k] - hits[k - 1] !== 503) continue
+    const slug = text(payload, hits[k] + 7, 24)
+    const name = text(payload, hits[k] - 278, 30)
+    if (slug && name && /^[A-Z]/.test(name)) out.push({ slug, name })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}

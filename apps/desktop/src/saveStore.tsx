@@ -24,7 +24,10 @@ export interface SaveState {
   dictResult: string | null
   /** True while the remembered save is being re-read at startup. */
   restoring: boolean
-  roster: { count: number; ratingNames: string[]; unverifiedPairs: [string, string][]; players: RosterPlayer[] } | null
+  roster: {
+    count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
+    schools: { slug: string; name: string }[]; players: RosterPlayer[]
+  } | null
   rosterBusy: boolean
 }
 

@@ -485,16 +485,29 @@ thing — which no amount of care with precision, recall or bucket shape could
 have rescued. A list of players known to be on one roster settled it in a single
 pass.
 
-### Team names, not yet linked
+### Team names: present, but not linked to rosters
 
-The save carries a team table: 143 records at a 503-byte stride, each holding a
-slug (`teamdb_psu`), a full name, a nickname, hashtags and chants. It is in
-alphabetical order, and nothing in it is the team id — Penn State is entry 95
-there and team 74 on the rosters, and no byte or bit field in the record
-reproduces 74, 41 and 112 for Penn State, Ohio State and Michigan together.
+The save carries all 143 schools — a table of 503-byte records holding a slug
+(`teamdb_psu`), a full name, a nickname, hashtags and chants. What it does not
+carry, anywhere found so far, is the join between those records and the roster
+team ids. Five approaches came up empty:
 
-So rosters group correctly but are not named. Until the link is found the app
-has the user identify their own programme once, by a player on it.
+- **Order.** The table is alphabetical. Penn State is entry 95 there and team 74
+  on the rosters.
+- **A field in the record.** No byte or bit field anywhere in the 503-byte
+  record yields 74, 41 and 112 for Penn State, Ohio State and Michigan together.
+- **The generation id.** A generated player's asset name carries a team number,
+  but it is unrelated to where they play: across all 138 rosters the modal
+  generation id accounts for a mean of 4.7% of a roster, and only 94 distinct
+  values cover 138 teams. It is not a stale team, it is a different thing.
+- **Rivalry records.** `Maryland_Penn_State_Game` and its siblings are pure
+  strings with nothing numeric within ±160 bytes.
+- **Any name table in roster order.** Testing 29,302 base-and-stride windows for
+  a table with Penn State at 74, Ohio State at 41 and Michigan at 112 found
+  none.
+
+So the app has the user pick their school once, from the save's own list. That
+is one click and exactly right, where a guess would be neither.
 
 ### Still unmapped
 

@@ -8,7 +8,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Your programme has its name on it.** Pick your roster by a player on it, then
+  choose the school from the 143 your save carries — type "Penn" and it is
+  there. The header, the roster and the depth chart all use the name from then
+  on. The save groups rosters but does not link them to school names anywhere
+  DCC can read, so this is one click rather than automatic; it is remembered.
 
 ## [0.10.0] - 2026-09-04
 

@@ -131,6 +131,8 @@ export interface Persisted {
    * chosen once and remembered.
    */
   teamId: number | null
+  /** The school name chosen for that team, from the save's own list. */
+  teamName: string | null
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string

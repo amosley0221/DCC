@@ -13,7 +13,8 @@ declare global {
       pickSave(): Promise<string | null>
       analyzeSave(path: string): Promise<{ ok: true; report: SaveReport } | { ok: false; message: string }>
       roster(path: string): Promise<
-        | { ok: true; count: number; ratingNames: string[]; unverifiedPairs: [string, string][]; players: RosterPlayer[] }
+        | { ok: true; count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
+            schools: { slug: string; name: string }[]; players: RosterPlayer[] }
         | { ok: false; message: string }
       >
       backupSave(path: string): Promise<{ ok: true; dest: string } | { ok: false; message: string }>

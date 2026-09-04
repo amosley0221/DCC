@@ -34,6 +34,8 @@ export default function TeamSave() {
   const { state, dispatch } = useStore()
   const { path, roster, rosterBusy } = save
   const myTeam = state.teamId
+  const [naming, setNaming] = useState<number | null>(null)
+  const [schoolQuery, setSchoolQuery] = useState('')
   const [tab, setTab] = useState<TabName>('ROSTER')
   const [query, setQuery] = useState('')
   const [pos, setPos] = useState<string | null>(null)
@@ -45,7 +47,7 @@ export default function TeamSave() {
     const res = await window.dcc.roster(path)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, players: res.players } })
+      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, players: res.players } })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     }
   }
@@ -90,13 +92,38 @@ export default function TeamSave() {
       <SectionHeader
         title="Team"
         sub={<Meta>{!roster ? 'ROSTER NOT READ YET'
-          : mine ? `YOUR PROGRAMME — ${mine.list.length} PLAYERS`
+          : mine ? `${(state.teamName ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
           : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
         right={<div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
 
       <div className="col" style={{ gap: 12, maxWidth: 900 }}>
-        {roster && !mine ? (
+        {roster && naming !== null ? (
+          <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
+            <Kicker>Which school is team {naming}?</Kicker>
+            <p className="body-serif" style={{ marginTop: 7 }}>
+              These are the {roster.schools.length} schools your save carries. The save does not
+              link them to rosters anywhere DCC can read, so pick yours once and it sticks.
+            </p>
+            <Input placeholder="search schools" value={schoolQuery} onChange={(e) => setSchoolQuery(e.target.value)} />
+            <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              {roster.schools
+                .filter((sc) => !schoolQuery.trim() || sc.name.toLowerCase().includes(schoolQuery.trim().toLowerCase()))
+                .slice(0, 24)
+                .map((sc) => (
+                  <Chip key={sc.slug} on={false}
+                    onClick={() => { dispatch({ type: 'teamId', id: naming, name: sc.name }); setNaming(null); setSchoolQuery('') }}>
+                    {sc.name}
+                  </Chip>
+                ))}
+            </div>
+            <div className="row" style={{ gap: 8, marginTop: 10 }}>
+              <Btn onClick={() => { dispatch({ type: 'teamId', id: naming, name: null }); setNaming(null) }}>
+                Skip — just call it team {naming}
+              </Btn>
+            </div>
+          </Card>
+        ) : roster && !mine ? (
           <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
             <Kicker>Which one is yours?</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
@@ -117,7 +144,7 @@ export default function TeamSave() {
                 .map((t) => (
                   <button
                     key={t.id}
-                    onClick={() => { dispatch({ type: 'teamId', id: t.id }); setQuery('') }}
+                    onClick={() => { setNaming(t.id); setQuery('') }}
                     style={{ all: 'unset', cursor: 'pointer', padding: '6px 0', borderTop: '1px solid var(--line)' }}
                   >
                     <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
@@ -198,7 +225,7 @@ export default function TeamSave() {
 
             <Card className="card-pad">
               <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
-                <Kicker>{mine ? `Team ${mine.id}` : 'Every school'}{pos ? ` — ${pos}` : ''}, best first</Kicker>
+                <Kicker>{mine ? (state.teamName ?? `Team ${mine.id}`) : 'Every school'}{pos ? ` — ${pos}` : ''}, best first</Kicker>
                 {mine ? (
                   <button onClick={() => dispatch({ type: 'teamId', id: null })}
                     style={{ all: 'unset', cursor: 'pointer' }}>

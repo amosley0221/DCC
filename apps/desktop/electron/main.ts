@@ -4,7 +4,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from
 import { autoUpdater } from 'electron-updater'
 import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
-  checkDictionary, decodeFrames, autoFindDictionary, readRoster,
+  checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED,
 } from './saveAnalysis'
 
@@ -199,6 +199,7 @@ ipcMain.handle('save:roster', (_e, path: string) => {
       ok: true as const,
       count: players.length,
       ratingNames: Object.keys(RATING_BITS),
+      schools: readTeamNames(payload),
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }
