@@ -776,9 +776,44 @@ A second list, of `0x209a` handles at `0x18e2087`, was **reordered** — one
 element moved to the end — which looks like a board or priority ordering rather
 than a value.
 
-What is still missing is the row data behind handle `0x2160002a`. The handle
-appears nowhere else in the payload, so rows are addressed by computed offset
-from a table base, and the area around the other writes is zero-filled rather
-than a run of populated rows. Pinning it needs the class export for the *after*
-save: knowing which prospect gained the offer turns every one of these 12
-clusters from an anonymous change into a labelled one.
+### The recruiting row, found
+
+The export for the *after* save named the change: a swap, not an addition.
+
+| Prospect | Record | On My Board | Total Offers |
+| --- | --- | --- | --- |
+| Dee Dawsey | 3542 | No → Yes | 1 → 2 |
+| J.P. Putzier | 16245 | Yes → No | 2 → 1 |
+
+Both changed bytes sit exactly **12 bytes after that prospect's record index**,
+stored as a big-endian 16-bit value:
+
+```
+0x122b56a  0d d6 ...  Dawsey  (3542)   byte at +12: 06 -> 0a
+0x122ef42  3f 75 ...  Putzier (16245)  byte at +12: 09 -> 05
+```
+
+**Board state is bits 2-3 of that byte**: `1` off the board, `2` on it. Dawsey
+goes `01` → `10` and Putzier `10` → `01`, in opposite directions, which is what
+makes this a reading rather than a coincidence.
+
+Note the prospect is named by **record index**, not by the 14-bit player id —
+neither player id appears anywhere near any of the twelve changed clusters.
+
+The rows sit on a **24-byte stride** (the only divisor of the 14,808-byte gap
+between the two confirmed rows that holds up), spanning roughly `0x12271ea` to
+`0x123f7ea`, where 47% of slots hold a prospect record index against a 4%
+chance rate. 2,002 of 2,718 resolvable prospects are found there.
+
+### What is still open
+
+No column solved yet — stage, offers, gem/bust and commit score all fail the
+exact-match test at every position in the 24-byte row. The likely reason is
+that row identification still admits false positives: at 47% density, some
+slots match a prospect index by chance, and one bad pair rejects a correct
+column.
+
+What fixes it is more confirmed anchors. Each single-change diff pins one row
+exactly, the way these two did. A handful more — different prospects, different
+actions — would let the row layout be settled by agreement between known rows
+rather than by searching against noisy ones.
