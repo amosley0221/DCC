@@ -169,6 +169,41 @@ data** out of the 31 MB payload. Frames run 10–1,228 bytes, mean 444.
 It is not in the game install at all, which is why scanning there kept coming up
 empty.
 
+### Where the data actually sits
+
+Measuring each frame's true compressed extent (the shortest slice that still
+decodes to its declared content size — a truncated slice decodes to fewer bytes
+without complaining, so length has to be the test) gives the split:
+
+| Region | Bytes | |
+| --- | --- | --- |
+| zstd frames | 1,544,946 compressed | 5% of the payload, expanding to 6,846,220 |
+| plain | 29,608,954 | the remaining 95% |
+
+**Every edit observed so far lands in the plain region, not inside a frame** —
+both redshirt toggles and both rating changes. So the player attributes this
+project needs are readable without the dictionary at all; the dictionary opens
+the other 6.8 MB, which holds events, storylines and sorted collections.
+
+That reframes what the dictionary was for. It is still needed — a rating edit
+reorders a sorted collection inside a frame, and without decoding that frame the
+diff is buried in recompression noise — but the attribute bytes themselves were
+always in the clear.
+
+### Still unmapped, and what would settle it
+
+The plain region is bit-packed: bytes neighbouring the flags are multiples of
+`0x20`, and no byte-aligned stride survives scrutiny. Deriving the per-player
+pitch from the two redshirt offsets alone does not work either — their gap of
+2,231,040 has a hundred plausible divisors and none stands out against the
+zero-heavy background.
+
+What breaks the deadlock is knowing **which player** each edit belonged to. The
+name table is a clean 138-byte stride, so a player's index there is easy to
+find; with two known players' indices and their two flag offsets, the base and
+pitch fall straight out of two equations. Without the names, the same two
+offsets are just two numbers.
+
 ### What this buys immediately
 
 Diffing *decoded frames* rather than the compressed payload is dramatically
