@@ -110,6 +110,9 @@ jobs:
           name: android-apk-ci
           path: apk
 
+      - name: Give the APK a fixed name
+        run: mv apk/*.apk apk/DCC-launch-check.apk
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -124,30 +127,9 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: |
-            set -e
-            adb install -r apk/*.apk
-            adb logcat -c
-            adb shell am start -W -n com.dcc.app/.MainActivity
-            # Give the dynasty time to parse and the first frame to draw.
-            sleep 20
-            adb logcat -d > logcat.txt
-
-            # A crash on launch is exactly what a build check cannot miss:
-            # the APK installs fine and only dies when the user opens it.
-            if grep -qE "FATAL EXCEPTION|ANR in com.dcc.app" logcat.txt; then
-              echo "::error::The app crashed on launch."
-              grep -A 40 -E "FATAL EXCEPTION|ANR in com.dcc.app" logcat.txt | head -60
-              exit 1
-            fi
-
-            # Still running means it got past startup and drew something.
-            if ! adb shell pidof com.dcc.app > /dev/null; then
-              echo "::error::The app is not running 20s after launch."
-              tail -80 logcat.txt
-              exit 1
-            fi
-            echo "App launched and is still running."
+          # The action feeds this to sh line by line, so the checks live in a
+          # script file rather than inline shell.
+          script: bash scripts/android-launch-check.sh apk/DCC-launch-check.apk
 
       - uses: actions/upload-artifact@v4
         if: always()
