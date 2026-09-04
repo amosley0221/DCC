@@ -10,6 +10,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.3.1] - 2026-09-04
+
+### Fixed
+
+- The save analyser reported a real College Football save as an unrecognised
+  container. Its `FBCHUNKS` test compared a nine-byte slice against an
+  eight-character string, so the one format that matters never matched. It now
+  identifies the container and reports the game build, save timestamp, inner
+  payload magic and inflated size.
+
 ## [0.3.0] - 2026-09-04
 
 ### Added

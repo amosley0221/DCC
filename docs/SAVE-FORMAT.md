@@ -51,6 +51,34 @@ Readable content confirmed present:
 - **Team identities** — "Nittany Lions", "Beaver Stadium", school names.
 - **Slider descriptions** — the CPU tuning text shown in-game.
 
+## Type registry
+
+The payload carries its own schema. Scattered through it are **715** paired
+`ASTO` / `CMPC` records, each declaring one class:
+
+```
+11 04 1c 65 24 8d          type id (0x1104) and name hash
+"ASTO" ...                 asset/type object
+00 00 00 06                member count
+00 00 00 3c                instance size (60 bytes)
+1c 65 24 8d "CMPC"         compound class, same hash
+00 00 00 3c 00 00 00 3c    size, size
+"AcceptOutstandingOfferReaction"
+```
+
+The class names read like the game's own model, and they name most of what the
+apps need:
+
+`DepthChart` · `Conference[]` · `DraftPick[]` · `GameStats[]` · `CoachGoal[]` ·
+`BowlInfo[]` · `ComebackPlayer[]` · `HistoryEntry[]` · `Injury_PlayerInjuredRequest` ·
+`ManageRedshirtsRequest` · `TeamHistoricalData` · `Transition[]` · `Player[]`
+
+**Member names are not stored.** Searching the payload finds no field-name table
+— "Overall" appears seven times in 31 MB, far too few. Frostbite identifies
+members by hash, so the registry gives the class list and each class's size and
+member count, but not which offset holds which rating. That is what the diff
+method below is for.
+
 ## Not yet mapped
 
 Names and hometowns come out cleanly; the numbers do not yet. Still unknown:
@@ -62,15 +90,29 @@ Names and hometowns come out cleanly; the numbers do not yet. Still unknown:
 
 ## How to map the numeric fields
 
-Diffing is the reliable route and needs no guesswork:
+Since member names are hashed rather than stored, diffing is the way in, and it
+needs no guesswork:
 
-1. Save the dynasty, copy the file.
-2. In-game, change exactly one known value (one player's redshirt, say).
-3. Save again and diff the two inflated payloads.
+1. Save the dynasty, copy the file somewhere.
+2. In-game, change exactly one known value — one player's redshirt, one rating.
+3. Save again, and diff the two inflated payloads.
 
-Every differing byte is that field. A handful of these pins down the record
-layout far faster than reading bytes cold. Two saves a week apart would also
-show which regions carry week-to-week state.
+Every differing byte is that field. Combined with the registry's class sizes,
+a handful of these pins the record layout down quickly.
+
+Two saves taken days apart also help, by showing which regions carry
+week-to-week state — but they change too much at once to isolate a single
+field, so the controlled single-change pair is worth more.
+
+### Saves seen so far
+
+| Saved | SHA-256 (first 8) | Inflated |
+| --- | --- | --- |
+| 2026-08-30 13:09:27 | `860b83d7` | 31,131,540 |
+| 2026-09-04 08:35:00 | `2b1c869a` | 31,153,900 |
+
+Both decode identically, five days apart, which says the container is stable
+across play sessions rather than something that happened to work once.
 
 ## Reproducing this
 
