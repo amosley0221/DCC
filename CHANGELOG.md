@@ -10,6 +10,25 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.16.0] - 2026-09-04
+
+### Added
+
+- **Recruit faces.** Point DCC at a folder of extracted art and every recruit
+  gets their face, because the save already names it. The portraits are dumped
+  as `nilpp_Generic_0877_P_T0042_H_6_3` and the save calls the same face
+  `Generic_0877_P_T0042_H_6_3`, so the id is matched inside the filename rather
+  than against the whole of it — an exact-name match would find none of them.
+
+  The folder is indexed by name only. Portraits alone run to 786 MB, so nothing
+  is copied and no image is read until something displays it. Rows without a
+  match show initials rather than a stand-in face, and the card reports how many
+  of your players matched so a folder that does not fit is obvious immediately.
+
+  Art is read from your own machine and never leaves it — none of it is copied
+  into DCC or its repository.
+
+
 ## [0.15.1] - 2026-09-04
 
 ### Added

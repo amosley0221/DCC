@@ -1,4 +1,5 @@
 import { readdirSync, statSync, openSync, readSync, closeSync } from 'node:fs'
+import type { Dirent } from 'node:fs'
 import { join, extname, basename, relative } from 'node:path'
 
 /**
@@ -694,4 +695,104 @@ export function listTocs(root: string, limit = 200): string[] {
   }
   walk(root, 0)
   return found.sort((a, b) => b.bytes - a.bytes).slice(0, limit).map((f) => f.rel)
+}
+
+/* ------------------------------------------------------------------ faces */
+
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.dds', '.gif', '.bmp', '.avif'])
+
+export interface FaceIndex {
+  root: string
+  files: number
+  bytes: number
+  byExtension: { ext: string; files: number; bytes: number }[]
+  /** A handful of real filenames, so the naming scheme is visible. */
+  sample: string[]
+  /** stem (lowercased, no extension) -> path relative to root. */
+  map: Record<string, string>
+  truncated: boolean
+}
+
+/**
+ * Indexes a folder of loose image files.
+ *
+ * This exists because the art turned out to be reachable without decoding a
+ * 50 GB archive: point DCC at a folder of extracted images and the save
+ * already carries the name of each one. Only paths are held, never contents —
+ * a 958 MB folder indexes to a few megabytes of strings, and an image is read
+ * from disk when something actually displays it.
+ */
+export function indexFaces(root: string, cap = 120_000): FaceIndex {
+  const byExt = new Map<string, { files: number; bytes: number }>()
+  const map: Record<string, string> = {}
+  const sample: string[] = []
+  let files = 0
+  let bytes = 0
+  let truncated = false
+
+  const walk = (dir: string, depth: number) => {
+    if (truncated || depth > 8) return
+    let entries: Dirent[]
+    try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      if (truncated) return
+      const full = join(dir, e.name)
+      if (e.isDirectory()) { walk(full, depth + 1); continue }
+      const dot = e.name.lastIndexOf('.')
+      const ext = dot < 0 ? '' : e.name.slice(dot).toLowerCase()
+      if (!IMAGE_EXT.has(ext)) continue
+      let size = 0
+      try { size = statSync(full).size } catch { /* unreadable, still count it */ }
+      files++
+      bytes += size
+      const cur = byExt.get(ext) ?? { files: 0, bytes: 0 }
+      cur.files++; cur.bytes += size; byExt.set(ext, cur)
+      if (sample.length < 12) sample.push(relative(root, full))
+      // Keyed on the asset id found inside the filename, not on the whole
+      // stem. Extractors add their own prefix — the portraits in a real dump
+      // are named `nilpp_Generic_0001_P_T0000_D_1_1` while the save calls the
+      // same face `Generic_0001_P_T0000_D_1_1` — and requiring the names to be
+      // equal would miss every one of them.
+      const stem = e.name.slice(0, dot < 0 ? undefined : dot)
+      const id = stem.match(PLAYER_ART)?.[0] ?? stem
+      map[id.toLowerCase()] = relative(root, full)
+      if (files >= cap) truncated = true
+    }
+  }
+  walk(root, 0)
+
+  return {
+    root, files, bytes, sample, map, truncated,
+    byExtension: [...byExt.entries()]
+      .map(([ext, v]) => ({ ext, ...v }))
+      .sort((a, b) => b.files - a.files),
+  }
+}
+
+/**
+ * How well a folder of images lines up with the asset ids in a save.
+ *
+ * Reported rather than assumed. An exact stem match is the only thing counted
+ * as a hit — a fuzzy match would make a folder of unrelated pictures look like
+ * a success, which is the failure mode this whole area keeps producing.
+ */
+export interface FaceMatch {
+  players: number
+  matched: number
+  unmatchedSample: string[]
+  matchedSample: { id: string; file: string }[]
+}
+
+export function matchFaces(index: FaceIndex, assetIds: string[]): FaceMatch {
+  const matchedSample: { id: string; file: string }[] = []
+  const unmatchedSample: string[] = []
+  let matched = 0
+  for (const id of assetIds) {
+    const hit = index.map[id.toLowerCase()]
+    if (hit) {
+      matched++
+      if (matchedSample.length < 8) matchedSample.push({ id, file: hit })
+    } else if (unmatchedSample.length < 8) unmatchedSample.push(id)
+  }
+  return { players: assetIds.length, matched, unmatchedSample, matchedSample }
 }

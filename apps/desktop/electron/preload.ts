@@ -23,6 +23,9 @@ const api = {
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   roster: (path: string) => ipcRenderer.invoke('save:roster', path),
   pickInstall: () => ipcRenderer.invoke('assets:pickInstall') as Promise<string | null>,
+  pickFaces: () => ipcRenderer.invoke('assets:pickFaces') as Promise<string | null>,
+  indexFaces: (dir: string, assetIds: string[]) =>
+    ipcRenderer.invoke('assets:indexFaces', { dir, assetIds }),
   findInstall: () => ipcRenderer.invoke('assets:findInstall'),
   scanInstall: (dir: string) => ipcRenderer.invoke('assets:scan', dir),
   readTables: (root: string, files: string[]) => ipcRenderer.invoke('assets:readTables', { root, files }),

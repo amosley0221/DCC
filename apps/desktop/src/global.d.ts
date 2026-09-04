@@ -19,6 +19,24 @@ declare global {
         | { ok: false; message: string }
       >
       pickInstall(): Promise<string | null>
+      pickFaces(): Promise<string | null>
+      indexFaces(dir: string, assetIds: string[]): Promise<
+        | { ok: false; message: string }
+        | {
+            ok: true
+            files: number
+            bytes: number
+            byExtension: { ext: string; files: number; bytes: number }[]
+            sample: string[]
+            truncated: boolean
+            match: {
+              players: number; matched: number
+              unmatchedSample: string[]
+              matchedSample: { id: string; file: string }[]
+            }
+            paths: Record<string, string>
+          }
+      >
       findInstall(): Promise<{ found: true; path: string } | { found: false; searched: number; message: string }>
       readTables(root: string, files: string[]): Promise<
         { ok: true; tables: TableReport[] } | { ok: false; message: string }

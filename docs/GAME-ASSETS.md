@@ -108,6 +108,27 @@ face was generated for, and agrees with the player's actual team only 3.2% of
 the time. That mismatch is what made this field look useless. It is not a team
 field at all — it is part of an art name.
 
+## Reading art from a folder instead of the archives
+
+Extracted art turns out to be reachable without decoding the archives at all.
+A dump of the game's portraits names each file `nilpp_<asset id>`, and the save
+stores the bare `<asset id>`, so the two join on a substring:
+
+```
+folder :  nilpp_Generic_0877_P_T0042_H_6_3.png
+save   :        Generic_0877_P_T0042_H_6_3
+```
+
+DCC indexes such a folder by name only — the portraits alone are 786 MB — and
+serves one image at a time over a `dccart://` protocol restricted to the chosen
+root. Matching is exact on the extracted id: a fuzzy match would make a folder
+of unrelated pictures look like a success, which is the failure this area keeps
+producing. Players with no match show initials.
+
+This does not replace reading the archives directly, which is still the only
+route that needs nothing but the game itself. It does mean the feature works
+now rather than after the `.cas` work lands.
+
 ## Still to do
 
 1. Confirm `Generic_*` and `Unique_*` names appear in the decoded tables.

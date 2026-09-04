@@ -31,9 +31,52 @@ const GROUPS: [string, string[]][] = [
 const ovrColour = (o: number) =>
   o >= 90 ? 'var(--accent)' : o >= 80 ? 'var(--good)' : o >= 70 ? 'var(--ink)' : 'var(--ink3)'
 
+/** A face from the chosen art folder, or the initials while there is none. */
+function Face({ file, first, last }: { file?: string; first: string; last: string }) {
+  const initials = (first[0] ?? '') + (last[0] ?? '')
+  const box: React.CSSProperties = {
+    width: 30, height: 30, borderRadius: 4, flex: '0 0 auto',
+    background: 'var(--rule)', objectFit: 'cover',
+  }
+  if (!file) {
+    return (
+      <span style={{ ...box, display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--ink3)' }}>
+        {initials}
+      </span>
+    )
+  }
+  return <img style={box} alt="" loading="lazy"
+    src={'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')} />
+}
+
 export default function RecruitSave() {
   const { save, patch } = useSave()
   const { dispatch } = useStore()
+
+  const pickFaces = async () => {
+    const dir = await window.dcc.pickFaces()
+    if (!dir || !save.roster) return
+    patch({ facesBusy: true })
+    const ids = save.roster.players.map((p) => p.assetId)
+    const res = await window.dcc.indexFaces(dir, ids)
+    patch({ facesBusy: false })
+    if (!res.ok) {
+      dispatch({ type: 'log', line: { text: res.message, kind: 'bad' } })
+      return
+    }
+    patch({
+      faces: {
+        root: dir, files: res.files, bytes: res.bytes,
+        matched: res.match.matched, players: res.match.players,
+        sample: res.sample, unmatchedSample: res.match.unmatchedSample,
+      },
+      facePaths: res.paths,
+    })
+    dispatch({ type: 'log', line: {
+      text: `matched ${res.match.matched.toLocaleString()} of ${res.match.players.toLocaleString()} players to faces`,
+      kind: res.match.matched ? 'good' : 'bad',
+    } })
+  }
   const [group, setGroup] = useState('ALL')
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<number | null>(null)
@@ -112,6 +155,18 @@ export default function RecruitSave() {
         are left out rather than invented — this is sorted on the save's own overall.
       </p>
 
+      <div className="row" style={{ gap: 8, marginTop: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <Btn onClick={pickFaces} disabled={save.facesBusy}>
+          {save.facesBusy ? 'Indexing…' : save.faces ? 'Change the art folder' : 'Choose the art folder'}
+        </Btn>
+        <Meta>
+          {save.faces
+            ? `${save.faces.matched.toLocaleString()} of ${save.faces.players.toLocaleString()} players matched a face` +
+              ` — ${save.faces.files.toLocaleString()} images indexed`
+            : 'Point DCC at a folder of extracted art and the faces appear — the save names each one.'}
+        </Meta>
+      </div>
+
       <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
         {GROUPS.map(([g]) => (
           <Tab key={g} on={group === g} onClick={() => setGroup(g)}>{g}</Tab>
@@ -133,6 +188,7 @@ export default function RecruitSave() {
         {shown.slice(0, 300).map((p) => (
           <RecruitRow key={p.index} p={p} open={open === p.index}
             ratingNames={save.roster!.ratingNames}
+            face={save.facePaths[p.assetId]}
             onClick={() => setOpen(open === p.index ? null : p.index)} />
         ))}
       </div>
@@ -148,8 +204,8 @@ export default function RecruitSave() {
 }
 
 function RecruitRow(
-  { p, open, onClick, ratingNames }:
-  { p: RosterPlayer; open: boolean; onClick: () => void; ratingNames: string[] },
+  { p, open, onClick, ratingNames, face }:
+  { p: RosterPlayer; open: boolean; onClick: () => void; ratingNames: string[]; face?: string },
 ) {
   return (
     <div>
@@ -157,8 +213,9 @@ function RecruitRow(
         style={{
           gap: 10, width: '100%', textAlign: 'left', padding: '5px 8px',
           background: open ? 'var(--rule)' : 'transparent',
-          border: 0, borderRadius: 4, cursor: 'pointer', alignItems: 'baseline',
+          border: 0, borderRadius: 4, cursor: 'pointer', alignItems: 'center',
         }}>
+        <Face file={face} first={p.first} last={p.last} />
         <span style={{ width: 34, color: 'var(--ink3)', fontSize: 12 }}>{p.position}</span>
         <span style={{ flex: 1 }}>{p.first} {p.last}</span>
         <span style={{ color: 'var(--ink3)', fontSize: 12 }}>{p.hometown}</span>

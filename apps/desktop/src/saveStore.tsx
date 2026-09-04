@@ -36,6 +36,13 @@ export interface SaveState {
   installNote: string | null
   tables: TableReport[] | null
   art: ArtFind[] | null
+  /** Extracted art on disk: how it went, and asset id -> file within the root. */
+  faces: {
+    root: string; files: number; bytes: number; matched: number; players: number
+    sample: string[]; unmatchedSample: string[]
+  } | null
+  facePaths: Record<string, string>
+  facesBusy: boolean
 }
 
 const blank: SaveState = {
@@ -43,6 +50,7 @@ const blank: SaveState = {
   diff: null, diffing: false, scan: null, scanning: false,
   dict: null, dictResult: null, restoring: false, roster: null, rosterBusy: false,
   install: null, installBusy: false, installNote: null, tables: null, art: null,
+  faces: null, facePaths: {}, facesBusy: false,
 }
 
 interface Ctx {

@@ -83,5 +83,42 @@ for (const len of [17, 257]) {
   check('noise refused', solved === 0, solved + ' of 8 wrongly solved')
 }
 
+// Joining a save to a folder of extracted art. The names are not equal — the
+// portraits are dumped as `nilpp_<id>` while the save stores `<id>` — so this
+// asserts the id is found inside the filename, and that unrelated images do
+// not match anything.
+{
+  const fs = require('fs'), os = require('os'), path = require('path')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dcc-faces-'))
+  const named = [
+    'nilpp_Generic_0001_P_T0000_D_1_1.png',
+    'nilpp_Generic_0877_P_T0042_H_6_3.png',
+    'nilpp_Unique_AdamsAmare_1.png',
+    'nilpp_Blank.png',
+    'bowl_rose.png',
+  ]
+  for (const n of named) fs.writeFileSync(path.join(dir, n), '')
+  fs.mkdirSync(path.join(dir, 'nested'))
+  fs.writeFileSync(path.join(dir, 'nested', 'nilpp_Generic_0002_P_T0000_D_1_1.png'), '')
+
+  const idx = G.indexFaces(dir)
+  check('art folder: walks subdirectories', idx.files === 6, idx.files + ' images')
+
+  const ids = [
+    'Generic_0001_P_T0000_D_1_1', 'Generic_0877_P_T0042_H_6_3',
+    'Unique_AdamsAmare_1', 'Generic_0002_P_T0000_D_1_1',
+    'Generic_9999_P_T0099_D_9_9',
+  ]
+  const m = G.matchFaces(idx, ids)
+  check('art folder: matches through the extractor prefix', m.matched === 4, m.matched + ' of 5')
+  check('art folder: a face the save does not name is not invented',
+    m.unmatchedSample.length === 1 && m.unmatchedSample[0] === 'Generic_9999_P_T0099_D_9_9')
+  // A folder of unrelated pictures must match nothing, or "it worked" means
+  // nothing.
+  const empty = G.matchFaces(G.indexFaces(dir), ['Generic_1234_P_T0001_D_1_1'])
+  check('art folder: no fuzzy matching', empty.matched === 0, empty.matched + ' wrongly matched')
+  fs.rmSync(dir, { recursive: true, force: true })
+}
+
 console.log(failed ? 'ASSET CHECK FAILED' : 'ASSET CHECK OK')
 process.exit(failed ? 1 : 0)

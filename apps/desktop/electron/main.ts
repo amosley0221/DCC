@@ -1,16 +1,24 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
-import { join } from 'node:path'
+import { app, BrowserWindow, ipcMain, shell, dialog, protocol, net } from 'electron'
+import { join, resolve, sep } from 'node:path'
 import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 import { autoUpdater } from 'electron-updater'
 import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED,
 } from './saveAnalysis'
-import { scanInstall, findInstall, readTables, findArtNames, listTocs } from './gameAssets'
+import { scanInstall, findInstall, readTables, findArtNames, listTocs, indexFaces, matchFaces } from './gameAssets'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
+
+/**
+ * The folder of extracted art the user pointed at, and the only place the
+ * dccart:// protocol will read from. Held here rather than passed per request
+ * so a renderer cannot name its own root and walk out of it.
+ */
+let faceRoot: string | null = null
 
 /** Settings live in userData so they survive every in-place upgrade. */
 const settingsFile = () => join(app.getPath('userData'), 'settings.json')
@@ -217,6 +225,34 @@ ipcMain.handle('assets:pickInstall', async () => {
   return res.canceled ? null : res.filePaths[0]
 })
 
+ipcMain.handle('assets:pickFaces', async () => {
+  const r = await dialog.showOpenDialog({
+    title: 'Choose the folder of extracted art',
+    properties: ['openDirectory'],
+  })
+  return r.canceled ? null : r.filePaths[0]
+})
+
+ipcMain.handle('assets:indexFaces', (_e, { dir, assetIds }: { dir: string; assetIds: string[] }) => {
+  try {
+    const index = indexFaces(dir)
+    faceRoot = dir
+    return {
+      ok: true as const,
+      files: index.files, bytes: index.bytes, byExtension: index.byExtension,
+      sample: index.sample, truncated: index.truncated,
+      match: matchFaces(index, assetIds),
+      // Only the ids that actually resolved cross to the renderer, which keeps
+      // this to the players present rather than the whole folder.
+      paths: Object.fromEntries(
+        assetIds.map((id) => [id, index.map[id.toLowerCase()]]).filter(([, v]) => v),
+      ) as Record<string, string>,
+    }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
 ipcMain.handle('assets:findInstall', () => {
   try {
     return findInstall(dictionaryRoots())
@@ -384,7 +420,24 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
 
+  // Serves one image at a time out of the chosen art folder. Portraits run to
+  // 786 MB, so they are read from disk on demand rather than carried into the
+  // renderer as data.
+  protocol.registerSchemesAsPrivileged([
+    { scheme: 'dccart', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+  ])
+
   app.whenReady().then(() => {
+    protocol.handle('dccart', async (req) => {
+      if (!faceRoot) return new Response('no art folder', { status: 404 })
+      const rel = decodeURIComponent(new URL(req.url).pathname.replace(/^\//, ''))
+      const full = join(faceRoot, rel)
+      // A path that resolves outside the chosen folder is refused, so a crafted
+      // name cannot turn this into a general file reader.
+      const inside = resolve(full).startsWith(resolve(faceRoot) + sep)
+      if (!inside || !existsSync(full)) return new Response('not found', { status: 404 })
+      return net.fetch(pathToFileURL(full).toString())
+    })
     createWindow()
     setupUpdater()
     app.on('activate', () => {
