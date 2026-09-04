@@ -935,3 +935,36 @@ id its players carry.
 
 This closes the oldest gap in the project. The save still never writes a school
 against a roster, but it no longer has to: DCC names all 138 itself.
+
+## What else the schema answers
+
+It is a dictionary, not a map. It names every field and gives its exact width
+and enum values, but it does **not** give byte offsets, so each structure still
+has to be located in the payload. Everything still outstanding is described in
+it:
+
+| Structure | Members | What it covers |
+| --- | --- | --- |
+| `ScheduleKnownGame` | 9 | `HomeTeam`, `AwayTeam`, `SeasonWeek`, `Stadium`, `DayOfWeek`, `IsKickoffGame` |
+| `TeamStats` | 58 | `HOMEWINS`, `BOWLSMADE`, `BOWLSWON`, `CFPSWON`, `CONFCHAMPSWON`, `DEFPASSYARDS`, `FIRSTDOWNS` |
+| `CareerCoachStats` | 26 | `Wins`, `Losses`, `NCWins`, `BowlWins`, `RivalWinStreak`, `TimesFired`, `DraftPicks` |
+| `SeasonCoachStats` | 2 | `Wins`, `Losses` per season |
+| `SeasonInfo` | 59 | `CurrentWeek`, `CurrentSeasonYear`, and the stage flags that drive the calendar |
+
+### The layout rule is not cracked
+
+Knowing a record's members does not give their offsets. Five orderings were
+tested against 34 fields whose bit positions are already known — index order,
+alphabetical, reverse alphabetical, widest-first, narrowest-first — and none
+reproduces them at a constant offset; the best manages 3 of 34.
+
+There is structure in the failure. Sorted by bit position, the tail of the
+player record is nearly alphabetical — `SpeedRating` 849, `SpinMoveRating` 856,
+`StaminaRating` 863, `ToughnessRating` 874 — while `StiffArmRating` at 817 and
+`StrengthRating` at 824 sit before them and should sort after. So the order is
+close to alphabetical over some grouping that has not been identified.
+
+Cracking that would make every remaining field mechanical rather than searched
+for. Until then the method is the one that just worked for team ids: take a
+value the schema names, find it in the payload by its value, and confirm the
+stride.
