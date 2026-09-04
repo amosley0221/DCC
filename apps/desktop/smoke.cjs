@@ -146,6 +146,38 @@ app.whenReady().then(async () => {
   console.log('RECRUIT FROM SAVE: ' + (recruitFromSave ?? 'shows the recruiting pool'))
   if (recruitFromSave) { console.log('SMOKE FAIL: ' + recruitFromSave); app.exit(1); return }
 
+  // Portraits are served over a custom scheme, so two things have to be right:
+  // the protocol handler, and the page's own security policy. The policy was
+  // the one that broke — img-src did not list the scheme, so every face was
+  // refused by the page and rendered as a broken image. Loading a real file
+  // end to end is the only check that would have caught it.
+  const artLoads = await (async () => {
+    const dir = path.join(require('node:os').tmpdir(), 'dcc-art-smoke')
+    require('node:fs').mkdirSync(dir, { recursive: true })
+    // A 1x1 PNG, so a successful decode means the bytes really arrived.
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64')
+    const name = 'nilpp_Generic_0001_P_T0000_D_1_1.png'
+    require('node:fs').writeFileSync(path.join(dir, name), png)
+    const res = await win.webContents.executeJavaScript(
+      `window.dcc.indexFaces(${JSON.stringify(dir)}, ['Generic_0001_P_T0000_D_1_1'], [])`)
+    if (!res.ok) return 'indexFaces failed: ' + res.message
+    if (res.match.matched !== 1) return 'the art folder did not match the asset id'
+    const file = res.paths['Generic_0001_P_T0000_D_1_1']
+    if (!file) return 'no path came back for the matched id'
+    const loaded = await win.webContents.executeJavaScript(`new Promise((res) => {
+      const i = new Image()
+      i.onload = () => res(i.naturalWidth > 0 ? 'ok' : 'zero width')
+      i.onerror = () => res('blocked or not found')
+      i.src = 'dccart://art/' + ${JSON.stringify(file)}.split(/[\\/]/).map(encodeURIComponent).join('/')
+      setTimeout(() => res('timed out'), 4000)
+    })`)
+    return loaded === 'ok' ? null : 'the portrait did not load: ' + loaded
+  })()
+  console.log('ART OVER dccart://: ' + (artLoads ?? 'a real image loads'))
+  if (artLoads) { console.log('SMOKE FAIL: ' + artLoads); app.exit(1); return }
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))

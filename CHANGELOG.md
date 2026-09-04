@@ -10,6 +10,21 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.18.2] - 2026-09-04
+
+### Fixed
+
+- **Portraits render.** They were matching correctly — 15,798 of 16,448 players
+  — and then being refused by the app's own content security policy, which
+  listed no custom scheme under `img-src`, so every face arrived and was thrown
+  away as a broken image.
+
+  The smoke test now writes a real PNG into a folder, indexes it, and loads it
+  through the same scheme the app uses, failing if the image does not decode.
+  Checked against the broken policy first: it reports exactly this failure, so
+  it cannot pass by accident.
+
+
 ## [0.18.1] - 2026-09-04
 
 ### Added
