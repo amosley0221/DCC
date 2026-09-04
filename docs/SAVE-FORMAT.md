@@ -271,33 +271,80 @@ The fifth edit is the odd one out: `0x014b17d7` sits outside every 192-periodic
 region, in sparse 32-bit-aligned data padded with `ff ff ff ff` sentinels. One
 user action can touch two unrelated structures.
 
-### Tried and rejected: aligning records to names
+### Records line up with names
 
-If the 192-byte records were a parallel array to the 17,470 name slots, a
-player's index would give both. Two tests were run.
+Player index `i` has
 
-The name table has 1,020 blank slots, which is a fingerprint: a parallel array
-should be blank at the same indices. Scanning every possible start record that
-keeps both redshirt records inside the array, the best alignment was start
-record 65,890 (`0x00c10980`) at 0.556 — well clear of the 0.13 field behind it,
-and it named plausible players for all four edits.
+- its **strings** at `0x00f44e68 + i × 138`, and
+- its **numbers** at `(65890 + i) × 192`.
 
-It does not survive the decisive test. 11,804 players carry a team id in their
-asset id, so under a correct alignment some field of the record must reproduce
-it. Searching **every** bit offset in the record for an 8-, 9- or 10-bit
-MSB-first field matching the known team found nothing above 5% — chance. The
-blankness peak was coincidence, and the player identifications that came with it
-are withdrawn.
+The base was found from the name table's 1,020 blank slots — a parallel array
+should be blank at the same indices, and scanning every start record that keeps
+both redshirt edits inside the array peaked sharply at record 65,890.
 
-So the record layout is solid and the record-to-player link is not.
+It was briefly rejected on a bad test. Under a correct alignment, some field of
+the record ought to reproduce the team id already known from the asset id;
+searching every bit offset for an 8-, 9- or 10-bit field matching it found
+nothing, so the alignment was withdrawn. The test was wrong, not the alignment —
+the team is evidently not stored as a plain integer in this record. Naming the
+four edited players and having all four confirmed settles it:
+
+| Edit | Record | Player index | Player |
+| --- | --- | --- | --- |
+| Redshirt (T1 → T2) | 82,983 | 17,093 | Damien Priester |
+| Redshirt (T2 → T3) | 71,363 | 5,473 | Jabari Scroggins |
+| Acceleration (T3 → T4) | 81,921 | 16,031 | Peyton Falzone |
+| Strength (T4 → T5) | 81,921 | 16,031 | Peyton Falzone |
+
+### Ratings are 7-bit fields
+
+Bits are packed most-significant-first, so a field of width `w` ending at record
+bit `e` covers bits `[e−w+1, e]`. The two confirmed edits give two of them:
+
+| Field | End bit | Byte | Falzone T3 → T4 → T5 |
+| --- | --- | --- | --- |
+| **Acceleration** | 504 | 63 | 88 → **89** → 89 |
+| **Strength** | 824 | 103 | 65 → 65 → **66** |
+
+Read as 7 bits, neither exceeds 99 and neither is 0 for **any** of the 16,448
+players; acceleration averages 80.2, strength 66.8. Read as 8 bits, half the
+league lands above 99. Seven bits is the width.
+
+That gives a filter chance cannot pass: seven random bits exceed 99 for 22% of
+players, so a position where not one of 16,448 players falls outside 1–99 is a
+bounded quantity. **69 positions** qualify, and the gaps between consecutive
+ones are dominated by 7 — ratings packed back to back. The block runs from
+about byte 60 to byte 123 of the record, roughly 59 fields, which is the size of
+an EA player rating set.
+
+Sanity check on the extraction: across T3, T4 and T5 the only two fields that
+move for Falzone are the two he edited. Every other field holds still.
+
+### Redshirt
+
+Byte 136 changed `0x80 → 0x00`, which most-significant-first is record bit
+**1088**:
+
+| Player | T1 | T2 | T3 |
+| --- | --- | --- | --- |
+| Damien Priester | 1 | 0 | 0 |
+| Jabari Scroggins | 1 | 1 | 0 |
+
+Priester's redshirt comes off in the second save and Scroggins's in the third,
+matching how the saves were taken.
 
 ### Still unmapped, and what would settle it
 
-What breaks the deadlock is knowing **which player** each edit belonged to. A
-player's index in the name table is easy to find by name; with two known
-indices and their two record numbers, the array base and the index mapping fall
-out of two equations, and every field in the 192-byte record becomes
-addressable. Without the names, the record numbers are just numbers.
+The rating block is located but only two of its fields are named. Labelling the
+rest needs one thing: a player's rating card as the game shows it. With ~59
+values to match against ~59 fields, and values as distinctive as 98, 23, 91, 43,
+the assignment is essentially unique — one screenshot of Peyton Falzone's
+ratings would name the whole block in a single pass, no further save pairs
+needed.
+
+Position and class year are not in the rating block and are still unknown, as is
+the authoritative player→team link — it is not a plain integer anywhere in the
+192-byte record.
 
 ### What this buys immediately
 
