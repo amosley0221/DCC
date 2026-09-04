@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.14.0] - 2026-09-04
+
 ### Added
 
 - **The bundle tables can be read, and they name the art.** *Find the art* in
