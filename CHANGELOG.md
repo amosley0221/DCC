@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.9.1] - 2026-09-04
+
 ### Changed
 
 - **The roster lives inside Team, where the design puts it.** It shipped as a
