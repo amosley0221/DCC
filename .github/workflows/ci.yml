@@ -20,6 +20,9 @@ jobs:
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
 
+      - name: Check the bundled fonts are the format they claim
+        run: node scripts/check-fonts.mjs
+
       - run: npm ci
         working-directory: apps/desktop
 
@@ -94,3 +97,61 @@ jobs:
           name: android-apk-ci
           path: apps/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+  android-launch:
+    name: Android (launch on emulator)
+    needs: android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-apk-ci
+          path: apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install the release APK and open it
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            set -e
+            adb install -r apk/*.apk
+            adb logcat -c
+            adb shell am start -W -n com.dcc.app/.MainActivity
+            # Give the dynasty time to parse and the first frame to draw.
+            sleep 20
+            adb logcat -d > logcat.txt
+
+            # A crash on launch is exactly what a build check cannot miss:
+            # the APK installs fine and only dies when the user opens it.
+            if grep -qE "FATAL EXCEPTION|ANR in com.dcc.app" logcat.txt; then
+              echo "::error::The app crashed on launch."
+              grep -A 40 -E "FATAL EXCEPTION|ANR in com.dcc.app" logcat.txt | head -60
+              exit 1
+            fi
+
+            # Still running means it got past startup and drew something.
+            if ! adb shell pidof com.dcc.app > /dev/null; then
+              echo "::error::The app is not running 20s after launch."
+              tail -80 logcat.txt
+              exit 1
+            fi
+            echo "App launched and is still running."
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launch-logcat
+          path: logcat.txt
+          if-no-files-found: ignore

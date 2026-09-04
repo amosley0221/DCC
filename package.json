@@ -1,10 +1,12 @@
 {
   "name": "dynasty-command-center",
   "private": true,
-  "version": "0.1.0",
-  "description": "Dynasty Command Center — companion apps for an EA College Football 27 dynasty.",
+  "version": "0.1.1",
+  "description": "Dynasty Command Center \u2014 companion apps for an EA College Football 27 dynasty.",
   "license": "UNLICENSED",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "gen:data": "node scripts/generate-data.mjs",
     "gen:icons": "node scripts/generate-icons.mjs",
@@ -14,6 +16,7 @@
     "desktop:install": "npm --prefix apps/desktop ci",
     "desktop:dev": "npm --prefix apps/desktop run dev",
     "desktop:build": "npm --prefix apps/desktop run build",
-    "desktop:dist": "npm --prefix apps/desktop run dist"
+    "desktop:dist": "npm --prefix apps/desktop run dist",
+    "check:fonts": "node scripts/check-fonts.mjs"
   }
 }

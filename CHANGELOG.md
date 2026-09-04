@@ -10,6 +10,24 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.1.1] - 2026-09-04
+
+### Fixed
+
+- **The Android app crashed on launch.** The bundled typefaces were not fonts:
+  Google Fonts serves a format chosen from the request's user agent, and the one
+  used to fetch them was old enough to be served EOT — an Internet Explorer
+  format — under a `.ttf` name. Android cannot load EOT, so the app died drawing
+  its first frame. All twelve font files are now real TrueType.
+
+### Added
+
+- `scripts/check-fonts.mjs` validates every bundled font's header and table
+  directory, and CI runs it, so a wrong-format download fails the build.
+- CI now installs the release APK on an emulator and opens it, failing on a
+  crash or an app that is not running after launch. A startup crash cannot
+  reach a release again.
+
 ## [0.1.0] - 2026-09-04
 
 First installable build of both apps.
