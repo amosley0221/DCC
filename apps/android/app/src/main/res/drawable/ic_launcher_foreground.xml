@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Header rule in accent over three story bars, inset into the adaptive
+         icon's safe zone. -->
+    <path android:fillColor="#B33A2B" android:pathData="M32,36 h44 v4 h-44 z" />
+    <path android:fillColor="#EDE6DA" android:pathData="M32,48 h44 v7 h-44 z" />
+    <path android:fillColor="#B5ACA0" android:pathData="M32,61 h34 v7 h-34 z" />
+    <path android:fillColor="#8D857A" android:pathData="M32,74 h25 v7 h-25 z" />
+</vector>

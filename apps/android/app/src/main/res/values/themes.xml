@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Night Wire background, so the window behind Compose never flashes light. -->
+    <style name="Theme.DCC" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/dcc_bg0</item>
+        <item name="android:statusBarColor">@color/dcc_bar</item>
+        <item name="android:navigationBarColor">@color/dcc_bar</item>
+    </style>
+</resources>

@@ -1,0 +1,73 @@
+name: CI
+
+# Every push builds both apps, so a broken build is caught before a tag is cut.
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  desktop:
+    name: Desktop (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - run: npm ci
+        working-directory: apps/desktop
+
+      - run: npm run build
+        working-directory: apps/desktop
+
+      - name: Verify the generated dataset is in sync with its generator
+        run: |
+          # A stale committed dataset would ship two apps showing different
+          # universes, so the generator has to reproduce it exactly.
+          cp shared/data/dcc-data.json /tmp/committed.json
+          node scripts/generate-data.mjs
+          diff -q /tmp/committed.json shared/data/dcc-data.json \
+            || { echo "::error::shared/data/dcc-data.json is stale — run 'npm run gen:data && node scripts/sync-assets.mjs'"; exit 1; }
+          diff -q shared/data/dcc-data.json apps/android/app/src/main/assets/dcc-data.json \
+            || { echo "::error::the Android copy of the dataset is stale — run 'node scripts/sync-assets.mjs'"; exit 1; }
+
+      - name: Verify versions are in sync
+        run: |
+          node scripts/sync-version.mjs
+          git diff --exit-code -- apps/android/version.properties apps/desktop/package.json \
+            || { echo "::error::version files are out of sync — run 'npm run sync:version'"; exit 1; }
+
+      - name: Smoke test the built app
+        run: |
+          # Boots the real Electron app and clicks through every section, which
+          # catches a blank window that a type-check never would.
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
+          xvfb-run -a ./node_modules/electron/dist/electron smoke.cjs --no-sandbox
+        working-directory: apps/desktop
+
+  android:
+    name: Android (assemble)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble release APK
+        working-directory: apps/android
+        run: ./gradlew --no-daemon assembleRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-ci
+          path: apps/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

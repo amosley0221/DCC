@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dcc_bg0">#131110</color>
+    <color name="dcc_bar">#0E0C0B</color>
+    <color name="dcc_accent">#B33A2B</color>
+    <color name="dcc_ink">#EDE6DA</color>
+    <color name="dcc_ink3">#8D857A</color>
+</resources>

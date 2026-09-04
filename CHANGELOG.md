@@ -1,0 +1,44 @@
+# Changelog
+
+Every release on the [releases page](https://github.com/amosley0221/DCC/releases)
+carries the notes for its own version, taken from this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
+this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+_Nothing yet._
+
+## [0.1.0] - 2026-09-04
+
+First installable build of both apps.
+
+### Added
+
+- **Windows app** — an Electron workspace covering every section in the design:
+  Wire with approvable story effects and the heat meter, National, Recruit
+  (3,200-prospect pool, the interest-cutoff rule, and a full prospect editor),
+  Team (schedule with write-recap, roster editor, depth chart, and a trade
+  builder that makes an over-85 trade unsubmittable), Tamper (gated to week 11,
+  with a live offer-scored conversation), Coach, Queue with an agent log,
+  Export, and Devices with the save lease.
+- **Android app** — the same workspace on a left nav rail, with heat pinned at
+  the rail bottom: Wire, National, Recruit, Team, Tamper, Coach, Queue and
+  Settings, all editing the same shared queue.
+- Both themes ship in both apps — Night Wire is the default, Field Office is a
+  setting — with the design's five typefaces bundled so nothing needs network
+  access to render.
+- A deterministic seed dynasty: 24 fictional programs, 2,040 players, 3,200
+  prospects and a full schedule, generated once and read identically by both
+  apps. No licensed marks or real likenesses anywhere.
+
+### Install and updates
+
+- Windows ships an NSIS installer that upgrades over the existing install, and
+  the app checks GitHub Releases on launch and can install the next version
+  itself. Settings, queue and board live outside the install directory, so an
+  upgrade keeps them.
+- Android ships a signed APK. Every release is signed with the same key, so a
+  new APK installs over the old one without uninstalling and keeps app data.
+  Settings → Updates checks for and installs the next release in place.

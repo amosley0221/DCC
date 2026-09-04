@@ -1,0 +1,180 @@
+name: Release
+
+# Pushing a v* tag builds both apps and publishes them to a GitHub Release with
+# the CHANGELOG section for that version as the release notes.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and publish (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: Check version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - id: v
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "::error::Tag $TAG does not match package.json version $PKG. Cut releases with 'npm run release'."
+            exit 1
+          fi
+          # Fail early rather than publishing a release with no notes.
+          node scripts/release-notes.mjs "$VERSION" > /dev/null
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  android:
+    name: Android APK
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Use the private signing key when the repo has one
+        id: key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          # Android only installs an update over an existing app when both are
+          # signed by the same key. A repo secret wins; otherwise the committed
+          # key in apps/android/keystore is used, so updates always work.
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "injected=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "injected=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release APK
+        working-directory: apps/android
+        env:
+          DCC_KEYSTORE_FILE: ${{ steps.key.outputs.injected == 'true' && format('{0}/release.jks', runner.temp) || '' }}
+          DCC_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          DCC_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          DCC_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Name the APK after the version
+        run: |
+          mkdir -p out
+          cp apps/android/app/build/outputs/apk/release/app-release.apk \
+             "out/DCC-${{ needs.check.outputs.version }}.apk"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: out/*.apk
+          if-no-files-found: error
+
+  windows:
+    name: Windows installer
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - run: npm ci
+        working-directory: apps/desktop
+
+      - name: Build installer
+        working-directory: apps/desktop
+        run: npm run dist
+
+      - name: Collect installer, updater manifest and delta package
+        shell: bash
+        run: |
+          mkdir -p out
+          # latest.yml and the blockmap are what electron-updater reads to find
+          # and delta-download the next version, so both ship with the exe.
+          cp apps/desktop/release/*.exe out/
+          cp apps/desktop/release/latest.yml out/
+          cp apps/desktop/release/*.blockmap out/ 2>/dev/null || true
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: [check, android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Assemble release notes
+        run: |
+          VERSION="${{ needs.check.outputs.version }}"
+          {
+            node scripts/release-notes.mjs "$VERSION"
+            echo
+            echo "---"
+            echo
+            echo "### Install"
+            echo
+            echo "**Windows** — download \`DCC-Setup-$VERSION.exe\` and run it."
+            echo "It installs over any previous version; you never have to uninstall first."
+            echo "The app also checks for updates on launch and can install them itself."
+            echo
+            echo "**Android** — download \`DCC-$VERSION.apk\` and open it."
+            echo "It installs over any previous version and keeps your data, because every"
+            echo "release is signed with the same key. Settings → Updates checks for the next one."
+          } > NOTES.md
+          cat NOTES.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: v${{ needs.check.outputs.version }}
+          body_path: NOTES.md
+          files: |
+            artifacts/android-apk/*
+            artifacts/windows-installer/*
+          fail_on_unmatched_files: true
