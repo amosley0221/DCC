@@ -846,3 +846,40 @@ What fixes it is more confirmed anchors. Each single-change diff pins one row
 exactly, the way these two did. A handful more — different prospects, different
 actions — would let the row layout be settled by agreement between known rows
 rather than by searching against noisy ones.
+
+## The save describes itself
+
+This should have been the first thing looked for, and it was not.
+
+The payload carries a **type registry**: 20,562 distinct names, 243 of them
+array stores. The structures that have cost the most effort are all in it, named
+plainly:
+
+| Name | What it almost certainly is |
+| --- | --- |
+| `SchoolOffer` | offers, per recruit per school |
+| `SchoolPipelineInfluence` | school interest |
+| `RecruitTarget`, `UserRecruitTarget` | the recruiting board |
+| `RecruitingBoardRecruitListStore` | the board's list store |
+| `Prospect`, `Committed`, `ProspectInteraction` | commitment state |
+| `ScheduleKnownGame`, `ScheduleStructureEntry` | schedules |
+| `SeasonCoachStats`, `CareerCoachStats`, `CoachAward` | coach history |
+| `TeamStats`, `SeasonInfo`, `TeamValueTrackingTable` | team records |
+
+The schedule stores are named per conference and per season —
+`ScheduleStructureEntryArrayStoreBig100` through `Big105`, `SEC01`, `ACC27`,
+`Pac12`, and `ScheduleNeutralStadiumArrayStore2026` through `2054`. Individual
+fixtures are named outright: `Air_Force_Army_Game`, `Air_Force_Navy_Game`.
+
+This does not hand over the field layouts. It does say what exists, what it is
+called, and roughly where each store sits, which is the difference between
+searching a 31 MB file and reading an index. Every remaining unknown —
+recruiting stage, commit score, interest, schedules, standings, coach history —
+has a named home.
+
+### What this means for the method
+
+The bit-hunting that solved the ratings, the recruiting fields and the coach
+table worked, but it was the hard way round. The order should be: find the
+structure by name, then read its rows, then use a controlled diff only to
+confirm which column is which.
