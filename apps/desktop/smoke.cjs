@@ -130,6 +130,22 @@ app.whenReady().then(async () => {
   })()
   console.log('SAVE PERSISTENCE: ' + (savePersist ?? 'survives navigation'))
 
+  // With a save loaded, Recruit has to switch to the save-backed pool rather
+  // than the sample dynasty. Asserted in the DOM, because "the component
+  // exists" has passed before while the screen showed something else.
+  const recruitFromSave = await (async () => {
+    const idx = r.nav.indexOf('RECRUIT')
+    if (idx < 0) return 'RECRUIT missing from the nav'
+    await win.webContents.executeJavaScript(`document.querySelectorAll('.nav-item')[${idx}].click()`)
+    await wait(500)
+    const text = await win.webContents.executeJavaScript(
+      `((document.querySelector('.content-narrow')||{}).innerText||'')`)
+    if (!/RECRUITING POOL/i.test(text)) return 'Recruit did not show the save-backed pool: ' + text.slice(0, 120)
+    return null
+  })()
+  console.log('RECRUIT FROM SAVE: ' + (recruitFromSave ?? 'shows the recruiting pool'))
+  if (recruitFromSave) { console.log('SMOKE FAIL: ' + recruitFromSave); app.exit(1); return }
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))

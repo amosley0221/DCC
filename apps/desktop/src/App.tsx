@@ -15,6 +15,7 @@ import Devices from './sections/Devices'
 import Settings from './sections/Settings'
 import NoDynasty from './sections/NoDynasty'
 import Save from './sections/Save'
+import RecruitSave from './sections/RecruitSave'
 import TeamSave from './sections/TeamSave'
 import { Meta } from './ui'
 import UpdateToast from './UpdateToast'
@@ -118,6 +119,8 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
               <Save />
             ) : section === 'TEAM' && save.report ? (
               <TeamSave />
+            ) : section === 'RECRUIT' && save.report ? (
+              <RecruitSave />
             ) : !d ? (
               <NoDynasty
                 section={section.charAt(0) + section.slice(1).toLowerCase()}

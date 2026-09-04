@@ -10,6 +10,26 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.15.0] - 2026-09-04
+
+### Added
+
+- **Recruit reads your save.** Every player the save does not put on a roster
+  sits in one pool — the 138 schools hold exactly 85 each, and the rest are
+  recruits and the portal. In a 2027 Penn State save that is 4,718 players,
+  with names, positions, hometowns, overalls and all 53 ratings already
+  readable. Searchable, filterable by position group, sorted on the save's own
+  overall, and a row opens to its full rating card.
+
+  These are the same recruits other dynasty trackers show. Checked against a
+  live 2028 dynasty: Ty Merritt, MLB, Burton; Matt Ambrose, RE, Gainesville;
+  J.D. Kaesviharn, QB, Logansport — name, position and hometown all matching.
+
+  Star rating, class, archetype, recruiting stage, commit score and school
+  interest are not readable from the save yet, so they are left out rather than
+  invented.
+
+
 ## [0.14.2] - 2026-09-04
 
 ### Fixed
