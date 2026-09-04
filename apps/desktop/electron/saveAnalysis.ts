@@ -22,7 +22,20 @@ export interface SaveRegion {
   preview: string
 }
 
+/** Header of a Frostbite FBCHUNKS save, as used by College Football. */
+export interface FrostbiteHeader {
+  version: number
+  dataOffset: number
+  payloadBytes: number
+  build: string
+  saved: string
+  /** Magic of the decompressed payload, e.g. "FrTk". */
+  innerMagic: string
+  inflatedBytes: number
+}
+
 export interface SaveReport {
+  frostbite?: FrostbiteHeader
   name: string
   bytes: number
   sha256: string
@@ -65,7 +78,7 @@ function sniffContainer(head: Buffer): { container: string; notes: string[] } {
     ['bzip2', (b) => b.subarray(0, 3).toString('latin1') === 'BZh'],
     ['7-zip', (b) => b.subarray(0, 2).toString('latin1') === '7z'],
     ['SQLite database', (b) => b.subarray(0, 15).toString('latin1') === 'SQLite format 3'],
-    ['EA "FBCHUNKS"', (b) => b.subarray(0, 9).toString('latin1') === 'FBCHUNKS'],
+    ['Frostbite FBCHUNKS', (b) => b.subarray(0, 8).toString('latin1') === 'FBCHUNKS'],
     ['EA DBF-style', (b) => b.subarray(0, 3).toString('latin1') === 'DBF'],
   ]
   for (const [name, test] of magics) {
@@ -181,11 +194,52 @@ function extractUtf16(buf: Buffer, min = 5, cap = 60): string[] {
   return [...new Set(out)].slice(0, cap)
 }
 
+/**
+ * FBCHUNKS is the container College Football saves use: a fixed header naming
+ * the game build and save time, then a chunk record, then one zlib stream whose
+ * payload is Frostbite's own "FrTk" format. The rest of the file is zero padding.
+ */
+function readFrostbite(buf: Buffer): { header: FrostbiteHeader; payload: Buffer } | null {
+  if (buf.subarray(0, 8).toString('latin1') !== 'FBCHUNKS') return null
+  try {
+    const dataOffset = buf.readUInt32LE(10)
+    const payloadBytes = buf.readUInt32LE(14)
+    const [y, mo, d, h, mi, sec] = [22, 24, 26, 28, 30, 32].map((o) => buf.readUInt16LE(o))
+    const build = buf.subarray(34, 58).toString('latin1').replace(/\0+$/, '')
+
+    // The chunk record sits at dataOffset; its length field is followed by the
+    // stream itself, which starts at the first zlib header after it.
+    let streamAt = -1
+    for (let i = dataOffset; i < Math.min(dataOffset + 256, buf.length - 1); i++) {
+      if (buf[i] === 0x78 && ((buf[i] << 8) + buf[i + 1]) % 31 === 0) { streamAt = i; break }
+    }
+    if (streamAt < 0) return null
+
+    const payload = inflateSync(buf.subarray(streamAt))
+    return {
+      header: {
+        version: buf.readUInt16LE(8),
+        dataOffset,
+        payloadBytes,
+        build,
+        saved: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')} ` +
+          `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}:${String(sec).padStart(2, '0')}`,
+        innerMagic: payload.subarray(0, 4).toString('latin1'),
+        inflatedBytes: payload.length,
+      },
+      payload,
+    }
+  } catch {
+    return null
+  }
+}
+
 export function analyzeSave(path: string): SaveReport {
   const bytes = statSync(path).size
   const buf = readFileSync(path)
   const head = buf.subarray(0, 64)
   const { container, notes } = sniffContainer(head)
+  const frostbite = readFrostbite(buf)
 
   // Entropy per block shows where compressed or encrypted regions sit.
   const blocks = Math.min(64, Math.max(1, Math.ceil(buf.length / (256 * 1024))))
@@ -195,8 +249,18 @@ export function analyzeSave(path: string): SaveReport {
     entropy: Number(shannon(buf.subarray(i * blockSize, (i + 1) * blockSize)).toFixed(2)),
   }))
 
-  const regions = findCompressedRegions(buf)
-  const inflated = regions.length
+  // When the container is understood there is no need to go hunting for
+  // streams; the header says exactly where the payload is.
+  const regions = frostbite
+    ? [{
+        offset: frostbite.header.dataOffset,
+        method: 'zlib' as const,
+        compressedBytes: frostbite.header.payloadBytes,
+        inflatedBytes: frostbite.header.inflatedBytes,
+        preview: frostbite.payload.subarray(0, 160).toString('latin1').replace(/[^\x20-\x7e]/g, '·'),
+      }]
+    : findCompressedRegions(buf)
+  const inflated = frostbite ? frostbite.payload : regions.length
     ? Buffer.concat(
         regions.slice(0, 8).map((r) => {
           try {
@@ -213,6 +277,13 @@ export function analyzeSave(path: string): SaveReport {
   const textSource = inflated.length > 0 ? inflated : buf
   const entropy = Number(shannon(buf).toFixed(3))
 
+  if (frostbite) {
+    notes.push(
+      `Frostbite save from build ${frostbite.header.build}, written ${frostbite.header.saved}. ` +
+        `The payload is ${frostbite.header.innerMagic} and inflates to ` +
+        `${frostbite.header.inflatedBytes.toLocaleString()} bytes — it is compressed, not encrypted.`,
+    )
+  }
   if (entropy > 7.9 && regions.length === 0) {
     notes.push(
       'Entropy is very high with no decodable deflate streams, which points at ' +
@@ -227,6 +298,7 @@ export function analyzeSave(path: string): SaveReport {
   }
 
   return {
+    frostbite: frostbite?.header,
     name: basename(path),
     bytes,
     sha256: createHash('sha256').update(buf).digest('hex'),
