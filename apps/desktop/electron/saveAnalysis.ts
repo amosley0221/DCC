@@ -570,21 +570,36 @@ function verifyDictionary(buf: Buffer, offset: number, frames: Buffer[]): DictCa
 
   const coarse = frames.slice(0, 2)
   const seen: { length: number; score: number }[] = []
+
+  // A dedicated dictionary file is the whole file, so try that before sweeping
+  // — the sweep starts partway in and steps in fours, and would walk past it.
+  const whole = scoreAt(maxLen, frames)
+  if (whole > 0) {
+    let preview = ''
+    try {
+      preview = zstdDecompressSync(frames[0], { dictionary: buf.subarray(offset, offset + maxLen) })
+        .subarray(0, 180).toString('latin1').replace(/[^\x20-\x7e]/g, '.')
+    } catch { /* scored above */ }
+    if (whole > 0.6) return [{ length: maxLen, score: Number(whole.toFixed(4)), preview }]
+    seen.push({ length: maxLen, score: whole })
+  }
   for (let len = 512; len <= maxLen; len += 4) {
     const v = scoreAt(len, coarse)
-    if (v > 0.6) seen.push({ length: len, score: v })
+    if (v > 0.5) seen.push({ length: len, score: v })
   }
   if (seen.length === 0) return []
 
   seen.sort((a, b) => b.score - a.score)
   const out: DictCandidate[] = []
+  // Anything that decoded at all is reported with its score, so a near miss is
+  // visible rather than being swallowed by a threshold.
   const tried = new Set<number>()
   for (const c of seen.slice(0, 12)) {
     for (let len = c.length - 8; len <= c.length + 8; len++) {
       if (len < 1 || len > maxLen || tried.has(len)) continue
       tried.add(len)
       const v = scoreAt(len, frames)
-      if (v > 0.6) {
+      if (v > 0) {
         let preview = ''
         try {
           preview = zstdDecompressSync(frames[0], { dictionary: buf.subarray(offset, offset + len) })
@@ -652,6 +667,31 @@ export function findDictionary(
         dictionariesSeen++
         const id = at + 8 <= buf.length ? buf.readUInt32LE(at + 4) : 0
         const matches = (id >>> 0) === (dictionaryId >>> 0)
+        // A dictionary whose declared id differs may still be the right bytes
+        // with a different id stamped on it, so try patching the id and
+        // decoding. zstd refuses a frame whose dictionary id does not match.
+        if (!matches && frames.length) {
+          const patched = Buffer.from(buf.subarray(at, Math.min(at + 4 * 1024 * 1024, buf.length)))
+          patched.writeUInt32LE(dictionaryId >>> 0, 4)
+          const cands = verifyDictionary(patched, 0, frames)
+          if (cands.length) {
+            hits.push({
+              file: full,
+              offset: at,
+              dictionaryId: `0x${(id >>> 0).toString(16)}`,
+              matches: false,
+              verified: true,
+              lengthBytes: cands[0].length,
+              sampleText: cands[0].preview,
+              candidates: cands,
+              reason: `declares id 0x${(id >>> 0).toString(16)} but the content decodes this ` +
+                `save's frames once the id is patched — ${cands[0].length.toLocaleString()} bytes`,
+            })
+            at += 4
+            continue
+          }
+        }
+
         if (matches) {
           const cands = verifyDictionary(buf, at, frames)
           const best = cands[0]
@@ -670,26 +710,35 @@ export function findDictionary(
               : 'the dictionary id matches, but no length decoded frames to anything plausible',
           })
         } else if (hits.length < 40) {
+          const next = buf.indexOf(ZSTD_DICT_MAGIC, at + 4)
           hits.push({
             file: full,
             offset: at,
             dictionaryId: `0x${(id >>> 0).toString(16)}`,
             matches: false,
             verified: false,
-            reason: 'a zstd dictionary, but not the one this save uses',
+            reason: 'a zstd dictionary, but not the one this save uses' +
+              (next > at ? ` (up to ${(next - at).toLocaleString()} bytes)` : ''),
           })
         }
         at += 4
       }
 
-      if (perFile === 0 && buf.includes(idLE)) {
+      // Checked for every file, including ones that already yielded a
+      // dictionary: a tool that reads these saves will reference the id even if
+      // it keeps the dictionary itself packed.
+      const idAt = buf.indexOf(idLE)
+      if (idAt >= 0 && !hits.some((h) => h.file === full && h.verified)) {
         hits.push({
           file: full,
-          offset: buf.indexOf(idLE),
+          offset: idAt,
           dictionaryId: `0x${(dictionaryId >>> 0).toString(16)}`,
           matches: false,
           verified: false,
-          reason: 'mentions the dictionary id but holds no dictionary — may embed one compressed',
+          reason: perFile
+            ? `references the dictionary id, and holds ${perFile} other dictionar` +
+              `${perFile === 1 ? 'y' : 'ies'} — it knows about this format`
+            : 'mentions the dictionary id but holds no dictionary — may embed one compressed',
         })
       }
     }
