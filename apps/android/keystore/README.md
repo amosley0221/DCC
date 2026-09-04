@@ -11,6 +11,11 @@ committed, and the key is what makes "update without uninstalling first" work.
 | Key alias | `dcc` |
 | Key password | `dynastycommandcenter` |
 | Validity | 100 years |
+| Certificate SHA-256 | see `fingerprint.txt` |
+
+CI verifies every release APK against `fingerprint.txt`, so a key change can
+never ship quietly — an APK signed by a different key would stop installing over
+an installed one.
 
 ## The tradeoff
 
@@ -31,6 +36,9 @@ file otherwise. To switch, add these repository secrets
 | `ANDROID_KEYSTORE_PASSWORD` | store password |
 | `ANDROID_KEY_ALIAS` | key alias |
 | `ANDROID_KEY_PASSWORD` | key password |
+
+After switching, update `fingerprint.txt` to the new certificate's SHA-256
+(`keytool -list -v -keystore your-key.jks`) or CI will reject the build.
 
 Decide before you install the first build: switching keys later means
 uninstalling the app once, because Android rejects an update signed by a

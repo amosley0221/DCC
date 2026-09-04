@@ -33,7 +33,10 @@ android {
             // CI injects a private key when the repo has one; otherwise the
             // committed key is used so a local build produces an APK that
             // upgrades cleanly over a released one.
-            val injected = System.getenv("DCC_KEYSTORE_FILE")
+            //
+            // The workflow sets this variable to an empty string rather than
+            // leaving it unset when there is no secret, so blank counts as absent.
+            val injected = System.getenv("DCC_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
             if (injected != null) {
                 storeFile = file(injected)
                 storePassword = System.getenv("DCC_KEYSTORE_PASSWORD")
