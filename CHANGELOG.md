@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.9.2] - 2026-09-04
+
 ### Fixed
 
 - **All 53 ratings are now confirmed.** The five pairs the app warned it could
