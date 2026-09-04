@@ -10,12 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **All 53 ratings are now confirmed.** The five pairs the app warned it could
+  not tell apart are settled by a save raising one member of each. Three were
+  the other way round: 785 is Medium Throw Accuracy not Short, 906 is Run Block
+  Finesse not Power, and 817 is Stiff Arm not Trucking. Power Moves and Change
+  of Direction were already right. The caveat about unverified pairs is gone,
+  because there are none.
 - **Release was reading the wrong field.** Two positions both read 43 for the
-  player whose card was used to build the rating map, and the solver picked
-  between them arbitrarily. It picked wrong: the one it chose reads about 34 for
-  every position in the game, which no receiver rating does. The right one reads
-  72 for wide receivers, 69 for tight ends and 43 for linemen. Every other
-  rating was checked the same way and holds.
+  player whose card built the rating map, and the solver picked between them
+  arbitrarily. It picked wrong: the one it chose reads about 34 for every
+  position in the game, which no receiver rating does. The right one reads 72
+  for wide receivers, 69 for tight ends and 43 for linemen.
 
 ## [0.9.1] - 2026-09-04
 

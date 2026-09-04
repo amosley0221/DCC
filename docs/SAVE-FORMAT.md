@@ -391,13 +391,45 @@ Bit 529 also reads 68 for Falzone and would have fitted Trucking or Stiff Arm,
 but it correlates with nothing — r≈0.02 against every ball-carrier rating, where
 both 817 and 927 track Break Tackle at 0.69 and 0.73. It was never a field.
 
-**Five pairs are placed but not distinguished.** Within each, the two ratings
-behave so alike across the league that nothing in the file separates them, so
-the labels inside a pair could be swapped: Short/Medium Throw Accuracy, Run
-Block Power/Finesse, Trucking/Stiff Arm, Finesse/Power Moves, and
-Speed/Change of Direction. Reading a player is unaffected — both numbers are
-right, only which name goes on which is open. One more single-rating edit to
-either member of a pair settles it.
+**The five ambiguous pairs are settled.** A save raising one member of each by
+a single point, on Lamar Brown, moved exactly one bit per pair:
+
+| Rating raised | Bit that moved | Was labelled |
+| --- | --- | --- |
+| Medium Throw Accuracy | 785 | Short Throw Accuracy — **swapped** |
+| Run Block Finesse | 906 | Run Block Power — **swapped** |
+| Stiff Arm | 817 | Trucking — **swapped** |
+| Power Moves | 938 | Power Moves — correct |
+| Change of Direction | 632 | Change of Direction — correct |
+
+Three of five were the other way round, which is what fifty-fifty guesses do.
+The two that held were the two with independent evidence behind them: defensive
+tackles average more Power than Finesse Moves, and Speed correlates with
+Acceleration at 0.85 where Change of Direction manages 0.76.
+
+Two of the three swaps also make the league read *more* like football than the
+originals did, which is corroboration rather than proof but is worth recording:
+quarterbacks now average Short 77 > Medium 75 > Deep 74, in that order, and
+fullbacks now average Trucking 70 against Stiff Arm 62 rather than the reverse.
+
+Every rating is now fixed by a controlled edit or a rating card. There are no
+undetermined labels left.
+
+### A sixth change that was not an edit
+
+That save showed six changed fields, not five. The sixth was a 7-bit read
+ending at bit 560, which had been labelled Release. It is not a field at all:
+the overall rating occupies bits 555–561, so a window ending at 560 shares six
+of its seven bits and moves whenever overall does. Lamar Brown went 95 → 96, and
+that alone accounts for it. Across all 16,448 players the two never move
+independently — not once.
+
+The real Release is bit **959**, which averages 72 for wide receivers, 69 for
+tight ends and 43 for linemen. Bit 560 averages 34 for every position in the
+game, flat, which no receiver rating does. Both read 43 for the player whose
+card built the map, so the solver had no basis to choose and picked wrong; a
+position profile is what separates them, and is now the check every assignment
+has to pass.
 
 ### Position, and an overall
 

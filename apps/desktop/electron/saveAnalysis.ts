@@ -1032,15 +1032,15 @@ export const OVERALL_BIT = 561
  */
 export const RATING_BITS: Record<string, number> = {
   Speed: 849, Acceleration: 504, Agility: 490, Strength: 824, Awareness: 536,
-  Carrying: 696, 'BC Vision': 575, 'Break Tackle': 586, Trucking: 817, 'Stiff Arm': 927,
+  Carrying: 696, 'BC Vision': 575, 'Break Tackle': 586, Trucking: 927, 'Stiff Arm': 817,
   'Change of Direction': 632, 'Spin Move': 856, 'Juke Move': 714, Catching: 842,
   'Catch in Traffic': 671, 'Spectacular Catch': 657, 'Short Route Running': 895,
   'Medium Route Running': 625, 'Deep Route Running': 294, Release: 959, Jumping: 721,
-  'Throwing Power': 888, 'Short Throw Accuracy': 785, 'Medium Throw Accuracy': 799,
+  'Throwing Power': 888, 'Short Throw Accuracy': 799, 'Medium Throw Accuracy': 785,
   'Deep Throw Accuracy': 778, 'Throw on the Run': 810, 'Throw Under Pressure': 650,
   'Break Sack': 600, 'Play Action': 497, 'Pass Blocking': 543, 'Pass Block Power': 522,
-  'Pass Block Finesse': 568, 'Run Blocking': 920, 'Run Block Power': 906,
-  'Run Block Finesse': 913, 'Lead Block': 703, 'Impact Blocking': 753,
+  'Pass Block Finesse': 568, 'Run Blocking': 920, 'Run Block Power': 913,
+  'Run Block Finesse': 906, 'Lead Block': 703, 'Impact Blocking': 753,
   'Play Recognition': 984, Tackling: 831, 'Hit Power': 689, 'Block Shedding': 607,
   'Finesse Moves': 593, 'Power Moves': 938, Pursuit: 952, 'Man Coverage': 618,
   'Zone Coverage': 991, Press: 945, 'Kick/Punt Return': 682, 'Kicking Power': 735,
@@ -1048,18 +1048,14 @@ export const RATING_BITS: Record<string, number> = {
 }
 
 /**
- * Five pairs sit at known positions but could be the other way round: within
- * each pair the two ratings behave almost identically across the league, so
- * nothing in the file distinguishes them. Reading a player is unaffected —
- * only which of the two labels goes on which number.
+ * Every rating below is confirmed by a controlled edit or by a rating card, so
+ * there are no ambiguous pairs left. The five that were ambiguous — the two
+ * throw accuracies, the two run-block ratings, Trucking against Stiff Arm,
+ * Finesse against Power Moves, and Speed against Change of Direction — were
+ * settled by a save that raised one member of each by a single point. Three of
+ * the five were the other way round from the correlation guess.
  */
-export const RATING_PAIRS_UNVERIFIED: [string, string][] = [
-  ['Short Throw Accuracy', 'Medium Throw Accuracy'],
-  ['Run Block Power', 'Run Block Finesse'],
-  ['Trucking', 'Stiff Arm'],
-  ['Finesse Moves', 'Power Moves'],
-  ['Speed', 'Change of Direction'],
-]
+export const RATING_PAIRS_UNVERIFIED: [string, string][] = []
 
 export interface RosterPlayer {
   index: number
