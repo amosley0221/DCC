@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { StoreProvider, useBootstrap, useStore } from './store'
+import { SaveProvider, useSave } from './saveStore'
 import { applyTheme } from './theme'
 import type { UpdateStatus } from './updates'
 import Wire from './sections/Wire'
@@ -26,6 +27,7 @@ const THIS_MACHINE = 'gaming-pc'
 
 function Shell({ update, version }: { update: UpdateStatus | null; version: string }) {
   const { state, d, sem } = useStore()
+  const { save } = useSave()
   const [section, setSection] = useState<Section>('WIRE')
 
   const held = state.queue.filter((q) => q.state === 'HELD').length
@@ -58,8 +60,8 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
             so rather than showing green for something that does not exist. */}
         <div className="agent-strip">
           <div className="agent-row">
-            <span className="dot" style={{ background: d ? 'var(--warn)' : 'var(--ink4)' }} />
-            {d ? 'SAVE NOT READ' : 'NO SAVE'}
+            <span className="dot" style={{ background: save.report ? 'var(--good)' : d ? 'var(--warn)' : 'var(--ink4)' }} />
+            {save.report ? 'SAVE ANALYSED' : d ? 'SAVE NOT READ' : 'NO SAVE'}
           </div>
           <div className="agent-row">
             <span className="dot" style={{ background: 'var(--ink4)' }} />AGENT OFFLINE
@@ -91,8 +93,12 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
               </Meta>
               <Meta size={9}>{d.userTeam.wins}–{d.userTeam.losses} · WK {state.week}</Meta>
             </>
+          ) : save.report ? (
+            // A save has been read, even though its fields are not mapped yet.
+            // Saying "no dynasty loaded" here read as if nothing had happened.
+            <Meta size={9}>{save.report.name} · ANALYSED · FIELDS NOT MAPPED YET</Meta>
           ) : (
-            <Meta size={9}>NO DYNASTY LOADED</Meta>
+            <Meta size={9}>NO SAVE LOADED</Meta>
           )}
         </div>
 
@@ -128,6 +134,22 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
 
       <UpdateToast status={update} />
     </div>
+  )
+}
+
+/**
+ * Sits between the store and the shell so the analysed save outlives section
+ * switches, and so the path it remembers is written back to settings.
+ */
+function SaveGate({ update, version }: { update: UpdateStatus | null; version: string }) {
+  const { state, dispatch } = useStore()
+  const remembered = useRef(state.savePath).current
+  const forget = useCallback(() => dispatch({ type: 'savePath', path: null }), [dispatch])
+
+  return (
+    <SaveProvider remembered={remembered} onPathChange={forget}>
+      <Shell update={update} version={version} />
+    </SaveProvider>
   )
 }
 
@@ -167,7 +189,7 @@ export default function App() {
 
   return (
     <StoreProvider dynasty={boot.dynasty} initial={boot.initial}>
-      <Shell update={update} version={version} />
+      <SaveGate update={update} version={version} />
     </StoreProvider>
   )
 }

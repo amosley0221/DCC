@@ -8,6 +8,17 @@
 const path = require('node:path')
 const { writeFileSync } = require('node:fs')
 
+// Answer the open-file dialog with a fixture, so the real pick path can run
+// headless. Patched before main.cjs registers its handler; both share this
+// module instance.
+const SAVE_FIXTURE = path.join(require('node:os').tmpdir(), 'DYNASTY-SMOKE.sav')
+writeFileSync(SAVE_FIXTURE, Buffer.alloc(64 * 1024, 0x41))
+const dialog = require('electron').dialog
+const realShowOpen = dialog.showOpenDialog.bind(dialog)
+let answerDialog = false
+dialog.showOpenDialog = async (...args) =>
+  answerDialog ? { canceled: false, filePaths: [SAVE_FIXTURE] } : realShowOpen(...args)
+
 require(path.join(__dirname, 'dist/main/main.cjs'))
 
 const { app, BrowserWindow } = require('electron')
@@ -77,6 +88,48 @@ app.whenReady().then(async () => {
     return
   }
 
+  // The analysed save has to survive leaving the section and coming back — it
+  // used to live in the section's own state, so a menu click threw it away and
+  // the file had to be chosen again every time.
+  // Scoped to the section body on purpose: the title bar also shows the save
+  // name, so searching the whole page would pass even if the section lost it.
+  const SECTION_HAS_SAVE =
+    `/DYNASTY-SMOKE/.test((document.querySelector('.content-narrow')||{}).innerText||'')`
+  const savePersist = await (async () => {
+    const saveIdx = r.nav.indexOf('SAVE')
+    const otherIdx = r.nav.indexOf('WIRE')
+    if (saveIdx < 0 || otherIdx < 0) return 'SAVE or WIRE missing from the nav'
+
+    const click = async (i) => {
+      await win.webContents.executeJavaScript(`document.querySelectorAll('.nav-item')[${i}].click()`)
+      await wait(400)
+    }
+    answerDialog = true
+    await click(saveIdx)
+    await win.webContents.executeJavaScript(`(() => {
+      const b = [...document.querySelectorAll('button')].find(x => /CHOOSE SAVE FILE/i.test(x.textContent))
+      if (b) b.click()
+      return !!b
+    })()`)
+    for (let i = 0; i < 20; i++) {
+      await wait(400)
+      const got = await win.webContents.executeJavaScript(
+        SECTION_HAS_SAVE)
+      if (got) break
+    }
+    const before = await win.webContents.executeJavaScript(
+      SECTION_HAS_SAVE)
+    if (!before) return 'the save never appeared after choosing it'
+    await click(otherIdx)
+    await click(saveIdx)
+    await wait(400)
+    const after = await win.webContents.executeJavaScript(
+      SECTION_HAS_SAVE)
+    answerDialog = false
+    return after ? null : 'the save was lost when leaving the section and returning'
+  })()
+  console.log('SAVE PERSISTENCE: ' + (savePersist ?? 'survives navigation'))
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))
@@ -88,7 +141,8 @@ app.whenReady().then(async () => {
   const zstdOk = typeof require('node:zlib').zstdDecompressSync === 'function'
   console.log('ZSTD: node ' + process.versions.node + ' -> ' + (zstdOk ? 'supported' : 'MISSING'))
 
-  const ok = errors.length === 0 && r.nav.length >= 10 && zstdOk && visited.every((v) => !v.includes('title=""'))
+  const ok = errors.length === 0 && r.nav.length >= 10 && zstdOk && !savePersist &&
+    visited.every((v) => !v.includes('title=""'))
   console.log(ok ? 'SMOKE OK' : 'SMOKE FAIL')
   app.exit(ok ? 0 : 1)
 })

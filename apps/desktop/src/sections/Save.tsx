@@ -1,27 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useStore } from '../store'
+import { useSave } from '../saveStore'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
-import type { SaveReport, SaveDiff, DictScan } from '../../electron/saveAnalysis'
 
 /**
  * Dissects the dynasty save so the format can be worked out. Nothing here
  * writes to the save; the only file it creates is a copy and a report.
+ *
+ * The analysis itself lives in SaveProvider rather than here, so leaving the
+ * section and coming back does not throw it away.
  */
 export default function Save() {
   const { dispatch } = useStore()
-  const [path, setPath] = useState<string | null>(null)
-  const [report, setReport] = useState<SaveReport | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [backup, setBackup] = useState<string | null>(null)
-  const [diff, setDiff] = useState<SaveDiff | null>(null)
-  const [diffing, setDiffing] = useState(false)
-  const [scan, setScan] = useState<DictScan | null>(null)
-  const [scanning, setScanning] = useState(false)
-  const [dict, setDict] = useState<{ present: boolean; bytes?: number; id?: string } | null>(null)
-  const [dictResult, setDictResult] = useState<string | null>(null)
+  const { save, patch } = useSave()
+  const { path, report, busy, error, backup, diff, diffing, scan, scanning, dict, dictResult, restoring } = save
 
-  useEffect(() => { void window.dcc.dictionaryState().then(setDict) }, [])
+  const setPath = (v: typeof path) => patch({ path: v })
+  const setReport = (v: typeof report) => patch({ report: v })
+  const setBusy = (v: boolean) => patch({ busy: v })
+  const setError = (v: typeof error) => patch({ error: v })
+  const setBackup = (v: typeof backup) => patch({ backup: v })
+  const setDiff = (v: typeof diff) => patch({ diff: v })
+  const setDiffing = (v: boolean) => patch({ diffing: v })
+  const setScan = (v: typeof scan) => patch({ scan: v })
+  const setScanning = (v: boolean) => patch({ scanning: v })
+  const setDict = (v: typeof dict) => patch({ dict: v })
+  const setDictResult = (v: typeof dictResult) => patch({ dictResult: v })
+
+  useEffect(() => { if (!dict) void window.dcc.dictionaryState().then(setDict) }, [dict])
 
   const chooseDictionary = async () => {
     if (!path) return
@@ -61,6 +67,7 @@ export default function Save() {
     const chosen = await window.dcc.pickSave()
     if (!chosen) return
     setPath(chosen)
+    dispatch({ type: 'savePath', path: chosen })
     setReport(null)
     setError(null)
     setBusy(true)
@@ -171,8 +178,11 @@ export default function Save() {
         ) : null}
 
         {busy ? <Card className="card-pad"><Meta color="var(--warn)">ANALYSING…</Meta></Card> : null}
+        {restoring ? (
+          <Card className="card-pad"><Meta color="var(--warn)">REOPENING THE LAST SAVE…</Meta></Card>
+        ) : null}
 
-        {!path && !busy ? (
+        {!path && !busy && !restoring ? (
           <Card className="card-pad"><Empty>choose your DYNASTY-*.sav to begin</Empty></Card>
         ) : null}
 
@@ -202,11 +212,22 @@ export default function Save() {
                   <div><Meta size={9}>DICTIONARY</Meta><div className="num" style={{ fontSize: 15, color: 'var(--ink)' }}>{report.zstd.dictionaryId}</div></div>
                   <div><Meta size={9}>IN THE SAVE</Meta><div className="num" style={{ fontSize: 15, color: report.zstd.dictionaryInSave ? 'var(--good)' : 'var(--accent)' }}>{report.zstd.dictionaryInSave ? 'yes' : 'no'}</div></div>
                 </div>
-                <p className="body-serif" style={{ marginTop: 9 }}>
-                  The game objects live inside these frames, and every one of them is compressed
-                  against a shared dictionary that is not stored in the save. Without that
-                  dictionary the frames cannot be read. Search the game install for it — or any
-                  other tool that already reads these saves, since it must carry the dictionary too.
+<p className="body-serif" style={{ marginTop: 9 }}>
+                  {dict?.present ? (
+                    <>
+                      The game objects live inside these frames, compressed against a shared
+                      dictionary the save does not carry. That dictionary is loaded and verified
+                      against this save, so the frames are readable — about 6.8 MB of object data.
+                      Replace it only if you point the app at a save from a different game build.
+                    </>
+                  ) : (
+                    <>
+                      The game objects live inside these frames, and every one of them is compressed
+                      against a shared dictionary that is not stored in the save. Without that
+                      dictionary the frames cannot be read. Search the game install for it — or any
+                      other tool that already reads these saves, since it must carry the dictionary too.
+                    </>
+                  )}
                 </p>
                 {dict?.present ? (
                   <div className="effect" style={{ marginTop: 10 }}>

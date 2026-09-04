@@ -120,6 +120,11 @@ export interface Persisted {
    * actually been read off the PC.
    */
   dynastySource: 'none' | 'sample'
+  /**
+   * The save file the Save section last analysed, so it reopens on launch.
+   * Null when none has been chosen, or when the remembered one has gone.
+   */
+  savePath: string | null
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string

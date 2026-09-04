@@ -8,7 +8,25 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **The save stays loaded when you switch sections.** Choosing a save, visiting
+  any other section and coming back showed an empty panel and asked for the file
+  again. The analysis lived inside the Save section, so leaving it threw the work
+  away. It now lives above the menu and survives navigation.
+- **The save reopens on launch.** The app remembers the last save it analysed
+  and reads it again on startup, including across an in-place upgrade, instead
+  of starting empty every time. If the file has moved, it is quietly forgotten
+  rather than reported as an error.
+
+### Changed
+
+- **The status line says what has actually happened.** With a save analysed, the
+  title bar named the file and the sidebar reads `SAVE ANALYSED`. It used to say
+  `NO DYNASTY LOADED` either way, which read as though opening the save had not
+  worked — it had; DCC just cannot turn a save into a dynasty yet, because the
+  fields are still being mapped. The title bar now says so explicitly.
+- **The dictionary card stops telling you to go hunting once it has been found.**
 
 ## [0.8.1] - 2026-09-04
 
