@@ -8,7 +8,26 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **"Find it automatically" now actually finds the dictionary.** It reported
+  "Checked 6 dictionary file(s); none decoded this save" even when the correct
+  dictionary was sitting right there. The search and the verification were both
+  fine — the app itself could not decompress zstd. Electron 33 bundles Node 20,
+  which has no zstd support at all, so every decode threw before it began and
+  each failure was misread as "wrong dictionary". The app now runs on Electron
+  37 (Node 22.21), which has it. Loading a dictionary by hand and searching a
+  folder for one were broken by the same cause and are fixed with it.
+- **A runtime without zstd says so.** Rather than blaming the dictionary, the
+  app now reports plainly that the build cannot read compressed frames. The
+  startup test fails if the runtime ever loses zstd again, so this cannot ship
+  unnoticed a second time.
+- **Dictionary verification tolerates coincidence.** A frame's four magic bytes
+  turn up by chance inside compressed data, and those false frames never decode.
+  Verification previously demanded that every candidate decode and so could
+  reject the right dictionary over unlucky bytes; it now asks that the large
+  majority decode. A wrong dictionary is still rejected outright — it decodes
+  nothing.
 
 ## [0.8.0] - 2026-09-04
 

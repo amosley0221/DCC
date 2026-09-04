@@ -7,6 +7,19 @@ import * as zlib from 'node:zlib'
 const zstdDecompressSync = (zlib as unknown as {
   zstdDecompressSync(buf: Buffer, opts?: { dictionary?: Buffer }): Buffer
 }).zstdDecompressSync
+
+/**
+ * Whether the runtime can decompress zstd at all.
+ *
+ * Electron 33 shipped Node 20, which has no zstd, so every dictionary check
+ * threw and the failures were indistinguishable from "wrong dictionary". The
+ * app now requires Electron 37 (Node 22.21), but the flag stays so a runtime
+ * without zstd reports that plainly instead of blaming the dictionary.
+ */
+export const zstdSupported = typeof zstdDecompressSync === 'function'
+
+const NO_ZSTD =
+  'This build cannot read zstd frames. Reinstall the latest DCC — older builds shipped a runtime without zstd support.'
 import { statSync, readFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
@@ -850,6 +863,9 @@ export function decodeFrames(payload: Buffer, dictionary: Buffer): DecodedFrames
 export function checkDictionary(payload: Buffer, dictionary: Buffer): {
   ok: boolean; frames: number; failed: number; bytes: number; message: string
 } {
+  if (!zstdSupported) {
+    return { ok: false, frames: 0, failed: 0, bytes: 0, message: NO_ZSTD }
+  }
   if (dictionary.length < 8 || dictionary.readUInt32LE(0) !== 0xec30a437) {
     return { ok: false, frames: 0, failed: 0, bytes: 0, message: 'That file is not a zstd dictionary.' }
   }
@@ -867,15 +883,19 @@ export function checkDictionary(payload: Buffer, dictionary: Buffer): {
     }
     i += 4
   }
+  // The four magic bytes also turn up by chance inside compressed data, so a
+  // few failures are expected noise. What separates the right dictionary from
+  // a wrong one is that the great majority of frames decode, not that all do.
+  const verdict = ok >= 8 && ok >= (ok + failed) * 0.8
   const id = dictionary.readUInt32LE(4) >>> 0
   return {
-    ok: ok > 0 && failed === 0,
+    ok: verdict,
     frames: ok,
     failed,
     bytes,
-    message: ok > 0 && failed === 0
+    message: verdict
       ? `Dictionary 0x${id.toString(16)} decodes this save's frames.`
-      : `Dictionary 0x${id.toString(16)} did not decode this save (${failed} failures).`,
+      : `Dictionary 0x${id.toString(16)} did not decode this save (${ok} decoded, ${failed} failed).`,
   }
 }
 
@@ -931,6 +951,8 @@ export function autoFindDictionary(payload: Buffer, roots: string[]): AutoDictRe
       walk(full, depth + 1)
     }
   }
+
+  if (!zstdSupported) return { found: false, searched: 0, message: NO_ZSTD }
 
   for (const r of roots) walk(r, 0)
 

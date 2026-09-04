@@ -81,7 +81,14 @@ app.whenReady().then(async () => {
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))
   console.log('ERRORS: ' + (errors.join(' | ') || '(none)'))
-  const ok = errors.length === 0 && r.nav.length >= 10 && visited.every((v) => !v.includes('title=""'))
+
+  // The dictionary features need zstd, which arrived in Node 22.15. Electron 33
+  // bundled Node 20 and every dictionary check failed while reporting itself as
+  // "wrong dictionary". Assert the runtime can actually do the work.
+  const zstdOk = typeof require('node:zlib').zstdDecompressSync === 'function'
+  console.log('ZSTD: node ' + process.versions.node + ' -> ' + (zstdOk ? 'supported' : 'MISSING'))
+
+  const ok = errors.length === 0 && r.nav.length >= 10 && zstdOk && visited.every((v) => !v.includes('title=""'))
   console.log(ok ? 'SMOKE OK' : 'SMOKE FAIL')
   app.exit(ok ? 0 : 1)
 })
