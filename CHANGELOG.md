@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.12.0] - 2026-09-04
+
 ### Added
 
 - **A first step towards the game's own art.** Logos, portraits and coach faces
