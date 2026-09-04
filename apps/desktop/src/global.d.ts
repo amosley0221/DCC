@@ -16,6 +16,7 @@ declare global {
       diffSaves(a: string, b: string): Promise<{ ok: true; diff: SaveDiff } | { ok: false; message: string }>
       findDictionary(savePath: string, dictionaryId: number): Promise<{ ok: true; scan: DictScan } | { ok: false; message: string }>
       checkForUpdate(): Promise<unknown>
+      lastUpdateStatus(): Promise<UpdateStatus | null>
       downloadUpdate(): Promise<{ ok: boolean; message?: string }>
       installUpdate(): Promise<boolean>
       onUpdateStatus(cb: (s: UpdateStatus) => void): () => void

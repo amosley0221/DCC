@@ -80,7 +80,15 @@ function setupUpdater() {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
-  const send = (channel: string, payload?: unknown) => win?.webContents.send(channel, payload)
+  // The renderer subscribes only once React has mounted, which can be after the
+  // first check completes. Without a record of the last status that event is
+  // dropped and no prompt ever appears, so it is kept and replayed on request.
+  let lastStatus: unknown = null
+  const send = (channel: string, payload?: unknown) => {
+    if (channel === 'update:status') lastStatus = payload
+    win?.webContents.send(channel, payload)
+  }
+  ipcMain.handle('update:last', () => lastStatus)
 
   autoUpdater.on('checking-for-update', () => send('update:status', { state: 'checking' }))
   autoUpdater.on('update-not-available', (info) =>
@@ -123,11 +131,21 @@ function setupUpdater() {
   })
 
   if (!isDev) {
-    // Check shortly after launch, once the window is up to show the prompt,
-    // then a few times a day for a long-running session.
     const check = () => autoUpdater.checkForUpdates().catch(() => {})
     setTimeout(check, 4000)
-    setInterval(check, 6 * 60 * 60 * 1000)
+    // Half-hourly rather than a few times a day: a release published while the
+    // app is open should surface in a reasonable time.
+    setInterval(check, 30 * 60 * 1000)
+
+    // Coming back to the window is a good moment to look, throttled so that
+    // alt-tabbing does not hammer GitHub.
+    let lastFocusCheck = 0
+    win?.on('focus', () => {
+      const now = Date.now()
+      if (now - lastFocusCheck < 5 * 60 * 1000) return
+      lastFocusCheck = now
+      check()
+    })
   }
 }
 

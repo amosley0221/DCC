@@ -26,6 +26,7 @@ const api = {
   findDictionary: (savePath: string, dictionaryId: number) =>
     ipcRenderer.invoke('save:findDict', { savePath, dictionaryId }),
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  lastUpdateStatus: () => ipcRenderer.invoke('update:last') as Promise<UpdateStatus | null>,
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   onUpdateStatus: (cb: (s: UpdateStatus) => void) => {

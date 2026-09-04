@@ -8,7 +8,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- A new release could take up to six hours to surface in the Windows app, which
+  was the check interval. It now checks every 30 minutes, and again whenever the
+  window regains focus (throttled to once every 5 minutes).
+- The updater could drop its own notification. The main process reports status
+  to the window as soon as it has it, but the interface only subscribes once it
+  has mounted — an event arriving in between was lost with no replay, and the
+  next check was hours away. The last status is now kept and replayed to the
+  interface when it subscribes.
 
 ## [0.7.0] - 2026-09-04
 

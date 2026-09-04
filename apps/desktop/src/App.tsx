@@ -141,6 +141,8 @@ export default function App() {
     // frame is never unstyled.
     applyTheme('night')
     void window.dcc.info().then((i) => setVersion(i.version))
+    // Pick up anything the updater reported before this subscribed.
+    void window.dcc.lastUpdateStatus().then((s) => { if (s) setUpdate((cur) => cur ?? s) })
     return window.dcc.onUpdateStatus(setUpdate)
   }, [])
 
