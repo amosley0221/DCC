@@ -10,6 +10,18 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.16.1] - 2026-09-04
+
+### Added
+
+- **The scan export now describes your art folder.** Every folder inside it,
+  with file counts, sizes and a handful of real filenames from each, plus any
+  asset ids in your save that have no image. That is what makes a category of
+  art usable — helmets, logos, awards and bowls each name their files
+  differently — and it travels as a few kilobytes of text instead of as the
+  images, which stay on your machine where they belong.
+
+
 ## [0.16.0] - 2026-09-04
 
 ### Added

@@ -40,6 +40,8 @@ export interface SaveState {
   faces: {
     root: string; files: number; bytes: number; matched: number; players: number
     sample: string[]; unmatchedSample: string[]
+    byExtension: { ext: string; files: number; bytes: number }[]
+    dirs: { dir: string; files: number; bytes: number; sample: string[] }[]
   } | null
   facePaths: Record<string, string>
   facesBusy: boolean

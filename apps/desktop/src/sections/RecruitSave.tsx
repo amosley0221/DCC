@@ -69,6 +69,7 @@ export default function RecruitSave() {
         root: dir, files: res.files, bytes: res.bytes,
         matched: res.match.matched, players: res.match.players,
         sample: res.sample, unmatchedSample: res.match.unmatchedSample,
+        byExtension: res.byExtension, dirs: res.dirs,
       },
       facePaths: res.paths,
     })

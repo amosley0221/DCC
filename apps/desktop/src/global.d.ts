@@ -29,6 +29,7 @@ declare global {
             byExtension: { ext: string; files: number; bytes: number }[]
             sample: string[]
             truncated: boolean
+            dirs: { dir: string; files: number; bytes: number; sample: string[] }[]
             match: {
               players: number; matched: number
               unmatchedSample: string[]

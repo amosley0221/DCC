@@ -240,7 +240,7 @@ ipcMain.handle('assets:indexFaces', (_e, { dir, assetIds }: { dir: string; asset
     return {
       ok: true as const,
       files: index.files, bytes: index.bytes, byExtension: index.byExtension,
-      sample: index.sample, truncated: index.truncated,
+      sample: index.sample, truncated: index.truncated, dirs: index.dirs,
       match: matchFaces(index, assetIds),
       // Only the ids that actually resolved cross to the renderer, which keeps
       // this to the players present rather than the whole folder.

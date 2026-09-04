@@ -711,6 +711,12 @@ export interface FaceIndex {
   /** stem (lowercased, no extension) -> path relative to root. */
   map: Record<string, string>
   truncated: boolean
+  /**
+   * Per-folder counts and a few real names from each. This is the part worth
+   * exporting: the naming scheme is what makes a category of art usable, and
+   * it can be read off a handful of filenames without moving a single image.
+   */
+  dirs: { dir: string; files: number; bytes: number; sample: string[] }[]
 }
 
 /**
@@ -724,6 +730,7 @@ export interface FaceIndex {
  */
 export function indexFaces(root: string, cap = 120_000): FaceIndex {
   const byExt = new Map<string, { files: number; bytes: number }>()
+  const byDir = new Map<string, { files: number; bytes: number; sample: string[] }>()
   const map: Record<string, string> = {}
   const sample: string[] = []
   let files = 0
@@ -747,6 +754,11 @@ export function indexFaces(root: string, cap = 120_000): FaceIndex {
       bytes += size
       const cur = byExt.get(ext) ?? { files: 0, bytes: 0 }
       cur.files++; cur.bytes += size; byExt.set(ext, cur)
+      const key = relative(root, dir) || '.'
+      const d = byDir.get(key) ?? { files: 0, bytes: 0, sample: [] }
+      d.files++; d.bytes += size
+      if (d.sample.length < 6) d.sample.push(e.name)
+      byDir.set(key, d)
       if (sample.length < 12) sample.push(relative(root, full))
       // Keyed on the asset id found inside the filename, not on the whole
       // stem. Extractors add their own prefix — the portraits in a real dump
@@ -766,6 +778,10 @@ export function indexFaces(root: string, cap = 120_000): FaceIndex {
     byExtension: [...byExt.entries()]
       .map(([ext, v]) => ({ ext, ...v }))
       .sort((a, b) => b.files - a.files),
+    dirs: [...byDir.entries()]
+      .map(([dir, v]) => ({ dir, ...v }))
+      .sort((a, b) => b.bytes - a.bytes)
+      .slice(0, 60),
   }
 }
 

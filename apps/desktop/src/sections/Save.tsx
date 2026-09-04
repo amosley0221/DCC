@@ -242,6 +242,43 @@ export default function Save() {
           '',
         ]),
       ] : []),
+
+      // The extracted-art folder, described by name only. This is what makes a
+      // category of art usable — helmets, logos, awards and bowls each have
+      // their own scheme — and it travels as a few kilobytes of text rather
+      // than as the images themselves.
+      ...(save.faces ? [
+        '',
+        '## Extracted art folder',
+        '',
+        `- Root: ${save.faces.root}`,
+        `- ${save.faces.files.toLocaleString()} images, ${(save.faces.bytes / 1e6).toFixed(0)} MB`,
+        `- Matched ${save.faces.matched.toLocaleString()} of ${save.faces.players.toLocaleString()} players in the save`,
+        '',
+        '| Extension | Files | Bytes |',
+        '| --- | --- | --- |',
+        ...save.faces.byExtension.map((e) =>
+          `| ${e.ext} | ${e.files.toLocaleString()} | ${e.bytes.toLocaleString()} |`),
+        '',
+        '### Folders, by size',
+        '',
+        ...save.faces.dirs.flatMap((d) => [
+          `**${d.dir}** — ${d.files.toLocaleString()} files, ${(d.bytes / 1e6).toFixed(1)} MB`,
+          '',
+          '```',
+          ...d.sample,
+          '```',
+          '',
+        ]),
+        ...(save.faces.unmatchedSample.length ? [
+          '### Asset ids in the save with no image',
+          '',
+          '```',
+          ...save.faces.unmatchedSample,
+          '```',
+          '',
+        ] : []),
+      ] : []),
     ].join('\n')
     const dest = await window.dcc.saveText('game-install-scan.md', md)
     if (dest) dispatch({ type: 'log', line: { text: `install scan written — ${dest}`, kind: 'good' } })
