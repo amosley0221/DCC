@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.11.0] - 2026-09-04
+
 ### Added
 
 - **A Teams tab, and any team can be named.** All 138 programmes in one list,
