@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.8.2] - 2026-09-04
+
 ### Fixed
 
 - **The save stays loaded when you switch sections.** Choosing a save, visiting
