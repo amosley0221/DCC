@@ -1,0 +1,286 @@
+import React, {
+  createContext, useContext, useEffect, useMemo, useReducer, useRef, useState,
+} from 'react'
+import type {
+  Convo, Dynasty, LogLine, Persisted, Player, Prospect, QueueItem, Stage, Story,
+} from './model'
+import { applyTheme, type ThemeName } from './theme'
+import { SEMANTICS } from './theme'
+
+// ── initial state ─────────────────────────────────────────────────────────────
+
+export const emptyPersisted = (d: Dynasty): Persisted => ({
+  theme: 'night',
+  week: d.meta.currentWeek,
+  heat: 62,
+  gameRunning: true,
+  leaseHolder: d.devices.holder,
+  queue: [],
+  storyStatus: {},
+  board: [...d.seededBoard],
+  playerOverrides: {},
+  prospectOverrides: {},
+  depthOverrides: {},
+  convos: {},
+  recaps: {},
+  extraStories: [],
+  log: [{ at: Date.now(), text: 'agent online — save verified', kind: 'good' }],
+})
+
+// ── actions ───────────────────────────────────────────────────────────────────
+
+export type Action =
+  | { type: 'hydrate'; state: Persisted }
+  | { type: 'theme'; theme: ThemeName }
+  | { type: 'week'; week: number }
+  | { type: 'heat'; delta: number }
+  | { type: 'story'; id: string; status: Story['status'] }
+  | { type: 'queue/add'; item: Omit<QueueItem, 'id' | 'at' | 'state'> & { state?: QueueItem['state'] } }
+  | { type: 'queue/applyAll' }
+  | { type: 'queue/clear' }
+  | { type: 'queue/remove'; id: string }
+  | { type: 'game'; running: boolean }
+  | { type: 'board/toggle'; id: string }
+  | { type: 'player/patch'; id: string; patch: Partial<Player> }
+  | { type: 'prospect/patch'; id: string; patch: Partial<Prospect> }
+  | { type: 'depth/set'; teamId: string; pos: string; order: string[] }
+  | { type: 'convo/set'; playerId: string; convo: Convo }
+  | { type: 'lease'; holder: string }
+  | { type: 'recap'; gameId: string; story: Story }
+  | { type: 'log'; line: Omit<LogLine, 'at'> }
+  | { type: 'reset'; dynasty: Dynasty }
+
+let seq = 0
+const nextId = () => `q${Date.now().toString(36)}${(seq++).toString(36)}`
+
+function log(state: Persisted, text: string, kind: LogLine['kind'] = 'info'): LogLine[] {
+  return [...state.log, { at: Date.now(), text, kind }].slice(-200)
+}
+
+export function reducer(state: Persisted, action: Action): Persisted {
+  switch (action.type) {
+    case 'hydrate':
+      return action.state
+    case 'theme':
+      return { ...state, theme: action.theme }
+    case 'week':
+      return { ...state, week: Math.max(1, Math.min(15, action.week)) }
+    case 'heat':
+      return { ...state, heat: Math.max(0, Math.min(100, state.heat + action.delta)) }
+    case 'story':
+      return { ...state, storyStatus: { ...state.storyStatus, [action.id]: action.status } }
+    case 'queue/add': {
+      const item: QueueItem = {
+        id: nextId(),
+        at: Date.now(),
+        state: action.item.state ?? 'HELD',
+        ...action.item,
+      }
+      return {
+        ...state,
+        queue: [item, ...state.queue],
+        log: log(state, `queued ${item.type.toLowerCase()} — ${item.title}`, 'warn'),
+      }
+    }
+    case 'queue/remove':
+      return { ...state, queue: state.queue.filter((q) => q.id !== action.id) }
+    case 'queue/applyAll': {
+      const held = state.queue.filter((q) => q.state === 'HELD' && !q.needsConfirm)
+      if (!held.length) return state
+      // Applying is what makes an edit real: overrides move from pending to data.
+      let playerOverrides = { ...state.playerOverrides }
+      let prospectOverrides = { ...state.prospectOverrides }
+      const depthOverrides = { ...state.depthOverrides }
+      for (const item of held) {
+        const a = item.apply
+        if (!a) continue
+        if (a.kind === 'ovr') playerOverrides[a.playerId] = { ...playerOverrides[a.playerId], ovr: a.ovr }
+        if (a.kind === 'stage') prospectOverrides[a.prospectId] = { ...prospectOverrides[a.prospectId], stage: a.stage }
+        if (a.kind === 'depth') depthOverrides[`${a.teamId}:${a.pos}`] = a.order
+      }
+      const heldIds = new Set(held.map((h) => h.id))
+      return {
+        ...state,
+        gameRunning: false,
+        playerOverrides,
+        prospectOverrides,
+        depthOverrides,
+        queue: state.queue.map((q) => (heldIds.has(q.id) ? { ...q, state: 'APPLIED' as const } : q)),
+        log: [
+          ...state.log,
+          { at: Date.now(), text: 'game closed — save unlocked', kind: 'info' as const },
+          { at: Date.now(), text: `backup written — restore point ${new Date().toISOString().slice(11, 19)}`, kind: 'good' as const },
+          ...held.map((h) => ({ at: Date.now(), text: `applied ${h.type.toLowerCase()} — ${h.title}`, kind: 'good' as const })),
+          { at: Date.now(), text: `${held.length} item(s) applied · queue clear`, kind: 'good' as const },
+        ].slice(-200),
+      }
+    }
+    case 'queue/clear':
+      return { ...state, queue: [], log: log(state, 'queue cleared', 'info') }
+    case 'game':
+      return {
+        ...state,
+        gameRunning: action.running,
+        log: log(state, action.running ? 'game launched — save locked, writes held' : 'game closed — save unlocked', action.running ? 'warn' : 'good'),
+      }
+    case 'board/toggle': {
+      const on = state.board.includes(action.id)
+      return { ...state, board: on ? state.board.filter((b) => b !== action.id) : [action.id, ...state.board] }
+    }
+    case 'player/patch':
+      return { ...state, playerOverrides: { ...state.playerOverrides, [action.id]: { ...state.playerOverrides[action.id], ...action.patch } } }
+    case 'prospect/patch':
+      return { ...state, prospectOverrides: { ...state.prospectOverrides, [action.id]: { ...state.prospectOverrides[action.id], ...action.patch } } }
+    case 'depth/set':
+      return { ...state, depthOverrides: { ...state.depthOverrides, [`${action.teamId}:${action.pos}`]: action.order } }
+    case 'convo/set':
+      return { ...state, convos: { ...state.convos, [action.playerId]: action.convo } }
+    case 'lease':
+      return { ...state, leaseHolder: action.holder, log: log(state, `save lease → ${action.holder}`, 'warn') }
+    case 'recap':
+      return {
+        ...state,
+        extraStories: [action.story, ...state.extraStories],
+        recaps: { ...state.recaps, [action.gameId]: action.story.id },
+        log: log(state, `recap written — ${action.story.headline}`, 'good'),
+      }
+    case 'log':
+      return { ...state, log: log(state, action.line.text, action.line.kind) }
+    case 'reset':
+      return emptyPersisted(action.dynasty)
+    default:
+      return state
+  }
+}
+
+// ── derived view of the dynasty with pending + applied edits folded in ────────
+
+export interface Derived {
+  players: Player[]
+  playersById: Map<string, Player>
+  prospects: Prospect[]
+  prospectsById: Map<string, Prospect>
+  teamsById: Map<string, import('./model').Team>
+  stories: Story[]
+  rosterOf: (teamId: string) => Player[]
+  depthOf: (teamId: string, pos: string) => Player[]
+  queuedPlayerIds: Set<string>
+  queuedProspectIds: Set<string>
+  userTeam: import('./model').Team
+}
+
+function derive(d: Dynasty, s: Persisted): Derived {
+  const players = d.players.map((p) => (s.playerOverrides[p.id] ? { ...p, ...s.playerOverrides[p.id] } : p))
+  const prospects = d.prospects.map((p) => (s.prospectOverrides[p.id] ? { ...p, ...s.prospectOverrides[p.id] } : p))
+  const playersById = new Map(players.map((p) => [p.id, p]))
+  const prospectsById = new Map(prospects.map((p) => [p.id, p]))
+  const teamsById = new Map(d.teams.map((t) => [t.id, t]))
+
+  const byTeam = new Map<string, Player[]>()
+  for (const p of players) {
+    const list = byTeam.get(p.teamId)
+    if (list) list.push(p)
+    else byTeam.set(p.teamId, [p])
+  }
+
+  const stories = [...s.extraStories, ...d.stories].map((st) => ({
+    ...st,
+    status: s.storyStatus[st.id] ?? st.status,
+  }))
+
+  // Anything sitting in the queue unapplied shows a sync dot wherever it appears.
+  const queuedPlayerIds = new Set<string>()
+  const queuedProspectIds = new Set<string>()
+  for (const q of s.queue) {
+    if (q.state !== 'HELD') continue
+    if (q.apply?.kind === 'ovr') queuedPlayerIds.add(q.apply.playerId)
+    if (q.apply?.kind === 'stage') queuedProspectIds.add(q.apply.prospectId)
+  }
+
+  return {
+    players, playersById, prospects, prospectsById, teamsById, stories,
+    queuedPlayerIds, queuedProspectIds,
+    userTeam: teamsById.get(d.meta.userTeamId)!,
+    rosterOf: (teamId) => (byTeam.get(teamId) ?? []).slice().sort((a, b) => b.ovr - a.ovr),
+    depthOf: (teamId, pos) => {
+      const group = (byTeam.get(teamId) ?? []).filter((p) => p.pos === pos)
+      const order = s.depthOverrides[`${teamId}:${pos}`]
+      if (!order) return group.sort((a, b) => b.ovr - a.ovr)
+      const rank = new Map(order.map((id, i) => [id, i]))
+      return group.sort(
+        (a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999) || b.ovr - a.ovr,
+      )
+    },
+  }
+}
+
+// ── context ───────────────────────────────────────────────────────────────────
+
+interface Ctx {
+  dynasty: Dynasty
+  state: Persisted
+  dispatch: React.Dispatch<Action>
+  d: Derived
+  /** Heat threshold and stage sizes come from the shared token file. */
+  sem: typeof SEMANTICS
+}
+
+const StoreCtx = createContext<Ctx | null>(null)
+
+export function useStore(): Ctx {
+  const ctx = useContext(StoreCtx)
+  if (!ctx) throw new Error('useStore outside StoreProvider')
+  return ctx
+}
+
+export function StoreProvider({ dynasty, initial, children }: {
+  dynasty: Dynasty
+  initial: Persisted
+  children: React.ReactNode
+}) {
+  const [state, dispatch] = useReducer(reducer, initial)
+  const first = useRef(true)
+
+  useEffect(() => { applyTheme(state.theme) }, [state.theme])
+
+  // Persist to userData so nothing is lost across an in-place upgrade.
+  useEffect(() => {
+    if (first.current) { first.current = false; return }
+    const t = setTimeout(() => { void window.dcc.setSettings(state as unknown as Record<string, unknown>) }, 350)
+    return () => clearTimeout(t)
+  }, [state])
+
+  const d = useMemo(() => derive(dynasty, state), [dynasty, state])
+  const value = useMemo(() => ({ dynasty, state, dispatch, d, sem: SEMANTICS }), [dynasty, state, d])
+
+  return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
+}
+
+/** Loads the dynasty and any saved state before the app renders. */
+export function useBootstrap() {
+  const [boot, setBoot] = useState<{ dynasty: Dynasty; initial: Persisted } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const dynasty = (await window.dcc.dynasty()) as Dynasty
+        const saved = await window.dcc.getSettings()
+        const base = emptyPersisted(dynasty)
+        // Merge rather than replace, so a state file written by an older build
+        // still loads after an update adds new fields.
+        const initial: Persisted = saved && typeof saved.theme === 'string'
+          ? { ...base, ...(saved as unknown as Persisted) }
+          : base
+        setBoot({ dynasty, initial })
+      } catch (e) {
+        setError(String((e as Error)?.message ?? e))
+      }
+    })()
+  }, [])
+
+  return { boot, error }
+}
+
+export const stageSizeOf = (stage: Stage): number | null =>
+  (SEMANTICS.stageSize as Record<string, number>)[stage] ?? null

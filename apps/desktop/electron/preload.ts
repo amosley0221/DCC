@@ -1,0 +1,32 @@
+import { contextBridge, ipcRenderer } from 'electron'
+
+export type UpdateStatus =
+  | { state: 'checking' }
+  | { state: 'current'; version?: string }
+  | { state: 'available'; version: string; notes?: unknown }
+  | { state: 'downloading'; percent: number }
+  | { state: 'ready'; version: string; notes?: unknown }
+  | { state: 'error'; message: string }
+  | { state: 'dev' }
+
+const api = {
+  info: () => ipcRenderer.invoke('app:info') as Promise<{
+    version: string; platform: string; isDev: boolean; userData: string
+  }>,
+  dynasty: () => ipcRenderer.invoke('app:dynasty'),
+  getSettings: () => ipcRenderer.invoke('settings:get') as Promise<Record<string, unknown>>,
+  setSettings: (next: Record<string, unknown>) => ipcRenderer.invoke('settings:set', next),
+  openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
+  saveText: (name: string, text: string) =>
+    ipcRenderer.invoke('app:saveText', { name, text }) as Promise<string | null>,
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (cb: (s: UpdateStatus) => void) => {
+    const handler = (_e: unknown, s: UpdateStatus) => cb(s)
+    ipcRenderer.on('update:status', handler)
+    return () => ipcRenderer.off('update:status', handler)
+  },
+}
+
+contextBridge.exposeInMainWorld('dcc', api)
+export type DccApi = typeof api

@@ -1,0 +1,33 @@
+# node
+node_modules/
+dist/
+release/
+out/
+*.tsbuildinfo
+.vite/
+
+# gradle / android
+.gradle/
+apps/android/build/
+apps/android/app/build/
+local.properties
+*.iml
+.cxx/
+captures/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+npm-debug.log*
+
+# build outputs we publish via releases, never commit
+*.apk
+*.aab
+*.exe
+!apps/android/keystore/*.jks
+
+# smoke-test output
+smoke.png

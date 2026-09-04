@@ -1,0 +1,31 @@
+{
+  "name": "@dcc/desktop",
+  "productName": "Dynasty Command Center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dynasty Command Center — Windows workspace and save agent.",
+  "author": { "name": "Dynasty Command Center" },
+  "main": "dist/main/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "node build-electron.mjs --watch & vite",
+    "build": "tsc --noEmit && vite build && node build-electron.mjs",
+    "dist": "npm run build && electron-builder --win --publish never",
+    "dist:dir": "npm run build && electron-builder --win --dir --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "esbuild": "0.24.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.7.2",
+    "vite": "6.0.7"
+  }
+}

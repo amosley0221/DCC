@@ -1,0 +1,43 @@
+appId: com.dcc.dynastycommandcenter
+productName: Dynasty Command Center
+copyright: Dynasty Command Center
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - "!**/*.map"
+
+extraResources:
+  - from: ../../shared/data/dcc-data.json
+    to: dcc-data.json
+
+# Published so electron-updater knows where to look for latest.yml.
+publish:
+  provider: github
+  owner: amosley0221
+  repo: DCC
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: DCC-Setup-${version}.exe
+
+nsis:
+  # Assisted installer: it detects an existing install and upgrades it in place,
+  # so a new version never requires uninstalling the old one first.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Dynasty Command Center
+  # Settings, themes and the local queue survive every upgrade and uninstall.
+  deleteAppDataOnUninstall: false
+  differentialPackage: true
+  uninstallDisplayName: Dynasty Command Center ${version}
