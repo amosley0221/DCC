@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { autoUpdater } from 'electron-updater'
-import { analyzeSave, diffSaves, findDictionary } from './saveAnalysis'
+import { analyzeSave, diffSaves, findDictionary, sampleFrame, readSavePayload } from './saveAnalysis'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -166,14 +166,18 @@ ipcMain.handle('save:analyze', (_e, path: string) => {
   }
 })
 
-ipcMain.handle('save:findDict', async (_e, dictionaryId: number) => {
+ipcMain.handle('save:findDict', async (_e, { savePath, dictionaryId }: { savePath: string; dictionaryId: number }) => {
   const res = await dialog.showOpenDialog(win!, {
     title: 'Choose your College Football install folder',
     properties: ['openDirectory'],
   })
   if (res.canceled || !res.filePaths[0]) return { ok: false as const, message: 'cancelled' }
   try {
-    return { ok: true as const, scan: findDictionary(res.filePaths[0], dictionaryId) }
+    // A real frame from this save is what proves a candidate dictionary is the
+    // right one, so it is extracted and handed to the scan.
+    const payload = readSavePayload(savePath)
+    const frame = payload ? sampleFrame(payload) : null
+    return { ok: true as const, scan: findDictionary(res.filePaths[0], dictionaryId, frame) }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.7.0] - 2026-09-04
+
+### Fixed
+
+- The dictionary scan stopped at the first zstd dictionary in each file and
+  moved on. The game executable embeds several, so the one the save needs was
+  being skipped. It now enumerates every dictionary in every file and reports
+  each with its id.
+
+### Added
+
+- Candidate dictionaries are now **verified** rather than guessed at: the scan
+  takes a real frame out of the save and tries to decompress it, sweeping
+  candidate dictionary lengths, and only reports a match when a frame actually
+  decodes. The scan also reports how many dictionaries it saw in total.
+
 ## [0.6.0] - 2026-09-04
 
 ### Added

@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto'
 import { inflateSync, inflateRawSync, gunzipSync } from 'node:zlib'
+import * as zlib from 'node:zlib'
+
+// Node gained zstd in 22.15 but the bundled type definitions lag behind it, so
+// the function is reached through a narrow local signature.
+const zstdDecompressSync = (zlib as unknown as {
+  zstdDecompressSync(buf: Buffer, opts?: { dictionary?: Buffer }): Buffer
+}).zstdDecompressSync
 import { statSync, readFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
@@ -236,6 +243,11 @@ function readFrostbite(buf: Buffer): { header: FrostbiteHeader; payload: Buffer 
   }
 }
 
+/** The decompressed FrTk payload of a save, or null if it is not one. */
+export function readSavePayload(path: string): Buffer | null {
+  return readFrostbite(readFileSync(path))?.payload ?? null
+}
+
 export function analyzeSave(path: string): SaveReport {
   const bytes = statSync(path).size
   const buf = readFileSync(path)
@@ -454,33 +466,83 @@ export function diffSaves(pathA: string, pathB: string): SaveDiff {
 
 export interface DictHit {
   file: string
-  bytes: number
-  /** Why this file is a candidate. */
-  reason: string
   offset: number
+  dictionaryId: string
+  /** True when this is the dictionary the save's frames were built against. */
+  matches: boolean
+  /** True when a real frame from the save actually decompressed with it. */
+  verified: boolean
+  lengthBytes?: number
+  sampleText?: string
+  reason: string
 }
 
 export interface DictScan {
   root: string
   filesScanned: number
   bytesScanned: number
+  dictionariesSeen: number
   hits: DictHit[]
   notes: string[]
 }
 
 /** zstd dictionary magic, little-endian 0xEC30A437. */
 const ZSTD_DICT_MAGIC = Buffer.from([0x37, 0xa4, 0x30, 0xec])
+const ZSTD_FRAME_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd])
+
+/** Pulls one small frame out of a save, to test candidate dictionaries against. */
+export function sampleFrame(payload: Buffer): Buffer | null {
+  const at = payload.indexOf(ZSTD_FRAME_MAGIC)
+  if (at < 0) return null
+  const next = payload.indexOf(ZSTD_FRAME_MAGIC, at + 4)
+  return payload.subarray(at, next > at ? next : Math.min(at + 4096, payload.length))
+}
 
 /**
- * Hunts the game install for the zstd dictionary the save's frames were
- * compressed with.
- *
- * Every frame in the save declares the same dictionary id and the dictionary
- * itself is not in the save, so without it those frames cannot be read. A
- * dictionary either starts with the zstd dictionary magic followed by its id,
- * or is embedded in a larger archive — so the id is searched for on its own too.
+ * A dictionary's content is the tail of its buffer, so appending bytes changes
+ * it and decompression fails — the exact end has to be found. Rather than
+ * parsing the dictionary format, candidate lengths are swept and each is tested
+ * against a real frame. A frame is a couple of hundred bytes, so thousands of
+ * attempts cost milliseconds.
  */
-export function findDictionary(root: string, dictionaryId: number, budgetBytes = 6 * 1024 ** 3): DictScan {
+function verifyDictionary(buf: Buffer, offset: number, frame: Buffer): { length: number; text: string } | null {
+  const maxLen = Math.min(buf.length - offset, 8 * 1024 * 1024)
+  const tryLen = (len: number) => {
+    try {
+      const out = zstdDecompressSync(frame, { dictionary: buf.subarray(offset, offset + len) })
+      return out
+    } catch {
+      return null
+    }
+  }
+  // Sizes zstd --train produces, then a sweep, then a fine pass around a hit.
+  const common = [112640, 110 * 1024, 65536, 32768, 16384, 8192, 4096, 131072, 262144]
+  for (const len of common) {
+    if (len > maxLen) continue
+    const out = tryLen(len)
+    if (out) return { length: len, text: out.subarray(0, 200).toString('latin1').replace(/[^\x20-\x7e]/g, '.') }
+  }
+  for (let len = 1024; len <= maxLen; len += 256) {
+    const out = tryLen(len)
+    if (out) return { length: len, text: out.subarray(0, 200).toString('latin1').replace(/[^\x20-\x7e]/g, '.') }
+  }
+  return null
+}
+
+/**
+ * Hunts the game install for the zstd dictionary the save's frames need.
+ *
+ * Every frame declares the same dictionary id and the dictionary is not in the
+ * save, so without it those frames cannot be read. Files can hold more than one
+ * dictionary — the game executable does — so every occurrence is checked, not
+ * just the first.
+ */
+export function findDictionary(
+  root: string,
+  dictionaryId: number,
+  frame: Buffer | null,
+  budgetBytes = 12 * 1024 ** 3,
+): DictScan {
   const idLE = Buffer.alloc(4)
   idLE.writeUInt32LE(dictionaryId >>> 0)
 
@@ -488,9 +550,10 @@ export function findDictionary(root: string, dictionaryId: number, budgetBytes =
   const notes: string[] = []
   let filesScanned = 0
   let bytesScanned = 0
+  let dictionariesSeen = 0
 
   const walk = (dir: string, depth: number) => {
-    if (depth > 8 || bytesScanned > budgetBytes) return
+    if (depth > 10 || bytesScanned > budgetBytes) return
     let entries: import('node:fs').Dirent[]
     try {
       entries = readdirSync(dir, { withFileTypes: true })
@@ -505,35 +568,56 @@ export function findDictionary(root: string, dictionaryId: number, budgetBytes =
 
       let size = 0
       try { size = statSync(full).size } catch { continue }
-      // Dictionaries are small; the archives that embed them are not, so the
-      // ceiling is generous rather than tight.
-      if (size === 0 || size > 512 * 1024 * 1024) continue
+      if (size === 0 || size > 3 * 1024 ** 3) continue
 
       let buf: Buffer
       try { buf = readFileSync(full) } catch { continue }
       filesScanned++
       bytesScanned += buf.length
 
-      const magicAt = buf.indexOf(ZSTD_DICT_MAGIC)
-      if (magicAt >= 0) {
-        const declared = buf.length >= magicAt + 8 ? buf.readUInt32LE(magicAt + 4) : 0
-        hits.push({
-          file: full,
-          bytes: size,
-          offset: magicAt,
-          reason: declared === (dictionaryId >>> 0)
-            ? `zstd dictionary with the matching id 0x${declared.toString(16)}`
-            : `zstd dictionary, id 0x${declared.toString(16)} (not the one the save uses)`,
-        })
-        continue
+      // Every dictionary in the file, not merely the first.
+      let at = 0
+      let perFile = 0
+      while ((at = buf.indexOf(ZSTD_DICT_MAGIC, at)) !== -1 && perFile < 500) {
+        perFile++
+        dictionariesSeen++
+        const id = at + 8 <= buf.length ? buf.readUInt32LE(at + 4) : 0
+        const matches = (id >>> 0) === (dictionaryId >>> 0)
+        if (matches) {
+          const check = frame ? verifyDictionary(buf, at, frame) : null
+          hits.push({
+            file: full,
+            offset: at,
+            dictionaryId: `0x${(id >>> 0).toString(16)}`,
+            matches: true,
+            verified: !!check,
+            lengthBytes: check?.length,
+            sampleText: check?.text,
+            reason: check
+              ? `the dictionary the save uses — verified, ${check.length.toLocaleString()} bytes`
+              : 'the dictionary id matches, but no frame decoded with it',
+          })
+        } else if (hits.length < 40) {
+          hits.push({
+            file: full,
+            offset: at,
+            dictionaryId: `0x${(id >>> 0).toString(16)}`,
+            matches: false,
+            verified: false,
+            reason: 'a zstd dictionary, but not the one this save uses',
+          })
+        }
+        at += 4
       }
-      const idAt = buf.indexOf(idLE)
-      if (idAt >= 0) {
+
+      if (perFile === 0 && buf.includes(idLE)) {
         hits.push({
           file: full,
-          bytes: size,
-          offset: idAt,
-          reason: 'contains the dictionary id, but no dictionary magic — may embed it',
+          offset: buf.indexOf(idLE),
+          dictionaryId: `0x${(dictionaryId >>> 0).toString(16)}`,
+          matches: false,
+          verified: false,
+          reason: 'mentions the dictionary id but holds no dictionary — may embed one compressed',
         })
       }
     }
@@ -541,10 +625,22 @@ export function findDictionary(root: string, dictionaryId: number, budgetBytes =
 
   walk(root, 0)
 
-  const exact = hits.filter((h) => h.reason.startsWith('zstd dictionary with the matching'))
-  if (exact.length) notes.push(`Found the dictionary in ${exact.length} file(s).`)
-  else if (hits.length) notes.push('No exact dictionary, but these files mention its id and are worth a look.')
-  else notes.push('Nothing found. The dictionary may be inside a packed archive that has to be unpacked first.')
-
-  return { root, filesScanned, bytesScanned, hits: hits.slice(0, 60), notes }
+  const verified = hits.filter((h) => h.verified)
+  const matching = hits.filter((h) => h.matches)
+  if (verified.length) {
+    notes.push(`Found and verified the dictionary — frames from the save decompress with it.`)
+  } else if (matching.length) {
+    notes.push(
+      'A dictionary with the right id is present, but no frame decoded against it. It is ' +
+        'probably stored compressed or split, so the bytes at that offset are not the whole thing.',
+    )
+  } else {
+    notes.push(
+      `Scanned ${dictionariesSeen} zstd dictionaries, none with id ` +
+        `0x${(dictionaryId >>> 0).toString(16)}. It is likely packed inside a game archive ` +
+        'that has to be unpacked first.',
+    )
+  }
+  hits.sort((a, b) => Number(b.verified) - Number(a.verified) || Number(b.matches) - Number(a.matches))
+  return { root, filesScanned, bytesScanned, dictionariesSeen, hits: hits.slice(0, 80), notes }
 }

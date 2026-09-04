@@ -20,10 +20,10 @@ export default function Save() {
   const [scanning, setScanning] = useState(false)
 
   const hunt = async () => {
-    if (!report?.zstd) return
+    if (!report?.zstd || !path) return
     setScanning(true)
     setScan(null)
-    const res = await window.dcc.findDictionary(Number(report.zstd.dictionaryId))
+    const res = await window.dcc.findDictionary(path!, Number(report.zstd.dictionaryId))
     setScanning(false)
     if (res.ok) setScan(res.scan)
     else if (res.message !== 'cancelled') setError(res.message)

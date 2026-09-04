@@ -180,12 +180,36 @@ being recompressed, not the field itself.
 and whatever shares that byte) are readable today. Everything inside them waits
 on the dictionary.
 
-### Where the dictionary might be
+### Where the dictionary lives
 
-The Save section's **Search game folder for it…** walks the install looking for
-a file starting with the zstd dictionary magic, or any file containing the id
-`0x65fc508b`. If it is packed inside a game archive, that archive has to be
-unpacked first.
+A scan of a real install (71 files, 6 GB) found:
+
+| File | Finding |
+| --- | --- |
+| `CollegeFB27.fixed.exe` @ `0x78858c6` | a zstd dictionary, id `0x85452274` |
+| `Data\Win32\superbundlelayout\…\cas_12.cas` @ `0xd3be103` | contains the id `0x65fc508b`, no dictionary magic |
+
+**The executable embeds formatted zstd dictionaries.** The first scan reported
+only one because it stopped at the first magic per file; it now enumerates every
+occurrence, so a second pass should surface `0x65fc508b` if it is in there.
+
+The frames declare a non-zero dictionary id, which means the dictionary is
+*formatted* — magic, id, entropy tables, content — rather than a raw byte blob.
+So it carries the magic and is findable by scanning for it.
+
+### Verifying a candidate
+
+A dictionary's content is the tail of its buffer, so appending bytes changes it
+and decompression fails; truncating from the end is tolerated. The exact length
+therefore matters, and rather than parse the dictionary format the scanner
+sweeps candidate lengths and tests each against a real frame taken from the
+save. A frame is a couple of hundred bytes, so thousands of attempts cost
+milliseconds. A candidate is only reported as verified when a frame actually
+decompressed with it.
+
+Node gained zstd with dictionary support in 22.15, confirmed round-tripping
+here, so once the right bytes are found the frames open with no extra
+dependency.
 
 ### Saves seen so far
 
