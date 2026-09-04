@@ -203,99 +203,167 @@ export function findInstall(roots: string[]): { found: true; path: string } | { 
 /** Frostbite marks a scrambled table with 0x00D1CE00 or 0x00D1CE01 — "DICE". */
 export const OBFUSCATION_MAGIC = [0x00d1ce00, 0x00d1ce01]
 
-export interface Deobfuscated {
-  keyOffset: number
+export interface Solved {
   keyLength: number
   dataOffset: number
-  xor: number
-  /** Printable runs of four or more characters — the signal that it worked. */
+  /** The recovered key, hex, for the record. */
+  keyHex: string
   strings: number
-  /** Known Frostbite table words present, the strongest evidence. */
+  /** How many printable runs pure noise of this length would give. */
+  expected: number
+  longRuns: number
   known: string[]
   sample: string[]
+  /** Rows of evidence behind each key byte. Below ~40 the key gets unreliable. */
+  samplesPerByte: number
 }
 
-/** Words a real Frostbite table of contents contains once it is readable. */
+/**
+ * Words a Frostbite table contains once readable. Only long ones: short words
+ * like "res" turn up in noise by chance, and a check that noise can pass is not
+ * a check.
+ */
 const TOC_WORDS = [
-  'superBundles', 'installChunks', 'totalSize', 'alwaysid', 'name', 'cas',
-  'bundles', 'chunks', 'ebx', 'res', 'idx', 'size', 'offset', 'sha1',
+  'superBundles', 'installChunks', 'totalSize', 'alwaysid', 'bundles',
+  'chunks', 'install', 'layout', 'Bundle', 'Chunk', 'football', 'package',
 ]
 
-function scoreText(buf: Buffer): { strings: number; known: string[]; sample: string[] } {
+/** Printable runs expected from random bytes: P(run of 4+) per position. */
+const NOISE_RATE = (1 - 95 / 256) * Math.pow(95 / 256, 4)
+
+function scoreText(buf: Buffer) {
   let strings = 0
+  let longRuns = 0
   const sample: string[] = []
   let run = 0
   let start = 0
   for (let i = 0; i <= buf.length; i++) {
     const c = i < buf.length ? buf[i] : 0
-    const printable = c >= 32 && c < 127
-    if (printable) { if (run === 0) start = i; run++ }
-    else {
+    if (c >= 32 && c < 127) { if (run === 0) start = i; run++ } else {
       if (run >= 4) {
         strings++
-        if (sample.length < 12) sample.push(buf.subarray(start, i).toString('latin1'))
+        if (run >= 8) {
+          longRuns++
+          if (sample.length < 12) sample.push(buf.subarray(start, i).toString('latin1'))
+        }
       }
       run = 0
     }
   }
   const text = buf.toString('latin1')
-  const known = TOC_WORDS.filter((w) => text.includes(w))
-  return { strings, known, sample }
+  return { strings, longRuns, known: TOC_WORDS.filter((w) => text.includes(w)), sample, expected: Math.round(buf.length * NOISE_RATE) }
 }
 
 /**
- * Works out how a scrambled table is scrambled, by trying the shapes the format
- * is known to use and keeping whichever produces readable text.
+ * Recovers a repeating-XOR key from the data itself.
  *
- * Deliberately a search rather than a single hard-coded scheme: the exact
- * offsets differ between Frostbite versions, and a guess that happens to be
- * wrong produces confident nonsense. Readable strings are the test — a wrong
- * key yields none, and the right one yields hundreds.
+ * This deliberately assumes nothing about where Frostbite keeps its key. A
+ * repeating key leaves two fingerprints: bytes a key-length apart agree far
+ * more often than chance, which gives the length; and within each residue class
+ * the commonest byte is almost certainly encrypting 0x00, since these tables are
+ * mostly padding, which gives the key. Both come from the file.
+ *
+ * The earlier version guessed offsets from memory and scored the result against
+ * a threshold that noise cleared comfortably. That is why it reported two
+ * solved tables that were nothing of the sort.
  */
-export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Deobfuscated | null; tried: number; runners: Deobfuscated[] } {
-  if (buf.length < 1024) return { obfuscated: false, best: null, tried: 0, runners: [] }
-  const magic = buf.readUInt32BE(0)
-  if (!OBFUSCATION_MAGIC.includes(magic)) return { obfuscated: false, best: null, tried: 0, runners: [] }
-
-  const keyOffsets = [0x08, 0x0c, 0x10, 0x128, 0x12c, 0x130]
-  const keyLengths = [256, 257, 258, 260, 264]
-  const xors = [0x00, 0x7b]
-  const results: Deobfuscated[] = []
-  let tried = 0
-
-  for (const keyOffset of keyOffsets) {
-    for (const keyLength of keyLengths) {
-      if (keyOffset + keyLength > buf.length) continue
-      const key = buf.subarray(keyOffset, keyOffset + keyLength)
-      // The payload starts either right after the key or at the classic 0x22C.
-      for (const dataOffset of [keyOffset + keyLength, 0x22c, 0x230]) {
-        if (dataOffset >= buf.length) continue
-        for (const xor of xors) {
-          tried++
-          const n = Math.min(buf.length - dataOffset, 64 * 1024)
-          const out = Buffer.allocUnsafe(n)
-          for (let i = 0; i < n; i++) out[i] = buf[dataOffset + i] ^ key[i % keyLength] ^ xor
-          const s = scoreText(out)
-          if (s.strings > 40 || s.known.length >= 3) {
-            results.push({ keyOffset, keyLength, dataOffset, xor, ...s })
-          }
-        }
-      }
-    }
+function keyLengths(data: Buffer, max = 1024): number[] {
+  const scored: { len: number; agree: number }[] = []
+  const n = Math.min(data.length, 256 * 1024)
+  for (let len = 1; len <= max; len++) {
+    let same = 0
+    let total = 0
+    for (let i = 0; i + len < n; i += 7) { if (data[i] === data[i + len]) same++; total++ }
+    if (total > 200) scored.push({ len, agree: same / total })
   }
-  results.sort((a, b) => b.known.length - a.known.length || b.strings - a.strings)
-  return { obfuscated: true, best: results[0] ?? null, tried, runners: results.slice(1, 4) }
-}
-
-/** Applies a solved scheme to the whole file. */
-export function unscramble(buf: Buffer, d: Deobfuscated): Buffer {
-  const key = buf.subarray(d.keyOffset, d.keyOffset + d.keyLength)
-  const n = buf.length - d.dataOffset
-  const out = Buffer.allocUnsafe(n)
-  for (let i = 0; i < n; i++) out[i] = buf[d.dataOffset + i] ^ key[i % d.keyLength] ^ d.xor
+  scored.sort((a, b) => b.agree - a.agree)
+  // Keep the strongest, plus their smallest divisors — a true length of 257
+  // also scores at 514, and the shorter one is the real answer.
+  const out: number[] = []
+  for (const s of scored.slice(0, 24)) {
+    let l = s.len
+    for (const cand of out) if (l % cand === 0) { l = cand; break }
+    if (!out.includes(l)) out.push(l)
+    if (out.length >= 8) break
+  }
   return out
 }
 
+function deriveKey(data: Buffer, len: number): Buffer {
+  const key = Buffer.alloc(len)
+  // Score every possible byte for each column rather than assuming the
+  // commonest plaintext is zero. These tables are mostly NUL padding and ASCII
+  // names, so the right key byte is the one that turns its column into those.
+  for (let k = 0; k < len; k++) {
+    let best = 0
+    let bestScore = -1
+    for (let cand = 0; cand < 256; cand++) {
+      let score = 0
+      let n = 0
+      for (let i = k; i < data.length && n < 4096; i += len, n++) {
+        const p = data[i] ^ cand
+        if (p === 0) score += 3
+        else if (p >= 32 && p < 127) score += 2
+        else if (p === 0x0a || p === 0x0d || p === 0x09) score += 1
+        else score -= 1
+      }
+      if (score > bestScore) { bestScore = score; best = cand }
+    }
+    key[k] = best
+  }
+  return key
+}
+
+export function deobfuscate(buf: Buffer): { obfuscated: boolean; best: Solved | null; tried: number; runners: Solved[] } {
+  if (buf.length < 4096) return { obfuscated: false, best: null, tried: 0, runners: [] }
+  const magic = buf.readUInt32BE(0)
+  if (!OBFUSCATION_MAGIC.includes(magic)) return { obfuscated: false, best: null, tried: 0, runners: [] }
+
+  const results: Solved[] = []
+  let tried = 0
+  // The key repeats, so guessing the payload start only rotates the recovered
+  // key — it does not have to be exact.
+  for (const dataOffset of [0x22c, 0x128, 0x08]) {
+    if (dataOffset + 4096 > buf.length) continue
+    const data = buf.subarray(dataOffset)
+    // A true key of 257 also scores at 514 and 771. Testing the divisors too
+    // matters because the shorter one gives every key byte twice the evidence,
+    // and a key byte decided on 27 samples is often wrong.
+    const cands = new Set<number>()
+    for (const len of keyLengths(data)) {
+      cands.add(len)
+      for (let d = 2; d <= 6; d++) if (len % d === 0) cands.add(len / d)
+    }
+    for (const len of [...cands].sort((a, b) => a - b)) {
+      tried++
+      const key = deriveKey(data, len)
+      const n = Math.min(data.length, 128 * 1024)
+      const out = Buffer.allocUnsafe(n)
+      for (let i = 0; i < n; i++) out[i] = data[i] ^ key[i % len]
+      const s = scoreText(out)
+      // Noise clears the old bar easily; require several times what noise gives,
+      // plus runs long enough that noise essentially never produces them.
+      if (s.strings > s.expected * 3 && s.longRuns > 20) {
+        results.push({
+          keyLength: len, dataOffset, keyHex: key.subarray(0, 32).toString('hex'),
+          samplesPerByte: Math.floor(data.length / len), ...s,
+        })
+      }
+    }
+  }
+  // Best evidence first; among equals prefer the shorter key, which is the real
+  // period rather than a multiple of it.
+  results.sort((a, b) => b.known.length - a.known.length || b.longRuns - a.longRuns || a.keyLength - b.keyLength)
+  return { obfuscated: true, best: results[0] ?? null, tried, runners: results.slice(1, 4) }
+}
+
+export function unscramble(buf: Buffer, d: Solved): Buffer {
+  const data = buf.subarray(d.dataOffset)
+  const key = deriveKey(data, d.keyLength)
+  const out = Buffer.allocUnsafe(data.length)
+  for (let i = 0; i < data.length; i++) out[i] = data[i] ^ key[i % d.keyLength]
+  return out
+}
 export interface TableReport {
   file: string
   bytes: number
@@ -342,7 +410,9 @@ export function readTables(root: string, files: string[]): TableReport[] {
       obfuscated: d.obfuscated,
       solved: !!d.best,
       scheme: d.best
-        ? `key at 0x${d.best.keyOffset.toString(16)} length ${d.best.keyLength}, data from 0x${d.best.dataOffset.toString(16)}, xor 0x${d.best.xor.toString(16)}`
+        ? `repeating key of ${d.best.keyLength} bytes from 0x${d.best.dataOffset.toString(16)} — ` +
+          `${d.best.strings} runs against ${d.best.expected} expected from noise, ${d.best.longRuns} of 8+ chars, ` +
+          `${d.best.samplesPerByte} samples per key byte${d.best.samplesPerByte < 40 ? ' (thin — the key may be imperfect)' : ''}`
         : null,
       strings: d.best ? d.best.strings : plainScore.strings,
       known: d.best ? d.best.known : plainScore.known,

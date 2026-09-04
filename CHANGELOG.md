@@ -8,7 +8,26 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **The table unscrambler was reporting success on noise.** v0.13.0 said it had
+  solved both of the game's tables. It had not: the readable-text threshold it
+  judged by was forty runs, and random bytes produce about eight hundred. Both
+  "solutions" were the noise floor. The strings it printed were visibly
+  gibberish, which is what gave it away.
+- **It now recovers the key from the file instead of guessing offsets.** A
+  repeating XOR key leaves two fingerprints, and both are in the data: bytes one
+  key-length apart agree far more often than chance, which gives the length, and
+  the right byte for each key position is the one turning its column into the
+  NULs and ASCII these tables are made of. Nothing is assumed about where the
+  key is kept.
+- **The bar is now set above noise, not below it.** A solve needs several times
+  the printable runs noise gives, plus runs long enough that noise essentially
+  never makes them. Across six trials of random data with the right magic
+  bytes, it now reports nothing — where the old check passed every time.
+- **It says how confident it is.** The report gives samples per key byte;
+  below about forty the key can be imperfect, and it says so rather than
+  presenting a shaky result as a clean one.
 
 ## [0.13.0] - 2026-09-04
 
