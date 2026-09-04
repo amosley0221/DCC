@@ -379,7 +379,16 @@ export interface SaveDiffRun {
   bits: string
 }
 
+export interface FrameDiff {
+  frameOffset: number
+  differingBytes: number
+  detail: { at: number; a: number; b: number }[]
+}
+
 export interface SaveDiff {
+  /** Present when a dictionary was available: differences inside decoded frames. */
+  frameDiffs?: FrameDiff[]
+  decodedNote?: string
   aName: string
   bName: string
   aInflated: number
@@ -399,7 +408,7 @@ export interface SaveDiff {
  * apart with one redshirt toggled differ by a single byte — which makes this
  * precise rather than approximate.
  */
-export function diffSaves(pathA: string, pathB: string): SaveDiff {
+export function diffSaves(pathA: string, pathB: string, dictionary?: Buffer | null): SaveDiff {
   const a = readFrostbite(readFileSync(pathA))
   const b = readFrostbite(readFileSync(pathB))
   if (!a || !b) throw new Error('Both files must be FBCHUNKS saves')
@@ -450,7 +459,41 @@ export function diffSaves(pathA: string, pathB: string): SaveDiff {
     notes.push('The payloads are identical — nothing was saved between these two files.')
   }
 
+  let frameDiffs: FrameDiff[] | undefined
+  let decodedNote: string | undefined
+  if (dictionary) {
+    const da = decodeFrames(A, dictionary)
+    const framesOf = (payload: Buffer) => {
+      const out = new Map<number, Buffer>()
+      let i = 0
+      while ((i = payload.indexOf(ZSTD_FRAME_MAGIC, i)) !== -1) {
+        try { out.set(i, zstdDecompressSync(payload.subarray(i), { dictionary })) } catch { /* skip */ }
+        i += 4
+      }
+      return out
+    }
+    const fa = framesOf(A)
+    const fb = framesOf(B)
+    frameDiffs = []
+    for (const [off, bufA] of fa) {
+      const bufB = fb.get(off)
+      if (!bufB || bufA.equals(bufB)) continue
+      const detail: { at: number; a: number; b: number }[] = []
+      const n = Math.min(bufA.length, bufB.length)
+      for (let k = 0; k < n && detail.length < 40; k++) {
+        if (bufA[k] !== bufB[k]) detail.push({ at: k, a: bufA[k], b: bufB[k] })
+      }
+      frameDiffs.push({ frameOffset: off, differingBytes: detail.length, detail })
+    }
+    decodedNote =
+      `${da.frames.toLocaleString()} frames decoded (${da.bytes.toLocaleString()} bytes of object ` +
+      `data); ${frameDiffs.length} frame(s) differ. Comparing decoded frames is far sharper than ` +
+      'comparing the compressed payload, where recompression alone moves hundreds of bytes.'
+  }
+
   return {
+    frameDiffs,
+    decodedNote,
     aName: basename(pathA),
     bName: basename(pathB),
     aInflated: A.length,
@@ -764,4 +807,74 @@ export function findDictionary(
   }
   hits.sort((a, b) => Number(b.verified) - Number(a.verified) || Number(b.matches) - Number(a.matches))
   return { root, filesScanned, bytesScanned, dictionariesSeen, hits: hits.slice(0, 80), notes }
+}
+
+
+// ── reading the frames ────────────────────────────────────────────────────────
+
+export interface DecodedFrames {
+  frames: number
+  failed: number
+  bytes: number
+  /** Concatenated object data, in frame order. */
+  data: Buffer
+  offsets: number[]
+}
+
+/**
+ * Decompresses every zstd frame in a payload with the game's dictionary.
+ *
+ * This is where the object data actually lives — roughly 6.8 MB of packed
+ * records in a 31 MB payload. Without the dictionary none of it is readable;
+ * with it, every frame decodes.
+ */
+export function decodeFrames(payload: Buffer, dictionary: Buffer): DecodedFrames {
+  const parts: Buffer[] = []
+  const offsets: number[] = []
+  let i = 0
+  let failed = 0
+  while ((i = payload.indexOf(ZSTD_FRAME_MAGIC, i)) !== -1) {
+    try {
+      parts.push(zstdDecompressSync(payload.subarray(i), { dictionary }))
+      offsets.push(i)
+    } catch {
+      failed++
+    }
+    i += 4
+  }
+  const data = Buffer.concat(parts)
+  return { frames: parts.length, failed, bytes: data.length, data, offsets }
+}
+
+/** Confirms a dictionary belongs to a save before it is kept. */
+export function checkDictionary(payload: Buffer, dictionary: Buffer): {
+  ok: boolean; frames: number; failed: number; bytes: number; message: string
+} {
+  if (dictionary.length < 8 || dictionary.readUInt32LE(0) !== 0xec30a437) {
+    return { ok: false, frames: 0, failed: 0, bytes: 0, message: 'That file is not a zstd dictionary.' }
+  }
+  // Only a handful of frames are needed to tell whether it is the right one.
+  let i = 0
+  let ok = 0
+  let failed = 0
+  let bytes = 0
+  while ((i = payload.indexOf(ZSTD_FRAME_MAGIC, i)) !== -1 && ok + failed < 200) {
+    try {
+      bytes += zstdDecompressSync(payload.subarray(i), { dictionary }).length
+      ok++
+    } catch {
+      failed++
+    }
+    i += 4
+  }
+  const id = dictionary.readUInt32LE(4) >>> 0
+  return {
+    ok: ok > 0 && failed === 0,
+    frames: ok,
+    failed,
+    bytes,
+    message: ok > 0 && failed === 0
+      ? `Dictionary 0x${id.toString(16)} decodes this save's frames.`
+      : `Dictionary 0x${id.toString(16)} did not decode this save (${failed} failures).`,
+  }
 }

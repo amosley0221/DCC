@@ -14,6 +14,11 @@ declare global {
       analyzeSave(path: string): Promise<{ ok: true; report: SaveReport } | { ok: false; message: string }>
       backupSave(path: string): Promise<{ ok: true; dest: string } | { ok: false; message: string }>
       diffSaves(a: string, b: string): Promise<{ ok: true; diff: SaveDiff } | { ok: false; message: string }>
+      dictionaryState(): Promise<{ present: boolean; bytes?: number; id?: string }>
+      setDictionary(savePath: string): Promise<
+        | { ok: true; bytes: number; id: string; frames: number; failed: number; objectBytes: number }
+        | { ok: false; message: string }
+      >
       findDictionary(savePath: string, dictionaryId: number): Promise<{ ok: true; scan: DictScan } | { ok: false; message: string }>
       checkForUpdate(): Promise<unknown>
       lastUpdateStatus(): Promise<UpdateStatus | null>

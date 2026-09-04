@@ -155,7 +155,36 @@ blocks rather than adjacent rows.
 The rating edits are not one clean byte, and the reason turns out to matter
 more than the edits do.
 
-## The real obstacle: a dictionary that is not in the save
+## Solved: the dictionary
+
+The dictionary is **`madden-franchise/data/zstd-dicts/c27/dict.bin`**, 13,300
+bytes, id `0x65fc508b`. It ships with the `madden-franchise` npm package — a
+library for EA franchise saves that has been extended to College Football, hence
+`c27` alongside the Madden `26` and `27`. Only `c27` matches this save; the
+Madden dictionaries do not.
+
+With it, **all 15,408 frames decode, zero failures — 6,846,220 bytes of object
+data** out of the 31 MB payload. Frames run 10–1,228 bytes, mean 444.
+
+It is not in the game install at all, which is why scanning there kept coming up
+empty.
+
+### What this buys immediately
+
+Diffing *decoded frames* rather than the compressed payload is dramatically
+sharper, because recompressing a frame moves hundreds of bytes that have nothing
+to do with the edit:
+
+| | Compressed payload | Decoded frames |
+| --- | --- | --- |
+| One rating edit (T3 → T4) | 150 bytes across 4 runs | **1 frame, 4 bytes** |
+
+And those four bytes are legible: bytes 424/440 swap `39 ↔ 120` and bytes
+431/447 swap `14 ↔ 13`, sixteen apart — two 16-byte entries exchanging places.
+That is a sorted collection being re-ordered by the edit, not the rating itself,
+which puts the rating value in the plain region rather than the frames.
+
+## The former obstacle: a dictionary that is not in the save
 
 The payload contains **15,408 zstd frames**, mean content 209 bytes. Every one
 declares the same dictionary:

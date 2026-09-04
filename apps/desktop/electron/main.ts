@@ -2,7 +2,10 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { autoUpdater } from 'electron-updater'
-import { analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload } from './saveAnalysis'
+import {
+  analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
+  checkDictionary, decodeFrames,
+} from './saveAnalysis'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -201,9 +204,54 @@ ipcMain.handle('save:findDict', async (_e, { savePath, dictionaryId }: { savePat
   }
 })
 
+/** The dictionary lives in userData so it survives updates and is found again. */
+const dictionaryPath = () => join(app.getPath('userData'), 'cfb-zstd-dict.bin')
+
+function storedDictionary(): Buffer | null {
+  try {
+    return existsSync(dictionaryPath()) ? readFileSync(dictionaryPath()) : null
+  } catch {
+    return null
+  }
+}
+
+ipcMain.handle('save:dictionaryState', () => {
+  const d = storedDictionary()
+  return d ? { present: true, bytes: d.length, id: `0x${d.readUInt32LE(4).toString(16)}` } : { present: false }
+})
+
+ipcMain.handle('save:setDictionary', async (_e, savePath: string) => {
+  const res = await dialog.showOpenDialog(win!, {
+    title: 'Choose the compression dictionary (dict.bin)',
+    properties: ['openFile'],
+    filters: [{ name: 'Dictionary', extensions: ['bin', 'dict', '*'] }],
+  })
+  if (res.canceled || !res.filePaths[0]) return { ok: false as const, message: 'cancelled' }
+  try {
+    const dict = readFileSync(res.filePaths[0])
+    const payload = readSavePayload(savePath)
+    if (!payload) return { ok: false as const, message: 'That save could not be read.' }
+    const check = checkDictionary(payload, dict)
+    if (!check.ok) return { ok: false as const, message: check.message }
+    mkdirSync(app.getPath('userData'), { recursive: true })
+    writeFileSync(dictionaryPath(), dict)
+    const all = decodeFrames(payload, dict)
+    return {
+      ok: true as const,
+      bytes: dict.length,
+      id: `0x${dict.readUInt32LE(4).toString(16)}`,
+      frames: all.frames,
+      failed: all.failed,
+      objectBytes: all.bytes,
+    }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
 ipcMain.handle('save:diff', (_e, { a, b }: { a: string; b: string }) => {
   try {
-    return { ok: true as const, diff: diffSaves(a, b) }
+    return { ok: true as const, diff: diffSaves(a, b, storedDictionary()) }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
 import type { SaveReport, SaveDiff, DictScan } from '../../electron/saveAnalysis'
@@ -18,6 +18,22 @@ export default function Save() {
   const [diffing, setDiffing] = useState(false)
   const [scan, setScan] = useState<DictScan | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [dict, setDict] = useState<{ present: boolean; bytes?: number; id?: string } | null>(null)
+  const [dictResult, setDictResult] = useState<string | null>(null)
+
+  useEffect(() => { void window.dcc.dictionaryState().then(setDict) }, [])
+
+  const chooseDictionary = async () => {
+    if (!path) return
+    const res = await window.dcc.setDictionary(path)
+    if (res.ok) {
+      setDictResult(
+        `${res.frames.toLocaleString()} frames decoded, ${res.failed} failed — ` +
+          `${res.objectBytes.toLocaleString()} bytes of object data.`,
+      )
+      void window.dcc.dictionaryState().then(setDict)
+    } else if (res.message !== 'cancelled') setDictResult(res.message)
+  }
 
   const hunt = async () => {
     if (!report?.zstd || !path) return
@@ -179,11 +195,20 @@ export default function Save() {
                   dictionary the frames cannot be read. Search the game install for it — or any
                   other tool that already reads these saves, since it must carry the dictionary too.
                 </p>
+                {dict?.present ? (
+                  <div className="effect" style={{ marginTop: 10 }}>
+                    DICTIONARY {dict.id} LOADED — {dict.bytes?.toLocaleString()} BYTES. THE FRAMES ARE READABLE.
+                  </div>
+                ) : null}
                 <div className="row" style={{ gap: 8, marginTop: 10 }}>
-                  <Btn variant="primary" disabled={scanning} onClick={hunt}>
+                  <Btn variant="primary" onClick={chooseDictionary}>
+                    {dict?.present ? 'Replace dictionary…' : 'Load dictionary file…'}
+                  </Btn>
+                  <Btn disabled={scanning} onClick={hunt}>
                     {scanning ? 'Scanning…' : 'Search a folder for it…'}
                   </Btn>
                 </div>
+                {dictResult ? <div style={{ marginTop: 9 }}><Meta size={10}>{dictResult}</Meta></div> : null}
                 {scan ? (
                   <div className="col" style={{ gap: 7, marginTop: 12 }}>
                     <Meta size={10}>
@@ -223,6 +248,26 @@ export default function Save() {
                 <div style={{ marginTop: 6 }}>
                   <Meta size={10}>{diff.aName} → {diff.bName}</Meta>
                 </div>
+                {diff.decodedNote ? (
+                  <div style={{ marginTop: 9 }}>
+                    <span className="body-serif">{diff.decodedNote}</span>
+                  </div>
+                ) : null}
+                {diff.frameDiffs?.length ? (
+                  <div className="col" style={{ gap: 6, marginTop: 11 }}>
+                    <Meta size={9}>INSIDE THE DECODED FRAMES</Meta>
+                    {diff.frameDiffs.slice(0, 12).map((f) => (
+                      <div key={f.frameOffset} className="col" style={{ gap: 2 }}>
+                        <Meta size={10}>
+                          frame 0x{f.frameOffset.toString(16)} · {f.differingBytes} byte(s)
+                        </Meta>
+                        <span className="mono" style={{ fontSize: 10, color: 'var(--ink2)' }}>
+                          {f.detail.slice(0, 8).map((d) => `+${d.at}: ${d.a}→${d.b}`).join('   ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {diff.notes.length ? (
                   <div className="col" style={{ gap: 5, marginTop: 9 }}>
                     {diff.notes.map((n, i) => <span key={i} className="body-serif">{n}</span>)}
