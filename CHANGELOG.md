@@ -10,6 +10,24 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.20.0] - 2026-09-04
+
+### Added
+
+- **Conference, division and head coach for all 138 teams.** The save keeps
+  them in a table of its own, keyed by the same team id the players carry, and
+  Team now shows them beside every roster — so an unnamed team reads as *SEC,
+  coached by J. Simon* rather than just *Team 47*.
+
+  Naming a team shows its conference and coach in the prompt, which narrows 143
+  schools to a handful.
+
+  Confirmed by the only pairing available: Penn State's players all carry team
+  id 74, and row 74 of the table is their coach with the Big Ten. The
+  conference sizes are the game's own — Big Ten 18, ACC 17, SEC and Big 12 16,
+  Sun Belt and American 14, MAC 13, MW and CUSA 10, Pac-12 8, Independent 2.
+
+
 ## [0.19.1] - 2026-09-04
 
 ### Fixed

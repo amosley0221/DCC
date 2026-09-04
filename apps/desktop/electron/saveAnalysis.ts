@@ -1302,6 +1302,78 @@ export interface TeamRecord {
   altAbbr: string | null
 }
 
+
+/* ------------------------------------------------------------- coaches */
+
+const CONFERENCES = [
+  'Big Ten', 'SEC', 'ACC', 'Big 12', 'Pac-12', 'American', 'MAC', 'MW',
+  'CUSA', 'Sun Belt', 'Independent',
+]
+
+/** Coach name at +0, conference at +19, division at +37. */
+export const COACH_STRIDE = 58
+
+export interface CoachRecord {
+  /** The save's own team id, 0-137 — the same field a player record carries. */
+  teamId: number
+  coach: string | null
+  conference: string | null
+  division: string | null
+}
+
+/**
+ * Reads the coach table: 414 records of 58 bytes, three blocks of the same 138
+ * teams in the save's own team-id order.
+ *
+ * Confirmed by the only pairing available: the user's team is Penn State,
+ * whose players carry team id 74, and row 74 is their coach with the Big Ten.
+ * The conference sizes are the game's own — Big Ten 18, ACC 17, SEC and Big 12
+ * 16, Sun Belt and American 14, MAC 13, MW and CUSA 10, Pac-12 8, Independent
+ * 2 — which is what makes this a reading rather than a coincidence.
+ *
+ * The table is located by its contents rather than a fixed offset, since a
+ * different save need not put it in the same place.
+ */
+export function readCoaches(payload: Buffer): CoachRecord[] {
+  const isConf = (o: number) => {
+    const t = text(payload, o, 20)
+    return t !== null && CONFERENCES.includes(t)
+  }
+  // Anchor on a conference name, then require its neighbours 58 bytes away to
+  // be conference names too — a lone match is a string somewhere else.
+  const probe = Buffer.from('Big Ten', 'latin1')
+  let start = -1
+  for (let i = 0; (i = payload.indexOf(probe, i)) !== -1; i++) {
+    const row = i - 19
+    let run = 0
+    for (let k = 1; k <= 4; k++) if (isConf(row + k * COACH_STRIDE + 19)) run++
+    if (run < 3) continue
+    let lo = row
+    while (lo - COACH_STRIDE >= 0 && isConf(lo - COACH_STRIDE + 19)) lo -= COACH_STRIDE
+    start = lo
+    break
+  }
+  if (start < 0) return []
+
+  const out: CoachRecord[] = []
+  for (let k = 0; ; k++) {
+    const o = start + k * COACH_STRIDE
+    if (o + COACH_STRIDE > payload.length) break
+    const conference = text(payload, o + 19, 20)
+    if (!conference || !CONFERENCES.includes(conference)) break
+    // Three blocks of the same teams; only the first is kept, and the team id
+    // is the row's position within its block.
+    if (k >= 138) break
+    out.push({
+      teamId: k,
+      coach: text(payload, o, 19) || null,
+      conference,
+      division: text(payload, o + 37, 20) || null,
+    })
+  }
+  return out
+}
+
 export function readTeamNames(payload: Buffer): TeamRecord[] {
   const tag = Buffer.from('teamdb_', 'latin1')
   const hits: number[] = []

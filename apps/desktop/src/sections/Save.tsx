@@ -100,7 +100,7 @@ export default function Save() {
     const res = await window.dcc.roster(path)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, players: res.players } })
+      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, players: res.players } })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     } else setError(res.message)
   }

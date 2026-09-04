@@ -36,6 +36,13 @@ export default function TeamSave() {
   const myTeam = state.teamId
   const names = state.teamNames
   const [naming, setNaming] = useState<number | null>(null)
+  // Conference and coach come from the save keyed by the same team id the
+  // players carry, so an unnamed roster is still identifiable.
+  const coachOf = useMemo(() => {
+    const m = new Map<number, { coach: string | null; conference: string | null; division: string | null }>()
+    for (const c of roster?.coaches ?? []) m.set(c.teamId, c)
+    return m
+  }, [roster])
   const [schoolQuery, setSchoolQuery] = useState('')
   const [tab, setTab] = useState<TabName>('ROSTER')
   const [query, setQuery] = useState('')
@@ -48,7 +55,7 @@ export default function TeamSave() {
     const res = await window.dcc.roster(path)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, players: res.players } })
+      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, players: res.players } })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     }
   }
@@ -104,10 +111,16 @@ export default function TeamSave() {
       <div className="col" style={{ gap: 12, maxWidth: 900 }}>
         {roster && naming !== null ? (
           <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
-            <Kicker>Which school is team {naming}?</Kicker>
+            <Kicker>
+              Which school is team {naming}?
+              {coachOf.get(naming)?.conference
+                ? ` — ${coachOf.get(naming)!.conference}${coachOf.get(naming)!.division ? ' ' + coachOf.get(naming)!.division : ''}, coached by ${coachOf.get(naming)!.coach ?? 'someone'}`
+                : ''}
+            </Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
               These are the {roster.schools.length} schools your save carries. The save does not
-              link them to rosters anywhere DCC can read, so pick yours once and it sticks.
+              link them to rosters anywhere DCC can read, so pick yours once and it sticks. The
+              conference and coach above come from the save and should narrow it down.
             </p>
             <Input placeholder="search schools" value={schoolQuery} onChange={(e) => setSchoolQuery(e.target.value)} />
             <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
@@ -145,8 +158,9 @@ export default function TeamSave() {
             <Kicker>Which one is yours?</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
               The save groups players into {teams.length} rosters of 85 — the scholarship limit —
-              but it does not record school names against them anywhere DCC can read yet. Find
-              yours by its players and it will be remembered.
+              but it does not record school names against them anywhere DCC can read yet. Each
+              one's conference and head coach do come from the save, which with its best players
+              should be enough to tell them apart. Find yours and it will be remembered.
             </p>
             <Input
               placeholder="type a player on your team"
@@ -182,8 +196,8 @@ export default function TeamSave() {
             <Kicker>All {teams.length} programmes</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
               The save sorts every player into one of these, 85 to a roster, but never records
-              which school each one is. Name any of them and it sticks — they are listed by their
-              best players so you can tell them apart.
+              which school each one is. It does record each one's conference and head coach, so
+              those are shown alongside the best players. Name any of them and it sticks.
             </p>
             <Input placeholder="search by player or school name" value={query} onChange={(e) => setQuery(e.target.value)} />
             <div className="col" style={{ gap: 0, marginTop: 10 }}>
@@ -205,7 +219,13 @@ export default function TeamSave() {
                       </strong>
                     </button>
                     {t.id === myTeam ? <Meta size={9} color="var(--accent)">YOURS</Meta> : null}
-                    <span style={{ color: 'var(--ink3)', fontSize: 11 }}>
+                    <span style={{ color: 'var(--ink3)', fontSize: 11, width: 130 }}>
+                      {[coachOf.get(t.id)?.conference, coachOf.get(t.id)?.division].filter(Boolean).join(' ')}
+                    </span>
+                    <span style={{ color: 'var(--ink3)', fontSize: 11, width: 110 }}>
+                      {coachOf.get(t.id)?.coach ?? ''}
+                    </span>
+                    <span style={{ color: 'var(--ink3)', fontSize: 11, flex: 1 }}>
                       {t.list.slice(0, 3).map((p) => p.first + ' ' + p.last).join(' · ')}
                     </span>
                   </div>
