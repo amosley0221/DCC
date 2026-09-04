@@ -29,21 +29,9 @@ why the file is 9.6 MB for 6.5 MB of data.
 
 Readable content confirmed present:
 
-- **Player records** — a fixed **138-byte stride** table. Within a record:
-
-  | Offset | Field |
-  | --- | --- |
-  | `+0x00` | hometown |
-  | `+0x1A` | first name |
-  | `+0x2B` | portrait asset id, e.g. `Generic_2584_P_T0122_H_7_4` |
-  | `+0x4C` | surname |
-
-  9,112 portrait-asset records appear in total, about the size of a full FBS
-  league. Sample: `James Bynum · Keller`, `Bryce Keasey · Williamsport`,
-  `DeVonte Jaimes · Catawissa`, `Philip Shembo · Fort Lauderdale`.
-
-  The `T0122` component of the asset id looks like a team reference — worth
-  confirming, since it is a candidate player→team link.
+- **Player names** — one contiguous table of 138-byte records. Its exact
+  bounds and field layout are in *The name table* below: 17,470 slots at
+  `0x00f44e68`, 16,450 of them filled.
 
 - **Coach records** — a separate table using `Unique_C_<Name>_<id>` assets.
 - **Generated storylines** — null-terminated prose, e.g. *"The Gamecocks prepare
@@ -84,7 +72,7 @@ method below is for.
 Names and hometowns come out cleanly; the numbers do not yet. Still unknown:
 
 - Ratings (overall, speed, awareness…) and their scale
-- Position, class year, redshirt status
+- Position, class year
 - The authoritative player→team link
 - Schedule, recruiting board, coach career records
 
@@ -190,19 +178,126 @@ reorders a sorted collection inside a frame, and without decoding that frame the
 diff is buried in recompression noise — but the attribute bytes themselves were
 always in the clear.
 
+### The name table
+
+Every player's strings live in **one contiguous array** at `0x00f44e68`:
+**17,470 slots of 138 bytes**, of which 16,450 are filled and 1,020 blank. The
+array ends at `0x011917d4`. Each slot is five fixed-width string fields:
+
+| Offset | Width | Field | Example |
+| --- | --- | --- | --- |
+| +0 | 17 | first name | `Carlton` |
+| +17 | 33 | asset id | `Unique_SmithCarlton_24796` |
+| +50 | 21 | last name | `Smith` |
+| +71 | 41 | short asset id | `SmithCarlton_24796` |
+| +112 | 26 | hometown | `Norfolk` |
+
+The asset id carries more than a name. Generated players use
+`Generic_<asset>_P_T<team>_<build>_<n>_<n>` — all 11,317 of them match that
+shape exactly, and the `T` field yields **240 distinct teams**. The remaining
+4,496 are `Unique_<Last><First>_<id>`, which carries no team, so roughly 72% of
+the roster can be assigned to a team from the name table alone.
+
+The array is not sorted by team: team ids change 11,760 times across the 17,470
+slots, so it is insertion or hash order, not a per-team roster block.
+
+### The record size: 192 bytes
+
+The numeric region is strongly periodic at **192 bytes**. Byte-populated-ness
+agrees at that lag 89.7% of the time against a 60.0% baseline — nearly +30
+points — and the next-strongest lags (384, 576, 768, 960) are all its multiples,
+so 192 is the fundamental, not a harmonic. Every region carrying the period
+begins on a multiple of 192, so the grid is phase-locked to the payload start.
+
+The two redshirt bytes settle it. On that grid they are **the same column**:
+
+| Edit | Offset | Record | Column |
+| --- | --- | --- | --- |
+| Redshirt A (T1 → T2) | `0x00f31dc8` | 82,983 | **136** |
+| Redshirt B (T2 → T3) | `0x00d112c8` | 71,363 | **136** |
+| Flag (T3 → T4) | `0x00f000ff` | 81,921 | 63 |
+| Value (T4 → T5) | `0x00f00126` | 81,921 | 102 |
+
+Their gap of 2,231,040 bytes is **exactly 11,620 records** of 192. Two
+independent players, edited in separate sessions, landing on the same column an
+exact whole number of records apart is not something a wrong stride produces.
+
+**Redshirt is bit 7 of byte +136 of a 192-byte record.**
+
+The last two edits share record 81,921 — one action changed a flag at +63 and a
+value at +102 of the same record.
+
+### What a record looks like
+
+Laying the two redshirt records side by side (record start = flag offset − 136):
+
+```
+        record A @0x00f31d40              record B @0x00d11240
+  +  0  00 23 fe 79 00 23 fe a2 …   |   00 0b 86 91 00 0b 86 ba …
+  + 48  00 04 00 00 ff 4a 00 00     |   00 0f 00 00 ff 4a 00 00
+  +144  0a aa aa a0 00 02 41 a0     |   0a aa aa a0 41 10 03 a0
+  +152  00 00 01 23                 |   00 00 01 21
+  +168  80 b7 c0 f2 80 65 4b ec     |   80 b7 c1 06 80 65 4c 3c
+```
+
+Constants line up at +52 (`ff 4a`), +58 (`ff 00`) and +144 (`0a aa aa a0`), and
++152/+168/+172 differ only in their low bytes. Same field skeleton, different
+values: these are two instances of one record type.
+
+A record opens with **five 32-bit ids** at +0…+19, each appearing exactly once
+in the whole 31 MB payload — object identity, not references to anything else.
+Record A's are `0x0023fe32`–`0x0023fea2`, record B's `0x000b864a`–`0x000b86ba`:
+five ids drawn from a span of 112 in both cases.
+
+### Field encoding
+
+All four plain-region edits are anchored on **bit 7 of a byte**, and the
+multi-byte ones changed by exactly `+0x80` and `+0x180`:
+
+| Edit | Change | Reads as |
+| --- | --- | --- |
+| Redshirt A | `80` → `00` | 1-bit flag, cleared |
+| Redshirt B | `92` → `12` | same bit; the rest of the byte is other flags |
+| Flag (T3 → T4) | `03` → `83` | 1-bit flag, set |
+| Value (T4 → T5) | `20 9d` → `21 1d` | field +1 |
+| Value (T3 → T4) | `13 82` → `15 02` | field +3 |
+
+A field whose least-significant bit is bit 7 of the second byte, changing by +1
+and +3, is a **bit-packed field read most-significant-bit first** — not a
+little-endian integer. That is why no byte-aligned interpretation of the region
+has ever made sense.
+
+The fifth edit is the odd one out: `0x014b17d7` sits outside every 192-periodic
+region, in sparse 32-bit-aligned data padded with `ff ff ff ff` sentinels. One
+user action can touch two unrelated structures.
+
+### Tried and rejected: aligning records to names
+
+If the 192-byte records were a parallel array to the 17,470 name slots, a
+player's index would give both. Two tests were run.
+
+The name table has 1,020 blank slots, which is a fingerprint: a parallel array
+should be blank at the same indices. Scanning every possible start record that
+keeps both redshirt records inside the array, the best alignment was start
+record 65,890 (`0x00c10980`) at 0.556 — well clear of the 0.13 field behind it,
+and it named plausible players for all four edits.
+
+It does not survive the decisive test. 11,804 players carry a team id in their
+asset id, so under a correct alignment some field of the record must reproduce
+it. Searching **every** bit offset in the record for an 8-, 9- or 10-bit
+MSB-first field matching the known team found nothing above 5% — chance. The
+blankness peak was coincidence, and the player identifications that came with it
+are withdrawn.
+
+So the record layout is solid and the record-to-player link is not.
+
 ### Still unmapped, and what would settle it
 
-The plain region is bit-packed: bytes neighbouring the flags are multiples of
-`0x20`, and no byte-aligned stride survives scrutiny. Deriving the per-player
-pitch from the two redshirt offsets alone does not work either — their gap of
-2,231,040 has a hundred plausible divisors and none stands out against the
-zero-heavy background.
-
-What breaks the deadlock is knowing **which player** each edit belonged to. The
-name table is a clean 138-byte stride, so a player's index there is easy to
-find; with two known players' indices and their two flag offsets, the base and
-pitch fall straight out of two equations. Without the names, the same two
-offsets are just two numbers.
+What breaks the deadlock is knowing **which player** each edit belonged to. A
+player's index in the name table is easy to find by name; with two known
+indices and their two record numbers, the array base and the index mapping fall
+out of two equations, and every field in the 192-byte record becomes
+addressable. Without the names, the record numbers are just numbers.
 
 ### What this buys immediately
 
