@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.21.0] - 2026-09-04
+
+### Added
+
+- **Every team is named.** All 138 rosters now carry their school, so Team opens
+  on *Penn State*, *Ohio State*, *Alabama* rather than *Team 74 — name it*.
+  Renaming still works and still wins, for a dynasty that has moved things
+  around.
+
+  The names come out of the save. Every recruit carries a top-ten list of
+  schools stored as team id and interest, and the game's own class export names
+  those schools — so matching 4,037 of 4,100 lists names every id by majority
+  vote, no id agreeing below 88% and no school claimed twice. Team 74 comes out
+  as Penn State, matching the id its players already carried.
+
+
 ## [0.20.0] - 2026-09-04
 
 ### Added

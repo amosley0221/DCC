@@ -883,3 +883,55 @@ The bit-hunting that solved the ratings, the recruiting fields and the coach
 table worked, but it was the hard way round. The order should be: find the
 structure by name, then read its rows, then use a controlled diff only to
 confirm which column is which.
+
+## The game's own schema
+
+The game ships a type schema — 3,526 types with member names, types, bit widths
+and full enum tables — and it settles by inspection what months of searching had
+to infer. It is the game's data, dumped, the same category as the zstd
+dictionary this project already uses. Nobody's implementation was read.
+
+It also explains the one thing that kept failing. Recruiting state is not in the
+player record and never was:
+
+```
+Recruit                                RecruitTarget
+  Class            RecruitingClass 4b    CommitScore is here?  no:
+  CommitScore      int 0..1023           ProspectInfluenceTotal, hours,
+  NationalRank     int 0..4500           NIL offer, scholarship status
+  Player           Player  <-- a link    Recruit  <-- a link
+  PositionRank     int 0..4000
+  QualityModifier  GemBust 3b          SchoolOffer
+  RecruitStage     RecruitStage 4b       HasOffer, InterestLevel,
+  StateRank        int 0..4000           OfferInterestLevel, Team
+  TopSchoolsList   ProspectTargetSchool[]
+  TotalScholarshipOffers int 0..63     ProspectTargetSchool
+                                         TeamId        int 0..2047
+RecruitStage: Top10 Top5 Top3 Battle     TeamInfluence int 0..65535
+  SoftCommitted HardCommitted Signed
+```
+
+The schema confirms work done without it, which is the useful check: the
+`Pipeline` enum is 6 bits with `0=Alabama 1=Arizona 2=Arkansas 3=BigApple
+4=BigSky 5=CentralFlorida`, exactly the width and table derived earlier from a
+class export.
+
+## Team id to school, without being told
+
+`ProspectTargetSchool` is a `{ TeamId, TeamInfluence }` pair, stored as two
+16-bit values, and every recruit has ten of them. Finding one recruit's ten
+influences in the payload — 485, 357, 144, 69, 59, 56, 56, 55, 55, 55 — located
+the array at a 4-byte stride, and the ids beside them are the same team ids the
+player records carry.
+
+Matching 4,037 of 4,100 top-ten lists against the class export names every id by
+majority vote. No id agrees below 88%, no school is claimed twice, and all 138
+are covered.
+
+The order is EA's, and old: **0-113 are the FBS schools alphabetically**, and
+**114-137 are the ones added since**, appended rather than merged in. Air Force
+is 0, Sac State is 137, Penn State is 74 — which independently matches the team
+id its players carry.
+
+This closes the oldest gap in the project. The save still never writes a school
+against a roster, but it no longer has to: DCC names all 138 itself.

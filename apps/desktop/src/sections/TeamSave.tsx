@@ -3,6 +3,7 @@ import { useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
+import { TEAM_ID_NAMES } from '../../electron/saveAnalysis'
 
 const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
@@ -36,6 +37,8 @@ export default function TeamSave() {
   const myTeam = state.teamId
   const names = state.teamNames
   const [naming, setNaming] = useState<number | null>(null)
+  /** The save's own name for a team, unless the user has set one. */
+  const nameOf = (id: number) => names[id] ?? TEAM_ID_NAMES[id] ?? null
   // Conference and coach come from the save keyed by the same team id the
   // players carry, so an unnamed roster is still identifiable.
   const coachOf = useMemo(() => {
@@ -100,10 +103,10 @@ export default function TeamSave() {
       <SectionHeader
         title="Team"
         mark={<SchoolArt size={22} file={
-          mine ? (save.schoolArt[`${names[mine.id] ?? ''}|logoLight`] ??
-                  save.schoolArt[`${names[mine.id] ?? ''}|icon`]) : undefined} />}
+          mine ? (save.schoolArt[`${nameOf(mine.id) ?? ''}|logoLight`] ??
+                  save.schoolArt[`${nameOf(mine.id) ?? ''}|icon`]) : undefined} />}
         sub={<Meta>{!roster ? 'ROSTER NOT READ YET'
-          : mine ? `${(names[mine.id] ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
+          : mine ? `${(nameOf(mine.id) ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
           : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
         right={<div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
@@ -195,9 +198,10 @@ export default function TeamSave() {
           <Card className="card-pad">
             <Kicker>All {teams.length} programmes</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
-              The save sorts every player into one of these, 85 to a roster, but never records
-              which school each one is. It does record each one's conference and head coach, so
-              those are shown alongside the best players. Name any of them and it sticks.
+              Every school is named, along with its conference and head coach. The save does not
+              write a school against a roster, but each recruit's top-ten list names schools by
+              the same team id the players carry, so the two can be joined. Rename any of them if
+              a dynasty has moved things around.
             </p>
             <Input placeholder="search by player or school name" value={query} onChange={(e) => setQuery(e.target.value)} />
             <div className="col" style={{ gap: 0, marginTop: 10 }}>
@@ -214,8 +218,8 @@ export default function TeamSave() {
                     style={{ gap: 10, alignItems: 'baseline', borderTop: '1px solid var(--line)', padding: '6px 0' }}>
                     <span className="num" style={{ color: 'var(--ink)', width: 26 }}>{t.top}</span>
                     <button onClick={() => setNaming(t.id)} style={{ all: 'unset', cursor: 'pointer', minWidth: 150 }}>
-                      <strong style={{ color: names[t.id] ? 'var(--ink)' : 'var(--ink3)' }}>
-                        {names[t.id] ?? `Team ${t.id} — name it`}
+                      <strong style={{ color: nameOf(t.id) ? 'var(--ink)' : 'var(--ink3)' }}>
+                        {nameOf(t.id) ?? `Team ${t.id} — name it`}
                       </strong>
                     </button>
                     {t.id === myTeam ? <Meta size={9} color="var(--accent)">YOURS</Meta> : null}
