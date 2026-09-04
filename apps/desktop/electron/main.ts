@@ -8,7 +8,10 @@ import {
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED,
 } from './saveAnalysis'
-import { scanInstall, findInstall, readTables, findArtNames, listTocs, indexFaces, matchFaces } from './gameAssets'
+import {
+  scanInstall, findInstall, readTables, findArtNames, listTocs,
+  indexFaces, matchFaces, matchSchools,
+} from './gameAssets'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -233,7 +236,9 @@ ipcMain.handle('assets:pickFaces', async () => {
   return r.canceled ? null : r.filePaths[0]
 })
 
-ipcMain.handle('assets:indexFaces', (_e, { dir, assetIds }: { dir: string; assetIds: string[] }) => {
+ipcMain.handle('assets:indexFaces', (
+  _e, { dir, assetIds, schools }: { dir: string; assetIds: string[]; schools: string[] },
+) => {
   try {
     const index = indexFaces(dir)
     faceRoot = dir
@@ -242,6 +247,7 @@ ipcMain.handle('assets:indexFaces', (_e, { dir, assetIds }: { dir: string; asset
       files: index.files, bytes: index.bytes, byExtension: index.byExtension,
       sample: index.sample, truncated: index.truncated, dirs: index.dirs,
       match: matchFaces(index, assetIds),
+      schoolArt: matchSchools(index, schools ?? []),
       // Only the ids that actually resolved cross to the renderer, which keeps
       // this to the players present rather than the whole folder.
       paths: Object.fromEntries(

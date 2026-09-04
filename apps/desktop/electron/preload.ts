@@ -24,8 +24,8 @@ const api = {
   roster: (path: string) => ipcRenderer.invoke('save:roster', path),
   pickInstall: () => ipcRenderer.invoke('assets:pickInstall') as Promise<string | null>,
   pickFaces: () => ipcRenderer.invoke('assets:pickFaces') as Promise<string | null>,
-  indexFaces: (dir: string, assetIds: string[]) =>
-    ipcRenderer.invoke('assets:indexFaces', { dir, assetIds }),
+  indexFaces: (dir: string, assetIds: string[], schools: string[]) =>
+    ipcRenderer.invoke('assets:indexFaces', { dir, assetIds, schools }),
   findInstall: () => ipcRenderer.invoke('assets:findInstall'),
   scanInstall: (dir: string) => ipcRenderer.invoke('assets:scan', dir),
   readTables: (root: string, files: string[]) => ipcRenderer.invoke('assets:readTables', { root, files }),

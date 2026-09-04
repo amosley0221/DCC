@@ -20,7 +20,7 @@ declare global {
       >
       pickInstall(): Promise<string | null>
       pickFaces(): Promise<string | null>
-      indexFaces(dir: string, assetIds: string[]): Promise<
+      indexFaces(dir: string, assetIds: string[], schools: string[]): Promise<
         | { ok: false; message: string }
         | {
             ok: true
@@ -36,6 +36,12 @@ declare global {
               matchedSample: { id: string; file: string }[]
             }
             paths: Record<string, string>
+            schoolArt: {
+              art: Record<string, string>
+              matched: string[]
+              missing: string[]
+              categories: { name: string; files: number }[]
+            }
           }
       >
       findInstall(): Promise<{ found: true; path: string } | { found: false; searched: number; message: string }>

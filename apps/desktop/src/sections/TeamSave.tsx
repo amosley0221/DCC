@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SectionHeader, Tab, Track } from '../ui'
+import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SchoolArt, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 
 const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
@@ -92,6 +92,9 @@ export default function TeamSave() {
     <>
       <SectionHeader
         title="Team"
+        mark={<SchoolArt size={22} file={
+          mine ? (save.schoolArt[`${names[mine.id] ?? ''}|logoLight`] ??
+                  save.schoolArt[`${names[mine.id] ?? ''}|icon`]) : undefined} />}
         sub={<Meta>{!roster ? 'ROSTER NOT READ YET'
           : mine ? `${(names[mine.id] ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
           : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
@@ -118,7 +121,13 @@ export default function TeamSave() {
                       if (myTeam === null) dispatch({ type: 'teamId', id: naming })
                       setNaming(null); setSchoolQuery('')
                     }}>
-                    {sc.name}
+                    <span className="row" style={{ gap: 6, alignItems: 'center' }}>
+                      <SchoolArt size={16} file={
+                        save.schoolArt[`${sc.name}|logoLight`] ??
+                        save.schoolArt[`${sc.name}|icon`] ??
+                        save.schoolArt[`${sc.name}|logoGold`]} />
+                      {sc.name}
+                    </span>
                   </Chip>
                 ))}
             </div>

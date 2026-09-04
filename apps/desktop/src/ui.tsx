@@ -14,14 +14,18 @@ export const Meta = ({ children, color, size }: { children: React.ReactNode; col
   <span className="meta" style={{ color, fontSize: size }}>{children}</span>
 )
 
-export function SectionHeader({ title, right, sub }: {
+export function SectionHeader({ title, right, sub, mark }: {
   title: string; right?: React.ReactNode; sub?: React.ReactNode
+  /** A school mark shown beside the title, when one is known. */
+  mark?: React.ReactNode
 }) {
   return (
     <>
       <div className="section-head">
         <div>
-          <h1 className="screen-title">{title}</h1>
+          <h1 className="screen-title" style={mark ? { display: 'flex', alignItems: 'center', gap: 10 } : undefined}>
+            {mark}{title}
+          </h1>
           {sub ? <div style={{ marginTop: 7 }}>{sub}</div> : null}
         </div>
         {right}
@@ -249,5 +253,25 @@ export function Empty({ children }: { children: React.ReactNode }) {
     <div className="mono" style={{ color: 'var(--ink4)', fontSize: 11, letterSpacing: 0.8, padding: '26px 2px' }}>
       {children}
     </div>
+  )
+}
+
+/**
+ * A school's mark from the chosen art folder, falling back to nothing rather
+ * than to another school's logo. Sized by the caller.
+ */
+export function SchoolArt(
+  { file, size = 20 }: { file?: string; size?: number },
+) {
+  if (!file) return null
+  return (
+    <img
+      alt=""
+      loading="lazy"
+      width={size}
+      height={size}
+      style={{ width: size, height: size, objectFit: 'contain', flex: '0 0 auto' }}
+      src={'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')}
+    />
   )
 }

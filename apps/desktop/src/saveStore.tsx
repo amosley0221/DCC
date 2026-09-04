@@ -44,6 +44,9 @@ export interface SaveState {
     dirs: { dir: string; files: number; bytes: number; sample: string[] }[]
   } | null
   facePaths: Record<string, string>
+  /** "<school>|<category>" -> file within the art root. */
+  schoolArt: Record<string, string>
+  schoolArtMissing: string[]
   facesBusy: boolean
 }
 
@@ -52,7 +55,7 @@ const blank: SaveState = {
   diff: null, diffing: false, scan: null, scanning: false,
   dict: null, dictResult: null, restoring: false, roster: null, rosterBusy: false,
   install: null, installBusy: false, installNote: null, tables: null, art: null,
-  faces: null, facePaths: {}, facesBusy: false,
+  faces: null, facePaths: {}, facesBusy: false, schoolArt: {}, schoolArtMissing: [],
 }
 
 interface Ctx {

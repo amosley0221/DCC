@@ -18,6 +18,26 @@ import type { RosterPlayer } from '../../electron/saveAnalysis'
  * here. A column that is not known is absent rather than filled in.
  */
 const UNASSIGNED = 255
+
+/**
+ * Who is actually a recruit.
+ *
+ * Everyone off a roster lands in one pool, and that pool is not all prospects:
+ * it also holds real players who left — transferred, graduated, drafted. The
+ * two are told apart by the art the save names for them. Recruits are
+ * generated, so they carry a `Generic_` face; real players carry an authored
+ * `Unique_` one. In a Penn State save that splits 4,527 generated from 180
+ * real, and the real ones are why Malachi Toney at 99 and Jadan Baugh at 95
+ * were sitting on top of a recruiting list.
+ *
+ * This is an inference from the asset id, not a class field read from the save
+ * — the save's own class and recruiting stage are still unmapped — so the
+ * screen says which group it is showing rather than presenting one as the
+ * whole truth.
+ */
+const KINDS = ['PROSPECTS', 'LEFT THE ROSTER', 'EVERYONE'] as const
+type Kind = (typeof KINDS)[number]
+const isGenerated = (p: RosterPlayer) => p.assetId.startsWith('Generic_')
 const GROUPS: [string, string[]][] = [
   ['ALL', []],
   ['OFFENCE', ['QB', 'HB', 'FB', 'WR', 'TE']],
@@ -58,7 +78,8 @@ export default function RecruitSave() {
     if (!dir || !save.roster) return
     patch({ facesBusy: true })
     const ids = save.roster.players.map((p) => p.assetId)
-    const res = await window.dcc.indexFaces(dir, ids)
+    const schools = save.roster.schools.map((s) => s.name)
+    const res = await window.dcc.indexFaces(dir, ids, schools)
     patch({ facesBusy: false })
     if (!res.ok) {
       dispatch({ type: 'log', line: { text: res.message, kind: 'bad' } })
@@ -72,20 +93,33 @@ export default function RecruitSave() {
         byExtension: res.byExtension, dirs: res.dirs,
       },
       facePaths: res.paths,
+      schoolArt: res.schoolArt.art,
+      schoolArtMissing: res.schoolArt.missing,
     })
     dispatch({ type: 'log', line: {
-      text: `matched ${res.match.matched.toLocaleString()} of ${res.match.players.toLocaleString()} players to faces`,
+      text: `matched ${res.match.matched.toLocaleString()} of ${res.match.players.toLocaleString()} players to faces` +
+        `, and ${res.schoolArt.matched.length} of ${schools.length} schools to logos`,
       kind: res.match.matched ? 'good' : 'bad',
     } })
   }
   const [group, setGroup] = useState('ALL')
+  const [kind, setKind] = useState<Kind>('PROSPECTS')
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<number | null>(null)
 
-  const pool = useMemo(
+  const unrostered = useMemo(
     () => (save.roster?.players ?? []).filter((p) => p.team === UNASSIGNED),
     [save.roster],
   )
+  const counts = useMemo(() => {
+    const gen = unrostered.filter(isGenerated).length
+    return { gen, real: unrostered.length - gen }
+  }, [unrostered])
+  const pool = useMemo(() => (
+    kind === 'PROSPECTS' ? unrostered.filter(isGenerated)
+    : kind === 'LEFT THE ROSTER' ? unrostered.filter((p) => !isGenerated(p))
+    : unrostered
+  ), [unrostered, kind])
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -151,10 +185,20 @@ export default function RecruitSave() {
     <Card className="card-pad">
       <Kicker>Recruiting pool — from your save</Kicker>
       <p className="body-serif" style={{ marginTop: 7 }}>
-        {pool.length.toLocaleString()} players your save does not put on any of the 138 rosters:
-        recruits and the portal. Star rating, class and commitment are not readable yet, so they
-        are left out rather than invented — this is sorted on the save's own overall.
+        {unrostered.length.toLocaleString()} players are on none of the 138 rosters, and they are
+        not all prospects. {counts.gen.toLocaleString()} are generated players — the recruits —
+        and {counts.real.toLocaleString()} are real players who left your rosters, which is why
+        names like Malachi Toney and Jadan Baugh turn up here. They are told apart by the face the
+        save names for each: generated players get a <code>Generic_</code> one, real players an
+        authored <code>Unique_</code> one. The save's own class and recruiting stage are still
+        unmapped, so nothing here is a reading of them.
       </p>
+
+      <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+        {KINDS.map((k) => (
+          <Tab key={k} on={kind === k} onClick={() => setKind(k)}>{k}</Tab>
+        ))}
+      </div>
 
       <div className="row" style={{ gap: 8, marginTop: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <Btn onClick={pickFaces} disabled={save.facesBusy}>

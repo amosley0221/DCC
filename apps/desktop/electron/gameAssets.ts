@@ -812,3 +812,98 @@ export function matchFaces(index: FaceIndex, assetIds: string[]): FaceMatch {
   }
   return { players: assetIds.length, matched, unmatchedSample, matchedSample }
 }
+
+/* ------------------------------------------------------- team art by school */
+
+/**
+ * Team art is named by school, not by an id the save carries, so it has to be
+ * matched on the name. Each category writes the school differently:
+ *
+ *   3d_logos/png_gold/Alabama_gold          logo, gold
+ *   3d_logos/PNG_OD/Alabama_OD              logo, dark
+ *   3d_logos/png_OL/Alabama_OL              logo, light
+ *   helmet/left/thel_lthelmets_Alabama_result
+ *   coachpolos/tjer_coachpolos_Alabama_Polos_result
+ *
+ * so the school is pulled out per category rather than guessed at.
+ */
+const SCHOOL_PATTERNS: [string, RegExp][] = [
+  ['logoGold', /^(.+)_gold$/i],
+  ['logoDark', /^(.+)_OD$/i],
+  ['logoLight', /^(.+)_OL$/i],
+  ['helmet', /^thel_[lr]thelmets_(.+)_result$/i],
+  ['polo', /^tjer_coachpolos_(.+?)(?:_Polos)?_result$/i],
+  ['jersey', /^tjer_teamjerseys_(.+)_result$/i],
+  // icons/ncaa-logos is a flat set of school marks in lowerCamelCase, and it
+  // spells names out — `california`, `eastCarolina`, `connecticut` — where the
+  // 3d set abbreviates. It matches the save's own names more often, so it is
+  // worth carrying as its own category rather than as a duplicate.
+  ['icon', /^([a-z][A-Za-z]+)$/],
+]
+
+/**
+ * The save writes school names for people; the art writes them for filenames.
+ * Stripping punctuation settles most of it — "Arizona State" against
+ * "ArizonaState" — but not the abbreviations, which differ in both directions
+ * and cannot be derived. Those are listed, and anything still unmatched is
+ * reported rather than guessed at, because a logo on the wrong team is worse
+ * than no logo.
+ */
+const SCHOOL_ALIASES: Record<string, string> = {
+  appst: 'appalachianstate', ccarolina: 'coastalcarolina', cmichigan: 'centralmichigan',
+  california: 'cal', emichigan: 'easternmichigan', eastcarolina: 'ecu',
+  flaatlantic: 'floridaatlantic', gasouthern: 'georgiasouthern', hawaii: 'hawaii',
+  jaxstate: 'jacksonvillestate', kennesawst: 'kennesawstate', miamioh: 'miamiuniversity',
+  mississippist: 'mississippistate', mtsu: 'midtennstate', uconn: 'connecticut',
+  wkentucky: 'westernkentucky', wmichigan: 'westernmichigan', washingtonst: 'washingtonstate',
+  sandiegost: 'sandiegostate', newmexicost: 'newmexicostate', samhouston: 'samhoustonstate',
+  niu: 'northernillinois', ndsu: 'northdakotastate', sacstate: 'sacramentostate',
+  ulmonroe: 'louisianamonroe',
+}
+
+const normSchool = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+export interface SchoolArt {
+  /** category -> path relative to the art root. */
+  art: Record<string, string>
+  matched: string[]
+  /** Schools in the save with no art at all, so the gap is visible. */
+  missing: string[]
+  categories: { name: string; files: number }[]
+}
+
+export function matchSchools(index: FaceIndex, schools: string[]): SchoolArt {
+  // category -> normalised school -> file
+  const bank = new Map<string, Map<string, string>>()
+  for (const [id, file] of Object.entries(index.map)) {
+    for (const [cat, re] of SCHOOL_PATTERNS) {
+      const m = id.match(re)
+      if (!m) continue
+      let inner = bank.get(cat)
+      if (!inner) { inner = new Map(); bank.set(cat, inner) }
+      inner.set(normSchool(m[1]), file)
+      break
+    }
+  }
+
+  const art: Record<string, string> = {}
+  const matched: string[] = []
+  const missing: string[] = []
+  for (const school of schools) {
+    const key = normSchool(school)
+    const alias = SCHOOL_ALIASES[key]
+    let any = false
+    for (const [cat, inner] of bank) {
+      const hit = inner.get(key) ?? (alias ? inner.get(alias) : undefined)
+      if (hit) { art[`${school}|${cat}`] = hit; any = true }
+    }
+    ;(any ? matched : missing).push(school)
+  }
+
+  return {
+    art, matched, missing,
+    categories: [...bank.entries()]
+      .map(([name, inner]) => ({ name, files: inner.size }))
+      .sort((a, b) => b.files - a.files),
+  }
+}

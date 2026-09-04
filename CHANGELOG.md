@@ -10,6 +10,33 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.17.0] - 2026-09-04
+
+### Added
+
+- **Team art: logos, helmets, jerseys, coach polos.** All 143 schools in a Penn
+  State save match, abbreviations included — the save says `California`,
+  `MTSU`, `Miami (OH)`, `Hawai'i`, and the art says `CAL`, `MidTennState`,
+  `MiamiUniversity`, `Hawaii`. Names are matched on the school after stripping
+  punctuation, with an explicit list for the abbreviations, which cannot be
+  derived. Anything unmatched is reported rather than guessed at: a logo on the
+  wrong team is worse than no logo.
+
+### Fixed
+
+- **Recruit was listing players who are not recruits.** Everyone off a roster
+  lands in one pool, and that pool also holds real players who left — which is
+  why Malachi Toney at 99 and Jadan Baugh at 95 were sitting on top of a
+  recruiting list. They are now separated: 4,527 generated players (the
+  recruits) from 180 real ones in a Penn State save, told apart by the face the
+  save names for each, since generated players carry a `Generic_` face and real
+  players an authored `Unique_` one. Prospects show by default, with tabs for
+  the others.
+
+  This is an inference from the asset id, not a class field — the save's own
+  class and recruiting stage are still unmapped, and the screen says so.
+
+
 ## [0.16.1] - 2026-09-04
 
 ### Added
