@@ -84,11 +84,35 @@ Carries the DICE magic but does not yield to the header key or to the search.
 It is genuinely encrypted rather than obfuscated — an earlier partial decode of
 it contained the word `encrypted`. It is not needed for art and is not pursued.
 
+## The join between a player and a face
+
+The save names every player's art directly, in an asset id on the player
+record. There are two schemes:
+
+| Shape | Count | Who |
+| --- | --- | --- |
+| `Unique_AdamsAmare_1` | 4,644 | real players, authored faces |
+| `Generic_0877_P_T0042_H_6_3` | 11,804 | generated players, including every recruit |
+
+The generated form breaks down as a head index (3,787 distinct), the team the
+face was generated for, a skin tone from `D`/`H`/`T`/`M`, and two further
+variants of 8 and 4 values.
+
+This is the join. A recruit in the save carries the name of their own face, so
+finding that string in a decoded bundle table proves the whole path end to end
+rather than merely suggesting it. *Find the art* now searches for exactly these
+names and reports them separately from the keyword guesses.
+
+Note the earlier misreading: the team baked into a `Generic_` id is the team the
+face was generated for, and agrees with the player's actual team only 3.2% of
+the time. That mismatch is what made this field look useless. It is not a team
+field at all — it is part of an art name.
+
 ## Still to do
 
-1. Read `cas.cat` — the catalogue that maps an asset to a `.cas` file, offset
-   and length.
-2. Resolve names from the bundle tables to catalogue entries.
+1. Confirm `Generic_*` and `Unique_*` names appear in the decoded tables.
+2. Resolve those names to a `.cas` file, offset and length. This install has no
+   `cas.cat`, so the mapping is inside the `.toc`/`.sb` tables themselves.
 3. Parse the Frostbite texture header.
 4. Decode BCn (block-compressed) pixel data.
 5. Show logos, portraits and faces in the app, read from the user's install at

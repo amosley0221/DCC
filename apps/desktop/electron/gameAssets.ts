@@ -584,6 +584,8 @@ export async function readTables(root: string, files: string[]): Promise<TableRe
 // ── asset names ───────────────────────────────────────────────────────────────
 
 export interface ArtFind {
+  /** Names matching the save's own asset-id scheme. */
+  playerArt?: string[]
   file: string
   bytes: number
   solved: boolean
@@ -596,7 +598,24 @@ export interface ArtFind {
 }
 
 /** What an art asset tends to be called, across the games that use this engine. */
-const ART = /logo|crest|helmet|uniform|portrait|headshot|face|head_|_head|cranium|team_|_team|coach|roster|player_|_logo/i
+/**
+ * What to look for in a decoded table.
+ *
+ * The first group is the useful one. The save names every player's art
+ * directly: real players as `Unique_AdamsAmare_1`, generated players — which
+ * is what recruits are — as `Generic_0877_P_T0042_H_6_3`, where the trailing
+ * fields are a head index, the team the face was generated for, a skin tone of
+ * D/H/T/M, and two more variants. Those exact strings are the join between a
+ * player in the save and a face in the archives, so finding one in a table
+ * proves the whole path rather than merely suggesting it.
+ *
+ * The second group is the old keyword sweep, kept because it costs nothing and
+ * catches logos and coach art, which are named on a different scheme.
+ */
+const ART = /(?:Generic|Unique)_[A-Za-z0-9]+_|logo|crest|helmet|uniform|portrait|headshot|face|head_|_head|cranium|team_|_team|coach|roster|player_|_logo/i
+
+/** The player-art names specifically — the ones the save can be joined to. */
+export const PLAYER_ART = /(?:Generic|Unique)_[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*/
 
 function stringsIn(buf: Buffer, min = 5): string[] {
   const out: string[] = []
@@ -648,6 +667,10 @@ export async function findArtNames(root: string, files: string[], cap = 24): Pro
       solved: !!d.best,
       keyLength: d.best?.keyLength ?? 0,
       totalStrings: all.length,
+      // Reported separately from the keyword hits: a name matching the save's
+      // own scheme is the thing that settles whether this path works, and it
+      // should not be buried among the "logo"-shaped guesses.
+      playerArt: uniqArt.filter((a) => PLAYER_ART.test(a)).slice(0, 20),
       art: uniqArt.slice(0, 40),
       sample: all.slice(0, 30),
     })

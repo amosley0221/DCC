@@ -10,6 +10,19 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.15.1] - 2026-09-04
+
+### Added
+
+- **_Find the art_ now searches for the names the save actually uses.** Every
+  player record carries the name of its own art: real players as
+  `Unique_AdamsAmare_1`, generated players — every recruit — as
+  `Generic_0877_P_T0042_H_6_3`, which is a head index, the team the face was
+  generated for, a skin tone of D/H/T/M, and two more variants. The scan looks
+  for those exact strings and reports them apart from the keyword guesses,
+  because a name in the save's own scheme is what joins a recruit to a face.
+
+
 ## [0.15.0] - 2026-09-04
 
 ### Added

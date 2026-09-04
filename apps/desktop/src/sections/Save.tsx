@@ -227,8 +227,13 @@ export default function Save() {
           `### ${f.file}`,
           '',
           `- ${f.bytes.toLocaleString()} bytes read, ${f.solved ? `unscrambled with a ${f.keyLength}-byte key` : 'not scrambled or not solved'}`,
-          `- ${f.totalStrings.toLocaleString()} strings, ${f.art.length} looking like art`,
+          `- ${f.totalStrings.toLocaleString()} strings, ${f.art.length} looking like art` +
+            `, ${(f.playerArt ?? []).length} matching the save's player-art scheme`,
           '',
+          // Listed first and on their own: a name in the save's own scheme is
+          // what joins a recruit to a face, so it is the finding that matters.
+          ...((f.playerArt ?? []).length
+            ? ['Player art (joins to the save):', '```', ...(f.playerArt ?? []), '```', ''] : []),
           ...(f.art.length ? ['Art names:', '```', ...f.art, '```', ''] : []),
           'Sample of all names:',
           '```',
