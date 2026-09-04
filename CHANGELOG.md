@@ -10,6 +10,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.19.1] - 2026-09-04
+
+### Fixed
+
+- **A team was missing.** DCC listed 142 schools where the save holds 143. The
+  team records sit in one contiguous run and the reader required each to follow
+  503 bytes after the previous one, which silently discarded the first record of
+  the run. That was Air Force.
+
+
 ## [0.19.0] - 2026-09-04
 
 ### Added

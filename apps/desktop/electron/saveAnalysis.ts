@@ -1307,9 +1307,16 @@ export function readTeamNames(payload: Buffer): TeamRecord[] {
   const hits: number[] = []
   let i = 0
   while ((i = payload.indexOf(tag, i)) !== -1) { hits.push(i); i++ }
+  // The records sit in one contiguous run of 503-byte entries, with a stray
+  // marker elsewhere in the payload. Requiring each hit to be 503 bytes after
+  // the previous one silently dropped the *first* record of the run — Air
+  // Force — and left 142 teams where the save holds 143.
+  const inRun = hits.map((h, k) =>
+    (k > 0 && h - hits[k - 1] === 503) || (k + 1 < hits.length && hits[k + 1] - h === 503))
+
   const out: TeamRecord[] = []
   for (let k = 0; k < hits.length; k++) {
-    if (k > 0 && hits[k] - hits[k - 1] !== 503) continue
+    if (!inRun[k]) continue
     const slug = text(payload, hits[k] + 7, 24)
     const name = text(payload, hits[k] - 278, 30)
     if (!slug || !name || !/^[A-Z]/.test(name)) continue
