@@ -28,8 +28,12 @@ commits, and creates an annotated tag.
 4. **publish** — creates the GitHub Release with that version's CHANGELOG
    section as the body and attaches every artifact.
 
-To rebuild a tag that already exists, run the workflow manually from the Actions
-tab and pass the tag.
+## Releasing without pushing a tag
+
+The workflow also runs from **Actions → Release → Run workflow** on any branch.
+It takes the version from `package.json`, builds both apps, and creates the
+`v<version>` tag at the commit it built. Use this to re-run a release, or when
+you cannot push tags from where you are working.
 
 ## Where the version lives
 
