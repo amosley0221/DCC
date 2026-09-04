@@ -15,6 +15,7 @@ import Settings from './sections/Settings'
 import NoDynasty from './sections/NoDynasty'
 import Save from './sections/Save'
 import { Meta } from './ui'
+import UpdateToast from './UpdateToast'
 
 const SECTIONS = [
   'WIRE', 'NATIONAL', 'RECRUIT', 'TEAM', 'TAMPER', 'COACH', 'QUEUE', 'EXPORT', 'DEVICES', 'SAVE', 'SETTINGS',
@@ -76,11 +77,11 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
           <Meta size={9}>v{version}</Meta>
           <span className="spacer" />
           {update?.state === 'ready' ? (
-            <button className="chip chip-accent" aria-pressed onClick={() => window.dcc.installUpdate()}>
-              Update {update.version} ready — restart
-            </button>
+            <Meta size={9} color="var(--accent)">UPDATE {update.version} READY</Meta>
           ) : update?.state === 'downloading' ? (
-            <Meta size={9} color="var(--warn)">DOWNLOADING UPDATE {update.percent}%</Meta>
+            <Meta size={9} color="var(--warn)">DOWNLOADING {update.percent}%</Meta>
+          ) : update?.state === 'available' ? (
+            <Meta size={9} color="var(--accent)">UPDATE {update.version} AVAILABLE</Meta>
           ) : null}
           {d ? (
             <>
@@ -124,6 +125,8 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
           </div>
         </div>
       </main>
+
+      <UpdateToast status={update} />
     </div>
   )
 }

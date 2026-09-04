@@ -64,6 +64,10 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
                 <Btn variant="primary" onClick={() => window.dcc.installUpdate()}>
                   Restart and install {update.version}
                 </Btn>
+              ) : update?.state === 'available' ? (
+                <Btn variant="primary" onClick={() => window.dcc.downloadUpdate()}>
+                  Download {update.version}
+                </Btn>
               ) : (
                 <Btn onClick={check} disabled={checking}>{checking ? 'Checking…' : 'Check for updates'}</Btn>
               )}

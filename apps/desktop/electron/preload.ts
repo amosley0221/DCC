@@ -23,6 +23,7 @@ const api = {
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   onUpdateStatus: (cb: (s: UpdateStatus) => void) => {
     const handler = (_e: unknown, s: UpdateStatus) => cb(s)

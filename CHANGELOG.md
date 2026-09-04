@@ -10,6 +10,25 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.4.0] - 2026-09-04
+
+### Added
+
+- **An update prompt in the Windows app.** When a new version is published, a
+  small panel appears in the corner with the version and its release notes, a
+  **Download** button with live progress, and **Restart and install** once it has
+  finished. Dismissing it hides that version until a newer one arrives; the
+  titlebar keeps a quiet marker either way, and Settings → Updates does the same
+  thing for anyone who dismissed it.
+
+### Changed
+
+- Updates no longer download on their own. The app used to pull ~80 MB in the
+  background without saying so; now it asks first and the download is a
+  deliberate click.
+- The app checks for updates shortly after launch and every six hours, instead
+  of only once at startup.
+
 ## [0.3.1] - 2026-09-04
 
 ### Fixed

@@ -49,6 +49,34 @@ app.whenReady().then(async () => {
   }
   writeFileSync(path.join(__dirname, '../../smoke.png'), (await win.webContents.capturePage()).toPNG())
 
+  // Drive the update prompt down the same IPC channel the updater uses, so the
+  // toast is exercised for real rather than only compiled.
+  const toastShots = process.env.DCC_SHOTS
+  const seen = []
+  for (const [label, payload] of [
+    ['available', { state: 'available', version: '9.9.9', notes: '<ul><li>A first change</li><li>A second change</li></ul>' }],
+    ['downloading', { state: 'downloading', percent: 42 }],
+    ['ready', { state: 'ready', version: '9.9.9' }],
+  ]) {
+    win.webContents.send('update:status', payload)
+    await wait(500)
+    const t = await win.webContents.executeJavaScript(`(() => {
+      const el = document.querySelector('.update-toast')
+      return el ? el.innerText.split('\\n').join(' | ') : null
+    })()`)
+    seen.push(`${label}: ${t ?? 'NOT SHOWN'}`)
+    if (toastShots) {
+      writeFileSync(path.join(toastShots, `toast-${label}.png`), (await win.webContents.capturePage()).toPNG())
+    }
+  }
+  console.log('UPDATE TOAST:')
+  seen.forEach((x) => console.log('  ' + x))
+  if (seen.some((x) => x.includes('NOT SHOWN'))) {
+    console.log('SMOKE FAIL: update prompt did not render')
+    app.exit(1)
+    return
+  }
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))

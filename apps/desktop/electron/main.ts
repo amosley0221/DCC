@@ -75,7 +75,9 @@ function createWindow() {
 // The published NSIS installer upgrades over the existing install, so an update
 // never asks the user to remove the old version.
 function setupUpdater() {
-  autoUpdater.autoDownload = true
+  // The app asks before downloading rather than pulling ~80 MB unannounced;
+  // the renderer shows a prompt with a Download button.
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
   const send = (channel: string, payload?: unknown) => win?.webContents.send(channel, payload)
@@ -102,6 +104,17 @@ function setupUpdater() {
     }
   })
 
+  ipcMain.handle('update:download', async () => {
+    try {
+      await autoUpdater.downloadUpdate()
+      return { ok: true as const }
+    } catch (err) {
+      const message = String((err as Error)?.message ?? err)
+      send('update:status', { state: 'error', message })
+      return { ok: false as const, message }
+    }
+  })
+
   ipcMain.handle('update:install', () => {
     // isSilent=false so the user sees the assisted installer; it replaces the
     // current install in place.
@@ -109,7 +122,13 @@ function setupUpdater() {
     return true
   })
 
-  if (!isDev) autoUpdater.checkForUpdatesAndNotify().catch(() => {})
+  if (!isDev) {
+    // Check shortly after launch, once the window is up to show the prompt,
+    // then a few times a day for a long-running session.
+    const check = () => autoUpdater.checkForUpdates().catch(() => {})
+    setTimeout(check, 4000)
+    setInterval(check, 6 * 60 * 60 * 1000)
+  }
 }
 
 ipcMain.handle('app:info', () => ({

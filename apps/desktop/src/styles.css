@@ -203,3 +203,17 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 .row { display: flex; align-items: center; gap: 10px; }
 .col { display: flex; flex-direction: column; }
 .spacer { flex: 1; }
+
+/* ── update prompt ──────────────────────────────────────────────────────── */
+.update-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 320px;
+  z-index: 50;
+  padding: 14px 16px 15px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-card);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+}
