@@ -22,6 +22,7 @@ const api = {
   pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
+  diffSaves: (a: string, b: string) => ipcRenderer.invoke('save:diff', { a, b }),
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),

@@ -314,3 +314,98 @@ export function analyzeSave(path: string): SaveReport {
     notes,
   }
 }
+
+
+// ── comparing two saves ───────────────────────────────────────────────────────
+
+export interface SaveDiffRun {
+  offset: number
+  length: number
+  a: string
+  b: string
+  /** Bits that changed in the first differing byte, high bit first. */
+  bits: string
+}
+
+export interface SaveDiff {
+  aName: string
+  bName: string
+  aInflated: number
+  bInflated: number
+  sameLength: boolean
+  differingBytes: number
+  runs: SaveDiffRun[]
+  notes: string[]
+}
+
+/**
+ * Diffs the decompressed payloads of two saves.
+ *
+ * Member names are hashed rather than stored, so the way to find out which
+ * bytes hold which value is to change exactly one thing in-game and see what
+ * moves. The payload is otherwise deterministic — two saves taken a minute
+ * apart with one redshirt toggled differ by a single byte — which makes this
+ * precise rather than approximate.
+ */
+export function diffSaves(pathA: string, pathB: string): SaveDiff {
+  const a = readFrostbite(readFileSync(pathA))
+  const b = readFrostbite(readFileSync(pathB))
+  if (!a || !b) throw new Error('Both files must be FBCHUNKS saves')
+
+  const A = a.payload
+  const B = b.payload
+  const n = Math.min(A.length, B.length)
+  const notes: string[] = []
+  if (A.length !== B.length) {
+    notes.push(
+      `Payloads differ in length by ${Math.abs(B.length - A.length)} bytes, so offsets past ` +
+        'the first insertion will not line up. A pair taken minutes apart usually matches exactly.',
+    )
+  }
+
+  const runs: SaveDiffRun[] = []
+  let differing = 0
+  let start = -1
+  let last = -1
+  const push = (from: number, to: number) => {
+    const len = to - from + 1
+    const changed = A[from] ^ B[from]
+    runs.push({
+      offset: from,
+      length: len,
+      a: A.subarray(from, Math.min(from + 24, to + 1)).toString('hex'),
+      b: B.subarray(from, Math.min(from + 24, to + 1)).toString('hex'),
+      bits: changed.toString(2).padStart(8, '0'),
+    })
+  }
+  for (let i = 0; i < n; i++) {
+    if (A[i] === B[i]) continue
+    differing++
+    // Bytes within 16 of each other are treated as one change.
+    if (start >= 0 && i - last <= 16) { last = i; continue }
+    if (start >= 0) push(start, last)
+    start = i
+    last = i
+  }
+  if (start >= 0) push(start, last)
+
+  if (differing === 1) {
+    notes.push(
+      'Exactly one byte changed, so that byte is the field you edited. The bit column ' +
+        'shows which bit moved — several booleans usually share a byte.',
+    )
+  } else if (differing === 0) {
+    notes.push('The payloads are identical — nothing was saved between these two files.')
+  }
+
+  return {
+    aName: basename(pathA),
+    bName: basename(pathB),
+    aInflated: A.length,
+    bInflated: B.length,
+    sameLength: A.length === B.length,
+    differingBytes: differing,
+    runs: runs.slice(0, 400),
+    notes,
+  }
+}

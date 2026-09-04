@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
-import type { SaveReport } from '../../electron/saveAnalysis'
+import type { SaveReport, SaveDiff } from '../../electron/saveAnalysis'
 
 /**
  * Dissects the dynasty save so the format can be worked out. Nothing here
@@ -14,6 +14,20 @@ export default function Save() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [backup, setBackup] = useState<string | null>(null)
+  const [diff, setDiff] = useState<SaveDiff | null>(null)
+  const [diffing, setDiffing] = useState(false)
+
+  const compare = async () => {
+    if (!path) return
+    const other = await window.dcc.pickSave()
+    if (!other) return
+    setDiffing(true)
+    setDiff(null)
+    const res = await window.dcc.diffSaves(path, other)
+    setDiffing(false)
+    if (res.ok) setDiff(res.diff)
+    else setError(res.message)
+  }
 
   const pick = async () => {
     const chosen = await window.dcc.pickSave()
@@ -134,9 +148,47 @@ export default function Save() {
               <div className="row" style={{ gap: 8, marginTop: 12 }}>
                 <Btn variant="primary" onClick={exportReport}>Export analysis report</Btn>
                 <Btn onClick={makeBackup}>Back up this save</Btn>
+                <Btn onClick={compare}>Compare with another save…</Btn>
               </div>
               {backup ? <div className="effect" style={{ marginTop: 10 }}>BACKED UP TO {backup}</div> : null}
             </Card>
+
+            {diffing ? <Card className="card-pad"><Meta color="var(--warn)">COMPARING…</Meta></Card> : null}
+
+            {diff ? (
+              <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
+                <Kicker>
+                  {diff.differingBytes.toLocaleString()} byte
+                  {diff.differingBytes === 1 ? '' : 's'} changed
+                </Kicker>
+                <div style={{ marginTop: 6 }}>
+                  <Meta size={10}>{diff.aName} → {diff.bName}</Meta>
+                </div>
+                {diff.notes.length ? (
+                  <div className="col" style={{ gap: 5, marginTop: 9 }}>
+                    {diff.notes.map((n, i) => <span key={i} className="body-serif">{n}</span>)}
+                  </div>
+                ) : null}
+                <div style={{ maxHeight: 300, overflowY: 'auto', marginTop: 11 }}>
+                  <table className="tbl">
+                    <thead>
+                      <tr><th style={{ width: 110 }}>Offset</th><th style={{ width: 54 }}>Len</th><th style={{ width: 84 }}>Bits</th><th>Before</th><th>After</th></tr>
+                    </thead>
+                    <tbody>
+                      {diff.runs.map((r) => (
+                        <tr key={r.offset}>
+                          <td className="num" style={{ color: 'var(--ink)' }}>0x{r.offset.toString(16)}</td>
+                          <td className="num">{r.length}</td>
+                          <td className="num" style={{ color: 'var(--accent)' }}>{r.bits}</td>
+                          <td className="num" style={{ color: 'var(--ink3)' }}>{r.a}</td>
+                          <td className="num" style={{ color: 'var(--ink3)' }}>{r.b}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            ) : null}
 
             <Card className="card-pad">
               <Kicker>Header</Kicker>

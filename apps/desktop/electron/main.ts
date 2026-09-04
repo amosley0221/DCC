@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'node:path'
 import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
 import { autoUpdater } from 'electron-updater'
-import { analyzeSave } from './saveAnalysis'
+import { analyzeSave, diffSaves } from './saveAnalysis'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -161,6 +161,14 @@ ipcMain.handle('save:pick', async () => {
 ipcMain.handle('save:analyze', (_e, path: string) => {
   try {
     return { ok: true as const, report: analyzeSave(path) }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:diff', (_e, { a, b }: { a: string; b: string }) => {
+  try {
+    return { ok: true as const, diff: diffSaves(a, b) }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

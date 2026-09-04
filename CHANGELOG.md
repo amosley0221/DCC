@@ -10,6 +10,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.5.0] - 2026-09-04
+
+### Added
+
+- **Compare two saves** in the Save section. Pick a second save and it lists
+  every byte that differs between the two decompressed payloads, with the bit
+  that moved. Because the payload turns out to be deterministic, changing one
+  thing in-game and comparing reads that field's location straight off — the
+  first such test differed by exactly one byte in 31 million.
+
 ## [0.4.0] - 2026-09-04
 
 ### Added

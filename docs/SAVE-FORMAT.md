@@ -104,6 +104,39 @@ Two saves taken days apart also help, by showing which regions carry
 week-to-week state — but they change too much at once to isolate a single
 field, so the controlled single-change pair is worth more.
 
+### Result of the first controlled diff
+
+Two saves 42 seconds apart, with one player's redshirt removed in between:
+
+```
+TEST1  sha b20ff5aa  saved 2026-09-04 08:52:04  inflated 31,153,900
+TEST2  sha 3566432e  saved 2026-09-04 08:52:46  inflated 31,153,900
+
+differing bytes: 1 of 31,153,900
+  0x00f31dc8   0x80 -> 0x00     bit 7
+```
+
+**One byte.** Two things follow, and both matter:
+
+1. **The payload is deterministic.** No timestamps, counters or checksums moved
+   inside it — only the edit. So every controlled diff isolates exactly one
+   field, with no noise to filter.
+2. **Redshirt is bit 7** of the byte at that offset for that player.
+
+The byte is not in the 138-byte name table — the nearest portrait record is
+78 KB away. Player strings and player state live in separate tables.
+
+The state region does not resolve to a byte-aligned stride: neighbouring bytes
+are all multiples of `0x20` (`c0 00 00 20 c0 40 80 …`), which is the signature
+of **bit-packed** fields that do not start on byte boundaries. A single diff
+cannot recover the pitch. Two more will:
+
+| Edit | What it establishes |
+| --- | --- |
+| Same field, a **different** player | The per-player pitch — the delta between the two offsets |
+| One player's **rating** ±1 | Where ratings live and how wide they are |
+| The **same** player's rating | Ties the ratings block to the flags block for one record |
+
 ### Saves seen so far
 
 | Saved | SHA-256 (first 8) | Inflated |
@@ -118,3 +151,8 @@ across play sessions rather than something that happened to work once.
 
 The Windows app's **Save** section runs this analysis on your own machine and
 exports the report, so the save itself never has to be sent anywhere.
+
+**Compare with another save…** in that section does the diff above: pick two
+saves and it lists every byte that changed, with the bit that moved. Since the
+payload is deterministic, the workflow is: save, change one thing in-game, save
+again, compare — and read the field straight off.
