@@ -1035,7 +1035,7 @@ export const RATING_BITS: Record<string, number> = {
   Carrying: 696, 'BC Vision': 575, 'Break Tackle': 586, Trucking: 817, 'Stiff Arm': 927,
   'Change of Direction': 632, 'Spin Move': 856, 'Juke Move': 714, Catching: 842,
   'Catch in Traffic': 671, 'Spectacular Catch': 657, 'Short Route Running': 895,
-  'Medium Route Running': 625, 'Deep Route Running': 294, Release: 560, Jumping: 721,
+  'Medium Route Running': 625, 'Deep Route Running': 294, Release: 959, Jumping: 721,
   'Throwing Power': 888, 'Short Throw Accuracy': 785, 'Medium Throw Accuracy': 799,
   'Deep Throw Accuracy': 778, 'Throw on the Run': 810, 'Throw Under Pressure': 650,
   'Break Sack': 600, 'Play Action': 497, 'Pass Blocking': 543, 'Pass Block Power': 522,
