@@ -10,6 +10,25 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.41.1] - 2026-09-05
+
+### Added
+
+- **The tables inside your save, and a way to read one.** The Save screen now
+  lists every store the file declares — 88 of them — with its row and member
+  counts, searchable, and writes any one's first sixty rows to a file as hex
+  plus the obvious readings of it.
+
+  This is the instrument the real rankings need. The save's own directory says
+  what tables exist and how wide a row is; it never says which column is which,
+  and every field DCC has decoded was found by putting rows beside a value
+  already known. Doing that used to need a hex editor.
+
+- **The art folder can be searched by name.** Type "bowl" or "trophy" and see
+  what the files are actually called. That is how the trophy, bowl, playoff and
+  conference-championship naming in 0.41.0 was found rather than guessed at —
+  the same mistake that once shipped a 208-byte art pack.
+
 ## [0.41.0] - 2026-09-05
 
 ### Added
@@ -29,16 +48,6 @@ _Nothing yet._
   seed by the ranking. December's games appear underneath as they are played.
 
   It is labelled a projection, because that is what it is until the save has one.
-
-- **The tables inside your save, and a way to read one.** The Save screen now
-  lists every store the file declares — 88 of them — with its row and member
-  counts, searchable, and writes any one's first sixty rows to a file. That is
-  the instrument the remaining decodes need: the directory says what exists and
-  how wide a row is, never which column is which, so a column is identified by
-  putting rows beside a number you already know.
-
-  The art folder can be searched the same way, which is how the trophy and bowl
-  naming above was found rather than guessed.
 
 ### Changed
 
