@@ -62,6 +62,10 @@ jobs:
         run: npm run check:relay
         working-directory: apps/desktop
 
+      - name: Check the snapshot classification
+        run: npm run check:snapshot
+        working-directory: apps/desktop
+
       - name: Smoke test the built app
         run: |
           # Boots the real Electron app and clicks through every section, which

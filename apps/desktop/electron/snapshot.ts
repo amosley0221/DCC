@@ -87,12 +87,32 @@ export interface DynastySnapshot {
 
 const UNASSIGNED = 255
 
+/**
+ * Whether a player is a recruit rather than someone on a roster.
+ *
+ * All three conditions are needed, and the team one is what makes it correct.
+ * `recruitFlag` is set on more than ten thousand players in a save, because it
+ * stays set on everyone who arrived as a recruit — fifty-nine of Penn State's
+ * eighty-five have it. What actually separates a recruit from a player is that
+ * a recruit is on nobody's roster. With the team check the pool comes out at
+ * 4,108, matching an export of the class; without it, at 10,790, and rosters
+ * lose two-thirds of their players to it.
+ */
+export function isRecruit(p: RosterPlayer): boolean {
+  return p.team === UNASSIGNED && p.recruitFlag && /^Generic_/.test(p.assetId ?? '')
+}
+
 /** Everything a list view shows, without the ratings block. */
 function slim(p: RosterPlayer): SnapshotPlayer {
   return {
     index: p.index, playerId: p.playerId, first: p.first, last: p.last,
     team: p.team, position: p.position, overall: p.overall,
-    year: p.classYear ?? null, dev: p.devTrait ?? null, archetype: p.archetype ?? null,
+    // The save's class field says where a player came in from — high school or
+    // a junior college — not what year they are now. It reads as an origin on a
+    // recruit and as nonsense on a senior, so rosters leave it empty rather than
+    // labelling a fourth-year starter "JUCO SO".
+    year: p.team === UNASSIGNED ? (p.classYear ?? null) : null,
+    dev: p.devTrait ?? null, archetype: p.archetype ?? null,
     heightIn: p.heightIn ?? null, weightLb: p.weightLb ?? null,
     redshirt: p.redshirt, hometown: p.hometown, state: p.homeState ?? null,
     stars: p.stars ?? null, nilK: p.nilK ?? null, assetId: p.assetId ?? null,
@@ -153,9 +173,7 @@ export function buildSnapshot(payload: Buffer, userTeamId: number | null): Dynas
   const roster: SnapshotPlayer[] = []
   const recruits: SnapshotRecruit[] = []
   for (const p of players) {
-    // A recruit is a generated player flagged as one; everyone else is on a roster.
-    const isRecruit = p.recruitFlag && /^Generic_/.test(p.assetId ?? '')
-    if (isRecruit) {
+    if (isRecruit(p)) {
       recruits.push({
         ...slim(p),
         pipeline: p.pipeline ?? null, dealbreaker: p.dealbreaker ?? null,

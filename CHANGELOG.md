@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.25.1] - 2026-09-05
+
+### Fixed
+
+- **Rosters were losing two-thirds of their players to the recruiting pool.**
+  The snapshot sent to the phone decided a recruit was any generated player
+  carrying the recruit flag, and that flag stays set after signing — 59 of Penn
+  State's 85 have it. So the phone showed a 26-man roster and a pool of 10,790.
+  A recruit is a player on nobody's roster, which brings the pool to 4,108,
+  matching an export of the class, and rosters back to their full 85.
+- **Rostered players were labelled with a year they do not have.** The save's
+  class field records where someone came in from, high school or a junior
+  college, not what year they are now, so the phone was calling fourth-year
+  starters "JUCO SO". It is shown on recruits, where it means something, and
+  left off rosters.
+
 ## [0.25.0] - 2026-09-05
 
 ### Added
