@@ -1123,6 +1123,40 @@ once.
   does not separate bowls; the month does.
 
 
+## The depth chart
+
+Decoded from a controlled pair of saves: the same dynasty before and after
+swapping the first and second string centre in game. The whole 31 MB payload
+differs by **ten bytes**, and four of them are the swap.
+
+`DepthChartStore` declares 145 rows of 45 members, and its own region is a
+reference table — 143 chart records interleaved with 5,005 slot records, one
+chart and exactly **35 slots per team**. The slots' contents live outside it,
+in a flat run of fixed-size records elsewhere in the payload.
+
+**A slot is 24 bytes.** Six four-byte fields, each either empty or a player
+reference: the two-byte tag `0x213e` followed by the player's **row in the
+roster table** — the same index `readRoster` reports as `index`, not the
+game's own `playerId`, and not the position in the array the reader returns.
+Those three numbers differ, and confusing the last two is what made this look
+undecodable for an afternoon.
+
+Depth order is array order, so first string is field 0. Unused fields are
+zero, which is why a three-deep slot shows twelve zero bytes of tail and a
+five-deep slot shows four.
+
+Teams run in blocks of 35 slots, in the team table's own order rather than the
+roster's team id. Slot 18 is centre; the rest are read off by taking the modal
+position of each slot across all 143 teams, since a slot's occupants are
+overwhelmingly players of the position it is for.
+
+What confirms it: every slot resolves to three to six players of one team and
+of a sensible position — the quarterback slot holds quarterbacks, the kicker
+slot holds a kicker and a punter — and slot 18 of the user's team reads
+`Mama (C 85) · Chukwuma (C 81) · Iheanacho (RT 88)` before the swap and
+`Chukwuma · Mama · Iheanacho` after, which is exactly the edit that was made
+and the only slot in the file that changed.
+
 ## Writing to a save
 
 The container is a fixed-size file: an 82-byte `FBCHUNKS` header whose chunk
