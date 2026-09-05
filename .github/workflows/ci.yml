@@ -195,4 +195,5 @@ jobs:
           path: |
             logcat.txt
             launch.png
+            ui.xml
           if-no-files-found: ignore

@@ -59,4 +59,25 @@ fi
 # artifacts is the only part of this check a person can disagree with.
 adb exec-out screencap -p > launch.png || echo "(could not capture a screenshot)"
 
+# And read the words off it, because a picture nobody opens proves nothing.
+# Compose publishes its text to the accessibility tree, so the shell's own
+# furniture — the masthead and the tabs — is assertable. These strings belong
+# to Gold Standard; the older themes' rail says WIRE and NATIONAL instead.
+if adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
+  adb shell cat /sdcard/ui.xml > ui.xml
+  echo "----- on screen -----"
+  grep -o 'text="[^"]*"' ui.xml | sed 's/text="//;s/"$//' | grep -v '^$' | sort -u || true
+  missing=""
+  for want in DYNASTY Board Legacy; do
+    grep -q "text=\"[^\"]*$want" ui.xml || missing="$missing $want"
+  done
+  if [ -n "$missing" ]; then
+    echo "::error::Gold Standard's shell is not on screen. Missing:$missing"
+    exit 1
+  fi
+  echo "==> the Gold Standard shell is on screen"
+else
+  echo "(could not read the view hierarchy; skipping the shell check)"
+fi
+
 echo "==> app launched, drew a window, and is still running after ${SETTLE_SECONDS}s"
