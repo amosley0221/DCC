@@ -10,6 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.29.3] - 2026-09-05
+
+### Fixed
+
+- **The phone's dark mode stays black.** The accent was washing the whole
+  screen — fine in champagne, a navy page in blue. It is painted as two soft
+  glows in opposite corners now, the way the desktop has always done it, so
+  the ground stays black and the accent shows at the edges rather than
+  becoming the background.
+
+
 ## [0.29.2] - 2026-09-05
 
 ### Changed
