@@ -30,6 +30,16 @@ _Nothing yet._
 
   It is labelled a projection, because that is what it is until the save has one.
 
+- **The tables inside your save, and a way to read one.** The Save screen now
+  lists every store the file declares — 88 of them — with its row and member
+  counts, searchable, and writes any one's first sixty rows to a file. That is
+  the instrument the remaining decodes need: the directory says what exists and
+  how wide a row is, never which column is which, so a column is identified by
+  putting rows beside a number you already know.
+
+  The art folder can be searched the same way, which is how the trophy and bowl
+  naming above was found rather than guessed.
+
 ### Changed
 
 - **Bigger.** Logos, helmets, faces and the type beside them were all a size or

@@ -1923,3 +1923,53 @@ export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGam
   }
   return out.sort((a, b) => a.week - b.week || a.row - b.row)
 }
+
+/**
+ * One store's rows, dumped for reading by eye.
+ *
+ * This is the instrument the remaining decodes need. The store directory says
+ * what exists and how wide each row is; it does not say which column is which.
+ * The method that has worked every time is to look at a handful of rows beside
+ * a value you already know — the poll's number one, a Heisman leader, a
+ * recruit's rank — and find the column that agrees.
+ *
+ * Each row comes back as hex and as the obvious readings of it, because a field
+ * that is a team index, a rank or a score is nearly always one of these.
+ */
+export interface StoreDump {
+  name: string
+  rows: number
+  members: number
+  rowBytes: number
+  /** The words the BSFT header lists for the members, near but not equal to bit offsets. */
+  memberBits: number[]
+  lines: string[]
+}
+
+export function dumpStore(payload: Buffer, name: string, limit = 40): StoreDump | null {
+  const t = storeTable(payload, name)
+  if (!t) return null
+  const rowBytes = Math.max(1, Math.min(t.rowBytes, 256))
+  const lines: string[] = []
+  for (let r = 0; r < Math.min(limit, t.rows); r++) {
+    const at = t.data + r * t.rowBytes
+    if (at + rowBytes > payload.length) break
+    const raw = payload.subarray(at, at + rowBytes)
+    const u8 = [...raw].join(' ')
+    const u16: number[] = []
+    for (let i = 0; i + 2 <= raw.length; i += 2) u16.push(raw.readUInt16BE(i))
+    const u32: number[] = []
+    for (let i = 0; i + 4 <= raw.length; i += 4) u32.push(raw.readUInt32BE(i))
+    lines.push(
+      `row ${r} @0x${at.toString(16)}\n` +
+      `  hex  ${raw.toString('hex').replace(/(.{2})/g, '$1 ').trim()}\n` +
+      `  u8   ${u8}\n` +
+      `  u16  ${u16.join(' ')}\n` +
+      `  u32  ${u32.join(' ')}`,
+    )
+  }
+  return {
+    name, rows: t.rows, members: t.memberBits.length,
+    rowBytes: t.rowBytes, memberBits: t.memberBits, lines,
+  }
+}

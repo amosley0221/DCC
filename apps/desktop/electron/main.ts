@@ -8,7 +8,7 @@ import {
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
-  readChampions, teamTableOrder,
+  readChampions, teamTableOrder, dumpStore,
 } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
@@ -215,6 +215,46 @@ ipcMain.handle('save:pick', async () => {
 ipcMain.handle('save:analyze', (_e, path: string) => {
   try {
     return { ok: true as const, report: analyzeSave(path) }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+/**
+ * A store's rows, written to a file for reading by eye.
+ *
+ * The store directory says what tables the save holds; it does not say which
+ * column is which. Every field decoded so far was found by looking at rows
+ * beside a value already known, and this is what makes that possible without
+ * a hex editor: pick a store by name, get its rows.
+ */
+ipcMain.handle('save:dumpStore', async (_e, { path, name, rows }: {
+  path: string; name: string; rows?: number
+}) => {
+  try {
+    const payload = readSavePayload(path)
+    if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
+    const dump = dumpStore(payload, name, Math.max(1, Math.min(rows ?? 40, 400)))
+    if (!dump) return { ok: false as const, message: `No store called ${name} in this save.` }
+    const text = [
+      `# ${dump.name}`,
+      '',
+      `- ${dump.rows.toLocaleString()} rows of ${dump.rowBytes} bytes, ${dump.members} members`,
+      `- header words: ${dump.memberBits.join(' ')}`,
+      '',
+      '```',
+      ...dump.lines,
+      '```',
+      '',
+    ].join('\n')
+    const dest = await dialog.showSaveDialog(win!, {
+      title: `Save the ${name} dump`,
+      defaultPath: `${name}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    })
+    if (dest.canceled || !dest.filePath) return { ok: false as const, message: 'cancelled' }
+    writeFileSync(dest.filePath, text)
+    return { ok: true as const, file: dest.filePath, rows: dump.rows, rowBytes: dump.rowBytes }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

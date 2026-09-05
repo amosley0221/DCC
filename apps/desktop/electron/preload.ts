@@ -100,6 +100,8 @@ const api = {
   readTables: (root: string, files: string[]) => ipcRenderer.invoke('assets:readTables', { root, files }),
   findArt: (root: string) => ipcRenderer.invoke('assets:findArt', root),
   searchArt: (query: string) => ipcRenderer.invoke('assets:searchArt', query),
+  dumpStore: (path: string, name: string, rows?: number) =>
+    ipcRenderer.invoke('save:dumpStore', { path, name, rows }),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),
   diffSaves: (a: string, b: string) => ipcRenderer.invoke('save:diff', { a, b }),
   dictionaryState: () => ipcRenderer.invoke('save:dictionaryState'),

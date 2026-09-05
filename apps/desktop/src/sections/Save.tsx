@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { useSave } from '../saveStore'
-import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
+import { Btn, Card, Empty, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
 import ArtFolder from './ArtFolder'
 
 /**
@@ -397,6 +397,8 @@ export default function Save() {
       <div className="col" style={{ gap: 12, maxWidth: 860 }}>
         <ArtFolder />
 
+        {report?.stores?.length ? <Stores stores={report.stores} path={path} /> : null}
+
         <Card className="card-pad">
           <Kicker>Why this exists</Kicker>
           <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
@@ -790,5 +792,71 @@ export default function Save() {
         ) : null}
       </div>
     </>
+  )
+}
+
+/**
+ * The tables the save declares, and a way to read one.
+ *
+ * The store directory says what exists and how wide a row is; it never says
+ * which column is which. Every field decoded so far was found by looking at
+ * rows beside a value already known — a poll's number one, a rank, a score —
+ * and this is what makes that possible without a hex editor.
+ */
+function Stores({ stores, path }: {
+  stores: { name: string; rows: number; members: number }[]
+  path: string | null
+}) {
+  const [q, setQ] = useState('')
+  const [note, setNote] = useState<string | null>(null)
+  const query = q.trim().toLowerCase()
+  const shown = query
+    ? stores.filter((s) => s.name.toLowerCase().includes(query))
+    : stores.slice(0, 20)
+
+  const dump = async (name: string) => {
+    if (!path) return
+    setNote(`reading ${name}…`)
+    const res = await window.dcc.dumpStore(path, name, 60)
+    setNote(res.ok
+      ? `${name}: ${res.rows.toLocaleString()} rows of ${res.rowBytes} bytes — written to ${res.file}`
+      : res.message)
+  }
+
+  return (
+    <Card className="card-pad">
+      <div className="card-head">
+        <Kicker>Tables in the save</Kicker>
+        <Meta size={10}>{stores.length} STORES</Meta>
+      </div>
+      <p className="body-serif" style={{ marginTop: 7 }}>
+        Every table the save announces, with its row and member counts. Click one to write its
+        first sixty rows to a file — that is how a column is identified: put the rows beside a
+        number you already know and find the one that agrees.
+      </p>
+      <Input placeholder="search the tables — poll, rank, award, stat…" value={q}
+        onChange={(e) => setQ(e.target.value)} />
+      <table className="tbl" style={{ marginTop: 10 }}>
+        <thead>
+          <tr><th>Store</th><th style={{ textAlign: 'right' }}>Rows</th><th style={{ textAlign: 'right' }}>Members</th><th /></tr>
+        </thead>
+        <tbody>
+          {shown.map((st) => (
+            <tr key={st.name}>
+              <td className="name">{st.name}</td>
+              <td className="num">{st.rows.toLocaleString()}</td>
+              <td className="num" style={{ color: 'var(--ink3)' }}>{st.members}</td>
+              <td style={{ textAlign: 'right' }}>
+                <button className="gs-close" disabled={!path} onClick={() => void dump(st.name)}>Dump</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!query && stores.length > shown.length ? (
+        <Meta size={9}>SHOWING THE {shown.length} BIGGEST — SEARCH FOR THE REST</Meta>
+      ) : null}
+      {note ? <div style={{ marginTop: 9 }}><Meta size={9}>{note.toUpperCase()}</Meta></div> : null}
+    </Card>
   )
 }

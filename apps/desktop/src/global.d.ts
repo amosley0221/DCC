@@ -70,6 +70,10 @@ declare global {
       pickFaces(): Promise<string | null>
       /** Filenames in the art folder containing a word, for naming schemes DCC has not learned. */
       searchArt(query: string): Promise<{ ok: true; hits: string[]; total: number }>
+      /** One store's rows, written to a file — the instrument the remaining decodes need. */
+      dumpStore(path: string, name: string, rows?: number): Promise<
+        { ok: true; file: string; rows: number; rowBytes: number } | { ok: false; message: string }
+      >
       indexFaces(
         dir: string,
         assetIds: string[],
