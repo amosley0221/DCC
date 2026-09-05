@@ -1,6 +1,6 @@
 import tokens from '@shared/tokens.json'
 
-export type ThemeName = 'night' | 'field'
+export type ThemeName = 'night' | 'field' | 'broadcast'
 export type Tokens = typeof tokens
 export type ThemeColors = Tokens['themes']['night']['colors']
 
@@ -17,6 +17,15 @@ const FONT_STACK: Record<ThemeName, { serif: string; mono: string; sans: string 
   field: {
     serif: "'Zilla Slab', Georgia, 'Times New Roman', serif",
     mono: "'Courier Prime', 'Cascadia Mono', Consolas, monospace",
+    sans: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
+  },
+  // One family for everything. The serif headlines and monospace labels are
+  // what make the other two themes read as a newspaper and a terminal; a sports
+  // broadcast uses a single grotesk at several weights and lets size and weight
+  // carry the hierarchy instead.
+  broadcast: {
+    serif: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
+    mono: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
     sans: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
   },
 }

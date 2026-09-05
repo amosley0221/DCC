@@ -10,6 +10,33 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.27.0] - 2026-09-05
+
+### Added
+
+- **A new look, and it is now the default.** Broadcast drops the serif headlines,
+  the monospace labels and the two-pixel white rule that made the app read as a
+  report. One sans family carries everything at four weights, titles are heavy
+  and tightly tracked, cards sit above the background instead of being drawn on
+  it, and section rules are hairlines. Night Wire and Field Office are still
+  there in Settings.
+- **A scoreboard.** The Schedule tab opens on your last result, or your next
+  kickoff once the results run out, with the score at the size a score deserves
+  and the conditions underneath. Box scores are a proper line-score table.
+
+### Fixed
+
+- **Upcoming games were coloured like losses.** The winner was derived from a
+  0-0 scoreline, so every fixture you had not played yet showed in the same
+  colour as a defeat.
+- **"You played" no longer shouts** on every row it applies to.
+
+### Notes
+
+- Anyone who never picked a theme moves to the new default. Choosing any theme
+  fixes that choice and this never touches it again, so Night Wire stays put if
+  you asked for it.
+
 ## [0.26.0] - 2026-09-05
 
 ### Added

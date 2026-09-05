@@ -22,7 +22,8 @@ export const blankPersisted = (): Persisted => ({
   publishRepo: '',
   relayUrl: '',
   relayToken: '',
-  theme: 'night',
+  theme: 'broadcast',
+  themeChosen: false,
   week: 1,
   heat: 0,
   gameRunning: true,
@@ -43,7 +44,7 @@ export const blankPersisted = (): Persisted => ({
 export const emptyPersisted = (d: Dynasty): Persisted => ({
   ...blankPersisted(),
   dynastySource: 'sample',
-  theme: 'night',
+  theme: 'broadcast',
   week: d.meta.currentWeek,
   heat: 62,
   gameRunning: true,
@@ -106,7 +107,7 @@ export function reducer(state: Persisted, action: Action): Persisted {
     case 'hydrate':
       return action.state
     case 'theme':
-      return { ...state, theme: action.theme }
+      return { ...state, theme: action.theme, themeChosen: true }
     case 'week':
       return { ...state, week: Math.max(1, Math.min(15, action.week)) }
     case 'heat':
@@ -362,9 +363,15 @@ export function useBootstrap() {
         const saved = await window.dcc.getSettings()
         // Merge onto the blank state, so a state file written by an older build
         // still loads after an update adds new fields.
-        const initial: Persisted = saved && typeof saved.theme === 'string'
+        const merged: Persisted = saved && typeof saved.theme === 'string'
           ? { ...blankPersisted(), ...(saved as unknown as Persisted) }
           : blankPersisted()
+        // A new default is worthless if it only reaches new installs, so anyone
+        // who never chose a theme moves to the current one. Picking any theme
+        // sets themeChosen and this stops touching it for good.
+        const initial: Persisted = merged.themeChosen
+          ? merged
+          : { ...merged, theme: blankPersisted().theme }
         // Nothing is read until a dynasty is actually in use.
         const dynasty = initial.dynastySource === 'none'
           ? null

@@ -24,7 +24,7 @@ const TTF_UA =
 const FAMILIES = [
   { css: 'Newsreader:wght@400;500;600', file: 'Newsreader', weights: [400, 500, 600] },
   { css: 'IBM+Plex+Mono:wght@400;600', file: 'IBMPlexMono', weights: [400, 600] },
-  { css: 'Public+Sans:wght@400;600', file: 'PublicSans', weights: [400, 600] },
+  { css: 'Public+Sans:wght@400;600;700;800', file: 'PublicSans', weights: [400, 600, 700, 800] },
   { css: 'Zilla+Slab:wght@400;500;600', file: 'ZillaSlab', weights: [400, 500, 600] },
   { css: 'Courier+Prime:wght@400;700', file: 'CourierPrime', weights: [400, 700] },
 ]

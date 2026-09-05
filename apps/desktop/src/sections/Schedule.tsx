@@ -9,6 +9,77 @@ const KICKOFFS = [720, 750, 810, 840, 900, 960, 1020, 1080, 1110, 1170, 1215, 12
 const CONDITIONS = [0, 2, 1, 4, 5, 6, 7, 8, 9]
 
 /**
+ * The one game that matters right now, given the top of the screen.
+ *
+ * A sports app opens on a result or a kickoff, not on a table. This is the
+ * user's most recent finished game, or their next one if the season has not
+ * caught up to them yet, drawn at the size the number deserves.
+ */
+function Hero({ g, team, icon }: {
+  g: SeasonGame
+  team: string
+  icon: (n: string | null) => string | undefined
+}) {
+  const home = g.home === team
+  const mine = home ? g.homeScore : g.awayScore
+  const theirs = home ? g.awayScore : g.homeScore
+  const won = mine > theirs
+  const kickoff = kickoffLabel(g.kickoff)
+  const weather = weatherName(g.weather)
+  return (
+    <Card className="card-pad">
+      <div className="row" style={{ gap: 10, alignItems: 'baseline', marginBottom: 14 }}>
+        <Meta size={9} color={g.played ? (won ? 'var(--good)' : 'var(--accent)') : 'var(--accent)'}>
+          {g.played ? (won ? 'WON' : 'LOST') : 'NEXT UP'}
+        </Meta>
+        <Meta size={9}>WEEK {g.week} · {dateLabel(g.month, g.day)}</Meta>
+        {g.userPlayed ? <Meta size={9}>YOU PLAYED</Meta> : null}
+      </div>
+      <div className="scoreboard">
+        <div className={`scoreboard-side away${g.played && g.awayScore < g.homeScore ? ' scoreboard-dim' : ''}`}>
+          <div className="scoreboard-team">
+            <div className="scoreboard-name">{g.away}</div>
+            <div className="scoreboard-sub">{g.away === team ? 'AWAY' : ''}</div>
+          </div>
+          <div className="scoreboard-mark">
+            {icon(g.away) ? <img src={icon(g.away)} alt="" /> : <Meta size={9}>{(g.away ?? '?').slice(0, 3).toUpperCase()}</Meta>}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          {g.played ? (
+            <div className="row" style={{ gap: 14, alignItems: 'center' }}>
+              <span className="score-num" style={{ fontSize: 46 }}>{g.awayScore}</span>
+              <span style={{ color: 'var(--ink4)', fontSize: 20 }}>–</span>
+              <span className="score-num" style={{ fontSize: 46 }}>{g.homeScore}</span>
+            </div>
+          ) : (
+            <div className="score-num" style={{ fontSize: 26 }}>{kickoff ?? 'TBD'}</div>
+          )}
+          {g.overtime ? <Meta size={9}>OVERTIME</Meta> : null}
+        </div>
+        <div className={`scoreboard-side${g.played && g.homeScore < g.awayScore ? ' scoreboard-dim' : ''}`}>
+          <div className="scoreboard-mark">
+            {icon(g.home) ? <img src={icon(g.home)} alt="" /> : <Meta size={9}>{(g.home ?? '?').slice(0, 3).toUpperCase()}</Meta>}
+          </div>
+          <div className="scoreboard-team">
+            <div className="scoreboard-name">{g.home}</div>
+            <div className="scoreboard-sub">{g.home === team ? 'HOME' : ''}</div>
+          </div>
+        </div>
+      </div>
+      <div className="row" style={{ gap: 14, marginTop: 14, flexWrap: 'wrap' }}>
+        {[
+          kickoff && g.played ? kickoff : null,
+          weather ? `${g.temperatureF}°F ${weather}` : null,
+          g.windMph ? `Wind ${g.windMph} mph` : null,
+          g.attendance ? `${g.attendance.toLocaleString()} in attendance` : null,
+        ].filter(Boolean).map((t) => <Meta key={t as string} size={9}>{t}</Meta>)}
+      </div>
+    </Card>
+  )
+}
+
+/**
  * Schedule and results, read from the save's game table.
  *
  * With a team chosen it is that team's season; without one it is the league,
@@ -46,6 +117,13 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
 
   const icon = (name: string | null) => (name ? (art[`${name}|icon`] ?? art[`${name}|logoLight`]) : undefined)
 
+  // The last result, or the next kickoff once the season has run out of results.
+  const hero = useMemo(() => {
+    const season = mine.filter((g) => !g.postseason)
+    const played = season.filter((g) => g.played)
+    return played.length ? played[played.length - 1] : (season.find((g) => !g.played) ?? null)
+  }, [mine])
+
   if (!games.length) return <Card className="card-pad"><Empty>the save has no games in it</Empty></Card>
 
   const record = mine.filter((g) => g.played && !g.postseason).reduce((r, g) => {
@@ -55,6 +133,8 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
 
   return (
     <>
+      {team && hero ? <Hero g={hero} team={team} icon={icon} /> : null}
+
       {team ? (
         <Card className="card-pad">
           <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
@@ -106,7 +186,12 @@ function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, lo
   const mineHome = team !== null && g.home === team
   const mineAway = team !== null && g.away === team
   const opponent = mineHome ? g.away : mineAway ? g.home : null
-  const won = mineHome ? g.homeScore > g.awayScore : mineAway ? g.awayScore > g.homeScore : null
+  // An unplayed game has no winner. Deriving one from 0-0 made every upcoming
+  // fixture read as a loss, in the same colour as one.
+  const won = !g.played ? null
+    : mineHome ? g.homeScore > g.awayScore
+    : mineAway ? g.awayScore > g.homeScore
+    : null
   const kickoff = kickoffLabel(g.kickoff)
   const result = !g.played ? null
     : hidden ? 'ON HOLD'
@@ -133,10 +218,17 @@ function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, lo
               <strong style={{ color: 'var(--ink)', minWidth: 110 }}>{g.home}</strong>
             </>
           )}
-          <span className="num" style={{ fontSize: 13, color: result === 'ON HOLD' ? 'var(--ink3)' : won === null ? 'var(--ink)' : won ? 'var(--good)' : 'var(--warn)', minWidth: 70 }}>
+          <span className="num" style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: result === 'ON HOLD' ? 'var(--ink3)'
+              : won === null ? 'var(--ink2)'
+              : won ? 'var(--good)' : 'var(--accent)',
+            minWidth: 70,
+          }}>
             {result ?? (kickoff ? `Sat ${kickoff}` : 'TBD')}
           </span>
-          {g.userPlayed ? <Meta size={9} color="var(--accent)">YOU PLAYED</Meta> : null}
+          {g.userPlayed ? <Meta size={9} color="var(--ink4)">PLAYED</Meta> : null}
         </div>
       </button>
       {open && !hidden ? (
@@ -168,24 +260,33 @@ function BoxScore({ g, savePath, onEdited, log, players, records, apiKey, team }
   ].filter(Boolean)
   const cols = ['Q1', 'Q2', 'Q3', 'Q4', ...(g.overtime || g.homeOT || g.awayOT ? ['OT'] : []), 'F']
   const line = (name: string | null, q: number[], ot: number, final: number) => (
-    <div className="row" style={{ gap: 0, alignItems: 'baseline' }}>
-      <span style={{ color: 'var(--ink)', width: 140, fontSize: 12 }}>{name}</span>
-      {q.map((v, i) => <span key={i} className="num" style={{ width: 34, textAlign: 'right', color: 'var(--ink2)', fontSize: 12 }}>{v}</span>)}
-      {cols.includes('OT') ? <span className="num" style={{ width: 34, textAlign: 'right', color: 'var(--ink2)', fontSize: 12 }}>{ot}</span> : null}
-      <span className="num" style={{ width: 40, textAlign: 'right', color: 'var(--ink)', fontSize: 13 }}>{final}</span>
-    </div>
+    <tr key={name ?? ''}>
+      <td>{name}</td>
+      {q.map((v, i) => <td key={i}>{v}</td>)}
+      {cols.includes('OT') ? <td>{ot}</td> : null}
+      <td className="final">{final}</td>
+    </tr>
   )
   return (
     <div style={{ marginTop: 8, paddingLeft: 4 }}>
       <Meta size={9}>{facts.join('  ·  ')}</Meta>
       {g.played ? (
-        <div style={{ marginTop: 6 }}>
-          <div className="row" style={{ gap: 0, alignItems: 'baseline' }}>
-            <span style={{ width: 140 }} />
-            {cols.map((c) => <Meta key={c} size={9}><span style={{ display: 'inline-block', width: c === 'F' ? 40 : 34, textAlign: 'right' }}>{c}</span></Meta>)}
-          </div>
-          {line(g.away, g.awayQ, g.awayOT, g.awayScore)}
-          {line(g.home, g.homeQ, g.homeOT, g.homeScore)}
+        <div style={{ marginTop: 8 }}>
+          <table className="linescore">
+            <thead>
+              <tr><th /></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ color: 'var(--ink4)', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', borderTop: 0 }} />
+                {cols.map((c) => (
+                  <td key={c} style={{ color: 'var(--ink4)', fontWeight: 700, fontSize: 10, letterSpacing: '0.08em', borderTop: 0 }}>{c}</td>
+                ))}
+              </tr>
+              {line(g.away, g.awayQ, g.awayOT, g.awayScore)}
+              {line(g.home, g.homeQ, g.homeOT, g.homeScore)}
+            </tbody>
+          </table>
           <Meta size={9}>Team and player statistics are only kept by the game for the current week; DCC shows what the save still holds.</Meta>
         </div>
       ) : null}

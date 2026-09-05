@@ -160,7 +160,13 @@ export interface Persisted {
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string
-  theme: 'night' | 'field'
+  theme: 'night' | 'field' | 'broadcast'
+  /**
+   * Whether the user has ever picked a theme themselves. Without this there is
+   * no way to tell "chose Night Wire" from "has simply never touched it", and a
+   * new default would only ever reach people installing for the first time.
+   */
+  themeChosen: boolean
   week: number
   heat: number
   gameRunning: boolean
