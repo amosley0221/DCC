@@ -10,6 +10,15 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.29.6] - 2026-09-05
+
+### Changed
+
+- **The art folder is remembered.** It was held in memory only, so every launch
+  asked for it again. The path is stored and re-indexed on launch once the
+  roster is in; a folder that has since gone is forgotten rather than reported.
+
+
 ## [0.29.5] - 2026-09-05
 
 ### Fixed
