@@ -10,6 +10,21 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.29.4] - 2026-09-05
+
+### Fixed
+
+- **The analysis report now describes the save.** It carried strings and
+  entropy but not the list of tables inside the file — that lived in the
+  game-install scan, where nobody looking at a save would find it, and it
+  came from the roster pass, so exporting before reading a roster dropped it
+  silently. It reads off the analysis now and lands in the save's own report.
+- The report also lists **class names in full**. The frequency list is capped
+  and sorted by count, and the save declares most of its classes exactly
+  once, so the names that say what the file actually holds were the ones
+  guaranteed never to appear.
+
+
 ## [0.29.3] - 2026-09-05
 
 ### Fixed
