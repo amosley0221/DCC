@@ -8,7 +8,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- **The desktop reads your save on launch.** It already re-opened the file you
+  were last looking at, but only far enough to read its header — every screen
+  is built out of the roster pass, so the front page came up empty and the
+  roster had to be read by hand every single time. Both passes run now, and
+  Home and The Program say they are reading while it happens.
+- **Choosing a save reads its roster too**, rather than asking for a second
+  click before anything appears. The button stays as the fallback it should
+  always have been: a save that moved, or a read that failed.
 
 ## [0.29.1] - 2026-09-05
 
