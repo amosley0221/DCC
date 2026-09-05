@@ -1211,3 +1211,41 @@ a queue and the tutorial and portal tables, and the effect is applied when the
 week advances. Offering a scholarship behaves the same way. So a controlled diff
 of two saves taken either side of a recruiting action does not localise the
 recruit record, which is what made this harder than the schedule.
+
+### A false positive worth knowing about
+
+Searching for the national rank as a bit-packed field, at every position and
+several widths, found a table with a 24-byte stride whose value matched the rank
+for 4,041 of 4,100 recruits. It is not the recruit table. It is an array of
+consecutive integers — dumping it at record 400 gives `03 23`, `03 24`, `03 25`
+and so on, incrementing by one every twelve bytes — and **any** search for a
+monotonic field matches a counter by construction, because rank *R* sits at index
+*R − 1* in any sequence of consecutive integers.
+
+That is the trap in searching for rank at all, and it invalidates the method
+rather than just this hit. Rank, position rank and state rank are all
+monotonic-ish over their orderings; only commit score, stage and the offer count
+are safe anchors. Any future attempt should either anchor on one of those, or
+require a candidate table to satisfy a monotonic field *and* a non-monotonic one
+at the same time.
+
+### Further encodings ruled out
+
+Commit score was searched for with anchors verified against the live game — two
+recruits' cards, cross-checked against a class export and matching on all nine
+values tested. None of the following exists in the save:
+
+- a 10, 11, 12 or 16-bit field in a table ordered by national rank, at any bit
+  stride from 32 to 4,096;
+- a byte-aligned 16-bit value, big or little endian, in rank order;
+- a value co-located within 400 bits of the national rank, position rank and
+  state rank at the schema's own widths, cross-checked on two recruits — the
+  seven surviving geometries had strides between the two of them ranging from
+  thirteen million to minus a hundred and thirty-four million bits, which is
+  what chance looks like at this scale.
+
+The last of those is the informative one. The player record scatters its own
+fields across all 1,536 bits with no grouping — Speed at 849, Acceleration at
+504, Agility at 490 — so expecting a recruit's four numbers to sit near each
+other was the wrong assumption to begin with. Whatever finds this record will
+have to establish its stride from a single non-monotonic field first.
