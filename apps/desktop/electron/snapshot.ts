@@ -176,6 +176,10 @@ export function buildSnapshot(payload: Buffer, userTeamId: number | null): Dynas
     if (isRecruit(p)) {
       recruits.push({
         ...slim(p),
+        // Recruits carry their ratings so the phone has something to reveal when
+        // one is scouted. Without them the overall is the whole payoff there,
+        // while the desktop shows the full card off the same save.
+        ratings: p.ratings,
         pipeline: p.pipeline ?? null, dealbreaker: p.dealbreaker ?? null,
         idealPitch: p.idealPitch ?? null,
       })
