@@ -26,7 +26,7 @@ _Nothing yet._
 ### Added
 
 - **The depth chart, read out of your save.** Every position in the order the
-  game plays them — offence, defence and special teams — with the starter on
+  game plays them — offense, defense and special teams — with the starter on
   the card and the rest a click away. It used to sort by overall and admit it
   could not read your real ordering.
 - **Reorder it and commit.** Open a position, drag or use the arrows, and the

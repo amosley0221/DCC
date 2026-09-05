@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Kicker, Meta } from '../ui'
+import { Btn, Kicker, Meta, PlayerFace } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
@@ -34,8 +34,22 @@ function cardRatings(pos: string): string[] {
   return GENERIC
 }
 
-const initials = (p: { first: string; last: string }) =>
-  `${p.first[0] ?? ''}${p.last[0] ?? ''}`.toUpperCase()
+/**
+ * A player's face where the front page used to draw their initials. The art is
+ * already indexed for the roster screens; there was no reason Home was the one
+ * place that did not use it.
+ */
+function Face({ p, size }: { p: { first: string; last: string; assetId?: string | null }; size: number }) {
+  const { save } = useSave()
+  return (
+    <PlayerFace
+      className="gs-row-avatar" round size={size}
+      first={p.first} last={p.last}
+      file={p.assetId ? save.facePaths[p.assetId] : undefined}
+    />
+  )
+}
+
 
 const ratingTone = (v: number) => (v >= 85 ? 'is-high' : v >= 75 ? 'is-mid' : 'is-low')
 
@@ -188,7 +202,7 @@ export default function WireSave() {
               aria-selected={open?.kind === 'player' && open.index === p.index}
               onClick={() => setOpen(open?.kind === 'player' && open.index === p.index ? null : { kind: 'player', index: p.index })}
             >
-              <span className="gs-row-avatar">{initials(p)}</span>
+              <Face p={p} size={30} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span className="gs-row-title">{p.first} {p.last}</span>
                 <span className="gs-row-sub" style={{ display: 'block' }}>
@@ -490,7 +504,7 @@ function ProspectCard({ p, revealed, onReveal, onClose }: {
       </div>
 
       <div className="row" style={{ gap: 16, marginTop: 14, alignItems: 'center' }}>
-        <span className="gs-row-avatar" style={{ width: 54, height: 54, fontSize: 17 }}>{initials(p)}</span>
+        <Face p={p} size={54} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 className="headline">{p.first} {p.last}</h2>
           <div style={{ marginTop: 4 }}>

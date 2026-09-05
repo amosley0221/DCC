@@ -281,19 +281,24 @@ export function SchoolArt(
  * Never another player's face: a gap is better than a wrong answer.
  */
 export function PlayerFace(
-  { file, first, last, size = 30 }: { file?: string; first: string; last: string; size?: number },
+  { file, first, last, size = 30, className, round }:
+  { file?: string; first: string; last: string; size?: number; className?: string; round?: boolean },
 ) {
   const box: React.CSSProperties = {
-    width: size, height: size, borderRadius: 4, flex: '0 0 auto',
+    width: size, height: size, borderRadius: round ? '50%' : 4, flex: '0 0 auto',
     background: 'var(--rule)', objectFit: 'cover',
   }
+  // Initials are the fallback rather than a broken image: a face is missing
+  // whenever the art folder has not been pointed at, or the player is one the
+  // game draws generically.
   if (!file) {
     return (
-      <span style={{ ...box, display: 'grid', placeItems: 'center', fontSize: size * 0.36, color: 'var(--ink3)' }}>
+      <span className={className}
+        style={{ ...box, display: 'grid', placeItems: 'center', fontSize: size * 0.36, color: 'var(--ink3)' }}>
         {(first[0] ?? '') + (last[0] ?? '')}
       </span>
     )
   }
-  return <img style={box} alt="" loading="lazy"
+  return <img className={className} style={box} alt="" loading="lazy"
     src={'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')} />
 }

@@ -11,7 +11,7 @@ const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
 
 const GROUPS: [string, string[]][] = [
-  ['OFFENCE', ['QB', 'HB', 'FB', 'WR', 'TE']],
+  ['OFFENSE', ['QB', 'HB', 'FB', 'WR', 'TE']],
   ['LINE', ['LT', 'LG', 'C', 'RG', 'RT']],
   ['FRONT', ['LE', 'RE', 'DT']],
   ['LINEBACK', ['LOLB', 'MLB', 'ROLB']],

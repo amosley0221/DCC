@@ -42,7 +42,7 @@ const isGenerated = (p: RosterPlayer) => p.assetId.startsWith('Generic_')
 const isRecruit = (p: RosterPlayer) => isGenerated(p) && p.recruitFlag
 const GROUPS: [string, string[]][] = [
   ['ALL', []],
-  ['OFFENCE', ['QB', 'HB', 'FB', 'WR', 'TE']],
+  ['OFFENSE', ['QB', 'HB', 'FB', 'WR', 'TE']],
   ['LINE', ['LT', 'LG', 'C', 'RG', 'RT']],
   ['FRONT', ['LE', 'RE', 'DT']],
   ['LINEBACK', ['LOLB', 'MLB', 'ROLB']],

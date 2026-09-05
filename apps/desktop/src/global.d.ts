@@ -22,7 +22,7 @@ declare global {
         | { ok: false; message: string }
       >
       depth(path: string): Promise<
-        | { ok: true; slots: { abbr: string; name: string; side: 'offence' | 'defence' | 'special' }[]
+        | { ok: true; slots: { abbr: string; name: string; side: 'offense' | 'defense' | 'special' }[]
             charts: { block: number; slots: number[][] }[] }
         | { ok: false; message: string }
       >

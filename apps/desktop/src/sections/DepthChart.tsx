@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import { Btn, Card, Kicker, Meta, PlayerFace } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 
-type Slot = { abbr: string; name: string; side: 'offence' | 'defence' | 'special' }
+type Slot = { abbr: string; name: string; side: 'offense' | 'defense' | 'special' }
 
 /**
  * The depth chart, read out of the save and reordered in place.
@@ -27,7 +27,7 @@ export default function DepthChart({ team, players }: { team: number; players: R
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState<number | null>(null)
-  const [side, setSide] = useState<Slot['side']>('offence')
+  const [side, setSide] = useState<Slot['side']>('offense')
   /** slot -> the order the user has dragged it into, until committed. */
   const [edits, setEdits] = useState<Record<number, number[]>>({})
   const [drag, setDrag] = useState<{ slot: number; from: number } | null>(null)
@@ -124,7 +124,7 @@ export default function DepthChart({ team, players }: { team: number; players: R
         <div className="row" style={{ gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
           <Kicker>Depth chart</Kicker>
           <div className="subtabs" style={{ marginLeft: 'auto' }}>
-            {(['offence', 'defence', 'special'] as const).map((s) => (
+            {(['offense', 'defense', 'special'] as const).map((s) => (
               <button key={s} className="tab" aria-pressed={side === s} onClick={() => setSide(s)}
                 style={{ color: side === s ? 'var(--accent)' : undefined }}>
                 {s === 'special' ? 'SPECIAL TEAMS' : s.toUpperCase()}

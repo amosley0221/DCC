@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { useSave } from '../saveStore'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
+import ArtFolder from './ArtFolder'
 
 /**
  * Dissects the dynasty save so the format can be worked out. Nothing here
@@ -394,6 +395,8 @@ export default function Save() {
       />
 
       <div className="col" style={{ gap: 12, maxWidth: 860 }}>
+        <ArtFolder />
+
         <Card className="card-pad">
           <Kicker>Why this exists</Kicker>
           <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
