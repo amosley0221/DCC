@@ -121,8 +121,13 @@ private fun resolve(p: DccPalette, accent: Color, derived: Boolean): DccColors {
             if (derived) listOf(accent, p.ink3) else p.heatStops,
         ),
         tones = p.tones,
-        haze = if (derived) accent.copy(alpha = 0.14f) else Color.Transparent,
-        haze2 = if (derived) accent.copy(alpha = 0.08f) else Color.Transparent,
+        // Lighter than the desktop's 14/8 on purpose. Both apps paint the haze
+        // as two corner glows, but a phone is narrow enough that the same glow
+        // covers proportionally far more of the screen, and a saturated accent
+        // at desktop strength stops reading as a wash over black and starts
+        // reading as the background colour itself.
+        haze = if (derived) accent.copy(alpha = 0.10f) else Color.Transparent,
+        haze2 = if (derived) accent.copy(alpha = 0.06f) else Color.Transparent,
     )
 }
 

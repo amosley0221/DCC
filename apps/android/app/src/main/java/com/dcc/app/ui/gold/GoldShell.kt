@@ -1,6 +1,7 @@
 package com.dcc.app.ui.gold
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +26,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -104,15 +107,28 @@ fun GoldShell(
 
     Box(Modifier.fillMaxSize().background(c.bg0)) {
         // Stadium haze: two soft washes in the accent, behind everything.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(c.haze, c.bg0, c.haze2),
-                    ),
+        //
+        // Corner glows, not a full-height gradient. A vertical gradient across
+        // the whole screen tinted every pixel, so the ground stopped being
+        // black and became the accent — fine for champagne, navy for blue. The
+        // desktop has always painted this as two ellipses fading to nothing;
+        // this is the same shape, and the middle of the screen stays bg0.
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(
+                Brush.radialGradient(
+                    listOf(c.haze, Color.Transparent),
+                    center = Offset(size.width * 0.72f, size.height * 0.10f),
+                    radius = size.width * 0.80f,
                 ),
-        )
+            )
+            drawRect(
+                Brush.radialGradient(
+                    listOf(c.haze2, Color.Transparent),
+                    center = Offset(size.width * 0.12f, size.height * 0.90f),
+                    radius = size.width * 0.70f,
+                ),
+            )
+        }
 
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             // ── masthead ──────────────────────────────────────────────────
