@@ -10,6 +10,24 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.30.2] - 2026-09-05
+
+### Fixed
+
+- **Offense and defense** are spelled the way American football spells them.
+- **The art folder has a home.** Faces are used on the roster, the recruiting
+  pool, tampering, the depth chart and the front page — but the only way to
+  point at the folder was a rail inside Recruiting, so missing it meant
+  initials everywhere with nothing saying why. There is a card on the Dynasty
+  file tab now that says whether a folder is set, how many of your players it
+  matched, and where it points.
+
+### Added
+
+- **Faces on the front page**, on the board rows and the prospect card. It was
+  the one screen still drawing initials with the art indexed a click away.
+
+
 ## [0.30.1] - 2026-09-05
 
 ### Fixed
