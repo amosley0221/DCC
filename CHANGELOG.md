@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.29.1] - 2026-09-05
+
 ### Fixed
 
 - **The ••• control on the phone no longer crashes the app.** Settings brings
