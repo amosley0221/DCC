@@ -22,6 +22,13 @@ const api = {
   pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   roster: (path: string) => ipcRenderer.invoke('save:roster', path),
+  publishSnapshot: (path: string, teamId: number | null, repo: string) =>
+    ipcRenderer.invoke('relay:publish', { path, teamId, repo }),
+  relayStart: (path: string | null, teamId: number | null, port?: number) =>
+    ipcRenderer.invoke('relay:start', { path, teamId, port }),
+  relayStop: () => ipcRenderer.invoke('relay:stop'),
+  relayState: (ctx?: { path: string | null; teamId: number | null }) =>
+    ipcRenderer.invoke('relay:state', ctx),
   writePlayers: (path: string, edits: unknown[], playerCount: number) =>
     ipcRenderer.invoke('save:writePlayers', { path, edits, playerCount }),
   writePress: (req: unknown) => ipcRenderer.invoke('press:write', req),

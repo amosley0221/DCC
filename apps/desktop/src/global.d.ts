@@ -3,6 +3,7 @@ import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRec
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
+import type { RelayState } from '../electron/relay'
 
 declare global {
   interface Window {
@@ -22,6 +23,12 @@ declare global {
       >
       writeGames(path: string, edits: GameEdit[]): Promise<WriteResult>
       writePlayers(path: string, edits: PlayerEdit[], playerCount: number): Promise<PlayerWriteResult>
+      publishSnapshot(path: string, teamId: number | null, repo: string): Promise<
+        { ok: boolean; message: string; assetUrl?: string; bytes?: number }
+      >
+      relayStart(path: string | null, teamId: number | null, port?: number): Promise<RelayState>
+      relayStop(): Promise<RelayState>
+      relayState(ctx?: { path: string | null; teamId: number | null }): Promise<RelayState>
       writePress(req: PressRequest): Promise<
         { ok: true; story: PressStory } | { ok: false; message: string }
       >

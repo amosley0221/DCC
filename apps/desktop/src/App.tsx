@@ -18,6 +18,7 @@ import Save from './sections/Save'
 import RecruitSave from './sections/RecruitSave'
 import TeamSave from './sections/TeamSave'
 import TamperSave from './sections/TamperSave'
+import DevicesSave from './sections/DevicesSave'
 import { Meta } from './ui'
 import UpdateToast from './UpdateToast'
 
@@ -124,6 +125,8 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
               <RecruitSave />
             ) : section === 'TAMPER' && save.report ? (
               <TamperSave />
+            ) : section === 'DEVICES' && save.path ? (
+              <DevicesSave />
             ) : !d ? (
               <NoDynasty
                 section={section.charAt(0) + section.slice(1).toLowerCase()}

@@ -16,6 +16,8 @@ export const blankPersisted = (): Persisted => ({
   teamId: null,
   teamNames: {},
   anthropicKey: '',
+  githubToken: '',
+  publishRepo: '',
   relayUrl: '',
   relayToken: '',
   theme: 'night',
@@ -85,6 +87,8 @@ export type Action =
   | { type: 'teamId'; id: number | null }
   | { type: 'teamName'; id: number; name: string | null }
   | { type: 'anthropicKey'; key: string }
+  | { type: 'githubToken'; token: string }
+  | { type: 'publishRepo'; repo: string }
 
 let seq = 0
 const nextId = () => `q${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -196,6 +200,10 @@ export function reducer(state: Persisted, action: Action): Persisted {
       return { ...state, teamId: action.id }
     case 'anthropicKey':
       return { ...state, anthropicKey: action.key }
+    case 'githubToken':
+      return { ...state, githubToken: action.token }
+    case 'publishRepo':
+      return { ...state, publishRepo: action.repo }
     case 'teamName': {
       const next = { ...state.teamNames }
       if (action.name) next[action.id] = action.name

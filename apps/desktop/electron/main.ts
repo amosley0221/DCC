@@ -15,6 +15,8 @@ import {
 import { writeStory } from './press'
 import type { PressRequest } from './press'
 import { buildSnapshot } from './snapshot'
+import { publishSnapshot } from './publish'
+import { relayState, startRelay, stopRelay } from './relay'
 import { writeGameEdits, writePlayerEdits } from './saveWrite'
 import type { GameEdit, PlayerEdit } from './saveWrite'
 
@@ -227,6 +229,36 @@ ipcMain.handle('save:roster', (_e, path: string) => {
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
+})
+
+// The relay needs to know which save is open and which team is the user's, and
+// both live in the renderer's state, so the renderer hands them over when it
+// starts the relay rather than the main process guessing.
+let relaySave: string | null = null
+let relayTeam: number | null = null
+
+ipcMain.handle('relay:publish', async (_e, { path, teamId, repo }: {
+  path: string; teamId: number | null; repo: string
+}) => {
+  try {
+    const payload = readSavePayload(path)
+    if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
+    const token = String(readSettings().githubToken ?? '')
+    return await publishSnapshot({ repo, token }, buildSnapshot(payload, teamId))
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('relay:start', (_e, { path, teamId, port }: { path: string | null; teamId: number | null; port?: number }) => {
+  relaySave = path
+  relayTeam = teamId
+  return startRelay({ savePath: () => relaySave, teamId: () => relayTeam }, port)
+})
+ipcMain.handle('relay:stop', () => stopRelay())
+ipcMain.handle('relay:state', (_e, ctx?: { path: string | null; teamId: number | null }) => {
+  if (ctx) { relaySave = ctx.path; relayTeam = ctx.teamId }
+  return relayState()
 })
 
 ipcMain.handle('save:writePlayers', (_e, { path, edits, playerCount }: {

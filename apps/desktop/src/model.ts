@@ -141,6 +141,13 @@ export interface Persisted {
    * kept with the rest of the settings on this machine and sent nowhere else.
    */
   anthropicKey: string
+  /**
+   * A GitHub token with repo access, used only to publish the dynasty snapshot
+   * so the phone can read it away from home. Kept on this machine.
+   */
+  githubToken: string
+  /** "owner/name" of the repository the snapshot is published to. */
+  publishRepo: string
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string
