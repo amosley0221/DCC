@@ -10,6 +10,24 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.39.2] - 2026-09-05
+
+### Fixed
+
+- **The phone was killed by a big art pack.** "Dynasty Command Center keeps
+  stopping" — it held the whole download in memory, and the buffer it grew into
+  doubles as it fills, so a hundred-megabyte pack wanted two or three hundred
+  megabytes at once. Android does not allow that.
+
+  It streams to a file now, at both ends: the download is copied straight
+  through, and the unpacking reads from that file. The largest thing alive at
+  any moment is an eight-kilobyte buffer, so the size of the pack no longer
+  matters and **Everyone** is a real choice rather than one that kills the app.
+
+  A download that dies partway no longer leaves the file behind, and an unpack
+  that fails no longer leaves half a pack on the phone reporting itself as
+  nothing installed.
+
 ## [0.39.1] - 2026-09-05
 
 ### Fixed

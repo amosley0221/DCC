@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -188,61 +189,84 @@ object SnapshotFetch {
 
     // ── the art pack ────────────────────────────────────────────────────────
 
-    sealed interface Bytes {
-        data class Ok(val bytes: ByteArray) : Bytes
-        data class Failed(val message: String) : Bytes
+    sealed interface Downloaded {
+        /** Where the pack landed. The caller owns the file and deletes it. */
+        data class Ok(val file: File) : Downloaded
+        data class Failed(val message: String) : Downloaded
     }
 
     /**
-     * The pictures, over the same two routes as the dynasty.
+     * The pictures, over the same two routes as the dynasty — straight to disk.
      *
-     * A pack is a ZIP of small PNGs rather than a JSON document, so it comes
-     * back as bytes and is not gzipped again — it is already compressed, and
-     * gzipping a ZIP makes it very slightly bigger.
+     * Never into memory. A pack of every face in the country is a hundred
+     * megabytes, `readBytes` doubles its buffer as it grows, and Android killed
+     * the app outright: "Dynasty Command Center keeps stopping". Copied through
+     * to a file, the largest thing alive at any moment is an eight-kilobyte
+     * buffer, and the size of the pack stops mattering.
+     *
+     * It is not gzipped on the way, either: a ZIP of PNGs is already compressed
+     * and gzipping it again would only make it slightly bigger.
      */
-    suspend fun artOverWifi(base: String, token: String): Bytes = withContext(Dispatchers.IO) {
-        val root = baseUrl(base)
-            ?: return@withContext Bytes.Failed("that address should look like http://192.168.1.42:7327")
-        if (token.isBlank()) {
-            return@withContext Bytes.Failed("the desktop shows a code beside the address — it goes here")
-        }
-        try {
-            val conn = open("$root/art", "application/zip")
-            conn.setRequestProperty("Authorization", "Bearer $token")
-            try {
-                when (val code = conn.responseCode) {
-                    200 -> Bytes.Ok(conn.inputStream.readBytes())
-                    401 -> Bytes.Failed("the desktop refused that code — it is made fresh each time")
-                    409 -> Bytes.Failed("build the art pack on the desktop first, under Devices")
-                    else -> Bytes.Failed("the desktop answered $code for the art pack")
-                }
-            } finally {
-                conn.disconnect()
+    suspend fun artOverWifi(base: String, token: String, into: File): Downloaded =
+        withContext(Dispatchers.IO) {
+            val root = baseUrl(base)
+                ?: return@withContext Downloaded.Failed(
+                    "that address should look like http://192.168.1.42:7327",
+                )
+            if (token.isBlank()) {
+                return@withContext Downloaded.Failed(
+                    "the desktop shows a code beside the address — it goes here",
+                )
             }
-        } catch (e: IOException) {
-            Bytes.Failed("nothing answered at $root — check the desktop is showing that address")
+            try {
+                val conn = open("$root/art", "application/zip")
+                conn.setRequestProperty("Authorization", "Bearer $token")
+                try {
+                    when (val code = conn.responseCode) {
+                        200 -> { drain(conn, into); Downloaded.Ok(into) }
+                        401 -> Downloaded.Failed(
+                            "the desktop refused that code — it is made fresh each time",
+                        )
+                        409 -> Downloaded.Failed(
+                            "build the art pack on the desktop first, under Devices",
+                        )
+                        else -> Downloaded.Failed("the desktop answered $code for the art pack")
+                    }
+                } finally {
+                    conn.disconnect()
+                }
+            } catch (e: IOException) {
+                Downloaded.Failed(
+                    "nothing answered at $root — check the desktop is showing that address",
+                )
+            }
         }
-    }
 
-    suspend fun artFromGitHub(repo: String, token: String): Bytes = withContext(Dispatchers.IO) {
-        val target = repo.trim()
-        if (!REPO.matches(target)) {
-            return@withContext Bytes.Failed("name the repository as owner/name, the way the desktop app has it")
+    suspend fun artFromGitHub(repo: String, token: String, into: File): Downloaded =
+        withContext(Dispatchers.IO) {
+            val target = repo.trim()
+            if (!REPO.matches(target)) {
+                return@withContext Downloaded.Failed(
+                    "name the repository as owner/name, the way the desktop app has it",
+                )
+            }
+            if (token.isBlank()) {
+                return@withContext Downloaded.Failed(
+                    "a GitHub token is needed — the same one the desktop publishes with",
+                )
+            }
+            try {
+                downloadTo(assetUrl(target, token, ART_ASSET_NAME), token, into)
+                Downloaded.Ok(into)
+            } catch (e: Refused) {
+                Downloaded.Failed(e.message.orEmpty())
+            } catch (e: IOException) {
+                Downloaded.Failed("GitHub could not be reached — this phone looks to be offline")
+            }
         }
-        if (token.isBlank()) {
-            return@withContext Bytes.Failed("a GitHub token is needed — the same one the desktop publishes with")
-        }
-        try {
-            Bytes.Ok(downloadBytes(assetUrl(target, token, ART_ASSET_NAME), token))
-        } catch (e: Refused) {
-            Bytes.Failed(e.message.orEmpty())
-        } catch (e: IOException) {
-            Bytes.Failed("GitHub could not be reached — this phone looks to be offline")
-        }
-    }
 
-    /** The redirect dance again, this time keeping the bytes as they arrive. */
-    private fun downloadBytes(assetUrl: String, token: String): ByteArray {
+    /** The redirect dance again, writing the body straight through to the file. */
+    private fun downloadTo(assetUrl: String, token: String, into: File) {
         var target = assetUrl
         var credentialed = true
         repeat(MAX_HOPS) {
@@ -260,8 +284,8 @@ object SnapshotFetch {
                     credentialed = false
                     return@repeat
                 }
-                return when (code) {
-                    200 -> conn.inputStream.readBytes()
+                when (code) {
+                    200 -> { drain(conn, into); return }
                     401, 403 -> throw Refused("GitHub refused the download — the token may have expired")
                     404 -> throw Refused("the published art pack has gone — build it again on the desktop")
                     else -> throw Refused("GitHub answered $code downloading the art pack")
@@ -271,6 +295,12 @@ object SnapshotFetch {
             }
         }
         throw Refused("GitHub sent the download round in circles")
+    }
+
+    /** Response body to file, eight kilobytes at a time. */
+    private fun drain(conn: HttpURLConnection, into: File) {
+        into.parentFile?.mkdirs()
+        conn.inputStream.use { input -> into.outputStream().use { out -> input.copyTo(out) } }
     }
 
     // ── plumbing ─────────────────────────────────────────────────────────────

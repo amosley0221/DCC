@@ -46,14 +46,18 @@ object ArtPack {
      * dynasty need", and a player who has left should not keep his face on the
      * phone forever. Entries are checked against the two folders the desktop
      * writes, so a ZIP from anywhere else cannot write outside this directory.
+     *
+     * Reads from a file, never from a byte array. A pack of every face in the
+     * country is a hundred megabytes, and holding it in memory while also
+     * writing it out is what Android was killing the app for.
      */
-    fun install(context: Context, bytes: ByteArray): Result<Manifest> = runCatching {
+    fun install(context: Context, pack: File): Result<Manifest> = runCatching {
         val dir = root(context)
         dir.deleteRecursively()
         dir.mkdirs()
 
         var written = 0
-        ZipInputStream(bytes.inputStream()).use { zip ->
+        ZipInputStream(pack.inputStream().buffered()).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 val name = entry.name
@@ -64,7 +68,7 @@ object ArtPack {
                 if (!ok) continue
                 val out = File(dir, name)
                 out.parentFile?.mkdirs()
-                out.outputStream().use { zip.copyTo(it) }
+                out.outputStream().buffered().use { zip.copyTo(it) }
                 written++
             }
         }
@@ -74,6 +78,10 @@ object ArtPack {
         val text = manifestFile(context).takeIf { it.exists() }?.readText()
             ?: error("that pack has no manifest")
         Repository.json.decodeFromString(Manifest.serializer(), text)
+    }.onFailure {
+        // A half-unpacked pack is worse than none: it is megabytes the phone
+        // cannot draw from and the screen would report as nothing installed.
+        root(context).deleteRecursively()
     }
 
     /** What is installed, or null when nothing is. */

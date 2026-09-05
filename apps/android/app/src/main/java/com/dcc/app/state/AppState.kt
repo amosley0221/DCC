@@ -2,6 +2,7 @@ package com.dcc.app.state
 
 import android.app.Application
 import android.net.Uri
+import java.io.File
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dcc.app.data.*
@@ -310,7 +311,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _busy.value = "art-$route"
             _importError.value = null
-            val result = withContext(Dispatchers.IO) { load() }
+            val result = withContext(Dispatchers.IO) {
+                // The scratch file goes whatever happens, including a download
+                // that died partway and left half a pack behind.
+                try { load() } finally { packScratch().delete() }
+            }
             result
                 .onSuccess { _art.value = it }
                 .onFailure { _importError.value = it.message ?: "that art pack could not be read" }
@@ -318,27 +323,49 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun acceptArt(fetched: SnapshotFetch.Bytes): Result<ArtPack.Manifest> = when (fetched) {
-        is SnapshotFetch.Bytes.Ok -> ArtPack.install(getApplication(), fetched.bytes)
-        is SnapshotFetch.Bytes.Failed -> Result.failure(IllegalArgumentException(fetched.message))
-    }
+    /**
+     * A scratch file for a pack on its way in.
+     *
+     * In the cache directory, because it is worthless the moment it is unpacked
+     * and Android may delete it whenever it likes. It is deleted here anyway,
+     * whichever way the import ends.
+     */
+    private fun packScratch(): File =
+        File(getApplication<Application>().cacheDir, "art-incoming.zip")
 
+    private fun installFrom(downloaded: SnapshotFetch.Downloaded): Result<ArtPack.Manifest> =
+        when (downloaded) {
+            is SnapshotFetch.Downloaded.Ok -> ArtPack.install(getApplication(), downloaded.file)
+            is SnapshotFetch.Downloaded.Failed ->
+                Result.failure(IllegalArgumentException(downloaded.message))
+        }
+
+    /**
+     * Imports a pack the user picked, copying it through a file rather than
+     * reading it whole: the document could be a hundred megabytes.
+     */
     fun importArt(uri: Uri) = bringArt("file") {
         runCatching {
-            val bytes = getApplication<Application>().contentResolver.openInputStream(uri)
-                ?.use { it.readBytes() } ?: error("that file could not be opened")
-            bytes
-        }.mapCatching { ArtPack.install(getApplication(), it).getOrThrow() }
+            val scratch = packScratch()
+            getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
+                scratch.outputStream().buffered().use { input.copyTo(it) }
+            } ?: error("that file could not be opened")
+            ArtPack.install(getApplication(), scratch).getOrThrow()
+        }
     }
 
     fun fetchArtOverWifi() {
         val s = _state.value
-        bringArt("wifi") { acceptArt(SnapshotFetch.artOverWifi(s.relayUrl, s.relayToken)) }
+        bringArt("wifi") {
+            installFrom(SnapshotFetch.artOverWifi(s.relayUrl, s.relayToken, packScratch()))
+        }
     }
 
     fun fetchArtFromGitHub() {
         val s = _state.value
-        bringArt("github") { acceptArt(SnapshotFetch.artFromGitHub(s.githubRepo, s.githubToken)) }
+        bringArt("github") {
+            installFrom(SnapshotFetch.artFromGitHub(s.githubRepo, s.githubToken, packScratch()))
+        }
     }
 
     fun clearArt() {
