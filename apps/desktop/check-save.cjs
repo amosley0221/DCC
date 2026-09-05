@@ -45,4 +45,53 @@ assert.deepEqual(g0.homeQ, [7, 14, 0, 7]); assert.deepEqual(g0.awayQ, [7, 0, 0, 
 assert.equal(g0.played, true); assert.equal(g0.userPlayed, true); assert.equal(g0.overtime, false); assert.equal(g0.postseason, false)
 assert.equal(g1.home, 'Pittsburgh'); assert.equal(g1.away, 'Penn State'); assert.equal(g1.week, 11)
 assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
-console.log('check-save: game table decodes 2/2 synthetic rows, team order verified')
+/* -------------------------------------------------- the title, and the season */
+// YearSummaryStore is where the champion lives — the game table carries the
+// bowls but not the playoff — so a row is built with the two team references it
+// holds, plus rows for a season not yet decided and for the free-list chain the
+// unused rows carry, which is what makes counting seasons work.
+{
+  const YROW = 44, YMEMBERS = 17, YROWS = 6
+  const yname = Buffer.from('YearSummaryStore', 'latin1')
+  const yhead = Buffer.concat([
+    Buffer.from('SPBF', 'latin1'), u32(486), u32(1), u32(0), u32(yname.length), yname,
+    u32(0x40), u32(0), u32(YROWS),
+    Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(YROW / 4), u32(YROWS), u32(YMEMBERS), u32(0),
+    Buffer.alloc(YMEMBERS * 4),
+  ])
+  const yrows = Buffer.alloc(YROW * YROWS)
+  const yref = (row, at, idx) => {
+    yrows.writeUInt16BE(0x319e, row * YROW + at)
+    yrows.writeUInt16BE(idx, row * YROW + at + 2)
+  }
+  // Season 1: Alabama over UConn. Season 2: Penn State over Pittsburgh.
+  yrows.writeUInt32BE(304, 0 * YROW); yref(0, 8, 2); yref(0, 16, 3)
+  yrows.writeUInt32BE(524, 1 * YROW); yref(1, 8, 5); yref(1, 16, 6)
+  // Season 3 is being played: it carries something, but no title yet.
+  yrows.writeUInt32BE(652, 2 * YROW)
+  // Rows nobody has reached hold their own index plus one, and nothing else.
+  for (let r = 3; r < YROWS; r++) yrows.writeUInt32BE(r + 1, r * YROW + 4)
+
+  const ypayload = Buffer.concat([Buffer.alloc(64), yhead, yrows, Buffer.alloc(64)])
+
+  const titles = S.readChampions(ypayload)
+  assert.equal(titles.length, 2, 'a season with no title game played names nobody')
+  assert.deepEqual(titles.map((t) => t.season), [1, 2])
+  assert.equal(order[titles[0].championIndex], 'Alabama')
+  assert.equal(order[titles[0].runnerUpIndex], 'UConn')
+  assert.equal(order[titles[1].championIndex], 'Penn State')
+  assert.equal(order[titles[1].runnerUpIndex], 'Pittsburgh')
+
+  // The season count is the rows carrying anything but the free-list word.
+  assert.equal(S.readSeasonOrdinal(ypayload), 3,
+    'three rows carry data, so the dynasty is in its third season')
+
+  // And the store header measures itself, which is what locates all of this.
+  const t = S.storeTable(ypayload, 'YearSummaryStore')
+  assert.equal(t.rowBytes, YROW)
+  assert.equal(t.rows, YROWS)
+  assert.equal(t.memberBits.length, YMEMBERS)
+}
+
+console.log('check-save: game table decodes 2/2 synthetic rows, team order verified,')
+console.log('            champions read per season and unplayed seasons name nobody')

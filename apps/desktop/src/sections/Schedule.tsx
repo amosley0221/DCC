@@ -15,10 +15,11 @@ const CONDITIONS = [0, 2, 1, 4, 5, 6, 7, 8, 9]
  * user's most recent finished game, or their next one if the season has not
  * caught up to them yet, drawn at the size the number deserves.
  */
-function Hero({ g, team, icon }: {
+function Hero({ g, team, mark }: {
   g: SeasonGame
   team: string
-  icon: (n: string | null) => string | undefined
+  /** The school's helmet, which is what a scoreboard puts either side of it. */
+  mark: (n: string | null) => string | undefined
 }) {
   const home = g.home === team
   const mine = home ? g.homeScore : g.awayScore
@@ -42,7 +43,9 @@ function Hero({ g, team, icon }: {
             <div className="scoreboard-sub">{g.away === team ? 'AWAY' : ''}</div>
           </div>
           <div className="scoreboard-mark">
-            {icon(g.away) ? <img src={icon(g.away)} alt="" /> : <Meta size={9}>{(g.away ?? '?').slice(0, 3).toUpperCase()}</Meta>}
+            {mark(g.away)
+              ? <SchoolArt size={46} file={mark(g.away)} />
+              : <Meta size={9}>{(g.away ?? '?').slice(0, 3).toUpperCase()}</Meta>}
           </div>
         </div>
         <div style={{ textAlign: 'center' }}>
@@ -59,7 +62,9 @@ function Hero({ g, team, icon }: {
         </div>
         <div className={`scoreboard-side${g.played && g.homeScore < g.awayScore ? ' scoreboard-dim' : ''}`}>
           <div className="scoreboard-mark">
-            {icon(g.home) ? <img src={icon(g.home)} alt="" /> : <Meta size={9}>{(g.home ?? '?').slice(0, 3).toUpperCase()}</Meta>}
+            {mark(g.home)
+              ? <SchoolArt size={46} file={mark(g.home)} />
+              : <Meta size={9}>{(g.home ?? '?').slice(0, 3).toUpperCase()}</Meta>}
           </div>
           <div className="scoreboard-team">
             <div className="scoreboard-name">{g.home}</div>
@@ -116,6 +121,12 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
   const hidden = (g: SeasonGame) => !spoilers && g.played && g.week >= holdFrom && !(g.home === team || g.away === team)
 
   const icon = (name: string | null) => (name ? (art[`${name}|icon`] ?? art[`${name}|logoLight`]) : undefined)
+  /**
+   * A helmet for the scoreboard, falling back to the logo. The extracted art
+   * has both, and a scoreboard with helmets on it reads as football in a way a
+   * pair of logos does not.
+   */
+  const helmet = (name: string | null) => (name ? (art[`${name}|helmet`] ?? icon(name)) : undefined)
 
   // The last result, or the next kickoff once the season has run out of results.
   const hero = useMemo(() => {
@@ -133,7 +144,7 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
 
   return (
     <>
-      {team && hero ? <Hero g={hero} team={team} icon={icon} /> : null}
+      {team && hero ? <Hero g={hero} team={team} mark={helmet} /> : null}
 
       {/* Their season and the rest of the country, side by side, the way a
           scoreboard page carries them. */}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StoreProvider, blankPersisted, useBootstrap, useStore } from './store'
 import { SaveProvider, useSave } from './saveStore'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
+import { currentWeek } from '../electron/season'
 import { applyTheme } from './theme'
 import type { UpdateStatus } from './updates'
 import Wire from './sections/Wire'
@@ -101,14 +102,10 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
 
   const me = state.teamId === null ? null : (state.teamNames[state.teamId] ?? TEAM_ID_NAMES[state.teamId] ?? null)
 
-  // The week the dynasty has actually reached, for the bar.
-  const week = (() => {
-    const played = (save.roster?.games ?? []).filter((g) => g.played && !g.postseason)
-    if (!played.length) return null
-    return me
-      ? Math.max(...played.filter((g) => g.home === me || g.away === me).map((g) => g.week), 0)
-      : Math.max(...played.map((g) => g.week))
-  })()
+  // The week the dynasty is on, which is the one you are about to play. This
+  // used to be the last week played, so the bar said 10 while the phone said 11
+  // off the same save.
+  const week = currentWeek(save.roster?.games ?? [], me)
 
   return (
     <div className="gs" onClick={() => games && setGames(false)}>

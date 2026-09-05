@@ -57,7 +57,17 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
   const [sheet, setSheet] = useState<number | null>(null)
 
   const faceOf = (p: RosterPlayer) => save.facePaths[p.assetId]
-  const champion = !!teamName && state.champions.includes(teamName)
+  /**
+   * A champion by the save's own year summary, or one the user has marked for a
+   * title the save cannot know about — a dynasty joined part-way through.
+   */
+  const champion = !!teamName && (
+    save.roster?.titles.some((t) => t.champion === teamName)
+    || state.champions.includes(teamName)
+  )
+  const wonIn = teamName
+    ? (save.roster?.titles ?? []).filter((t) => t.champion === teamName).map((t) => t.season)
+    : []
   const logo = teamName
     ? save.schoolArt[`${teamName}|logoLight`] ?? save.schoolArt[`${teamName}|icon`]
     : undefined
@@ -71,6 +81,13 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
    * is the right failure — a made-up colour on the wrong school is worse.
    */
   const teamColor = teamName ? save.schoolColors[teamName] : undefined
+  /**
+   * The team's own jersey, which is a transparent shoulders-and-collar image.
+   * Drawn over the portrait rather than under it: the game's portraits come
+   * with a generic grey shirt, and the jersey covers exactly that, leaving the
+   * head above the collar in the school's own kit.
+   */
+  const jersey = teamName ? save.schoolArt[`${teamName}|jersey`] : undefined
 
   const counts = useMemo(() => {
     const m = new Map<string, number>()
@@ -149,13 +166,17 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
               <Meta size={9} color="var(--accent)">CHANGE TEAM</Meta>
             </button>
           ) : null}
-          {teamName ? (
+          {teamName && wonIn.length ? (
+            <Meta size={9} color="var(--accent)">
+              ★ NATIONAL CHAMPION — SEASON {wonIn.join(', ')}
+            </Meta>
+          ) : teamName ? (
             <button
               onClick={() => dispatch({ type: 'champion', team: teamName, on: !champion })}
-              title="Mark this school as a national champion, which gives it the gold mark"
+              title="The save names a champion once the title game is played. Mark one yourself for a title it does not know about."
               style={{ all: 'unset', cursor: 'pointer' }}
             >
-              <Meta size={9} color={champion ? 'var(--accent2, var(--accent))' : 'var(--ink4)'}>
+              <Meta size={9} color={champion ? 'var(--accent)' : 'var(--ink4)'}>
                 {champion ? '★ NATIONAL CHAMPION' : 'MARK AS CHAMPION'}
               </Meta>
             </button>
@@ -275,6 +296,10 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
                 ) : (
                   <span className="playercard-initials">{(p.first[0] ?? '') + (p.last[0] ?? '')}</span>
                 )}
+                {jersey ? (
+                  <img className="playercard-jersey" alt="" loading="lazy"
+                    src={'dccart://art/' + jersey.split(/[\\/]/).map(encodeURIComponent).join('/')} />
+                ) : null}
 
                 <span className="playercard-ovr num">{p.overall}</span>
                 {p.redshirt ? <span className="playercard-rs">RS</span> : null}

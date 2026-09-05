@@ -8,14 +8,17 @@ import {
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
+  readChampions, teamTableOrder,
 } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
-  readLedger, readSettings, readThreads, rememberSchoolColors, snapshotExtras,
-  writeLedger, writeSettings, writeThreads,
+  readLedger, readSettings, readThreads, rememberSchoolColors, rememberTitles,
+  snapshotExtras, writeLedger, writeSettings, writeThreads,
 } from './sidecar'
 import type { TamperThread } from './sidecar'
 import { TEAM_ID_NAMES } from './teamIds'
+import { currentWeek } from './season'
+import type { WeekGame } from './season'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
   indexFaces, matchFaces, matchSchools, dominantColor,
@@ -233,6 +236,15 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
     const schools = readTeamNames(payload)
     const games = readSeasonGames(payload, schools)
     const season = readSeasonOrdinal(payload)
+    // Who won each season. The game table has the bowls but not the playoff,
+    // so this is the only place the champion is named.
+    const order = teamTableOrder(schools)
+    const titles = readChampions(payload).map((t) => ({
+      season: t.season,
+      champion: order[t.championIndex]?.name ?? null,
+      runnerUp: order[t.runnerUpIndex]?.name ?? null,
+    }))
+    rememberTitles(titles)
 
     // File the roster in the transfer ledger while the save is already open.
     // Doing it here rather than on demand is the whole point: a season the user
@@ -260,6 +272,7 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       stores: readStores(payload),
       games,
       season,
+      titles,
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }
@@ -268,16 +281,9 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
   }
 })
 
-/** The week a save is sitting on: the user's first unplayed game. Null without a team. */
-function weekOf(games: { week: number; played: boolean; postseason: boolean; home: string | null; away: string | null }[], teamId: number | null): number | null {
-  if (teamId === null) return null
-  const name = TEAM_ID_NAMES[teamId]
-  if (!name) return null
-  const mine = games.filter((g) => !g.postseason && (g.home === name || g.away === name))
-  const next = mine.filter((g) => !g.played).map((g) => g.week)
-  if (next.length) return Math.min(...next)
-  return mine.length ? Math.max(...mine.map((g) => g.week)) : null
-}
+/** The week a save is sitting on. Null without a team, since it is per team. */
+const weekOf = (games: WeekGame[], teamId: number | null) =>
+  currentWeek(games, teamId === null ? null : TEAM_ID_NAMES[teamId] ?? null)
 
 ipcMain.handle('transfers:read', () => {
   const ledger = readLedger()

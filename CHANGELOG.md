@@ -10,6 +10,35 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.36.0] - 2026-09-05
+
+### Added
+
+- **Who won each season, read out of the save.** The game table carries the
+  bowls but not the playoff, and the champion is in none of those 37 rows —
+  it is in the year summary, two team references a row, winner first. Your own
+  dynasty reads Oklahoma over Texas A&M in season 1 and Penn State over BYU in
+  season 2, and season 3 is blank because it has not been played. So the gold
+  mark now appears by itself: no marking a champion by hand unless you want one
+  the save cannot know about. **Yes, it will name this season's champion once
+  the title game is played.**
+- **The team's own jersey on the card.** The extracted art has a transparent
+  shoulders-and-collar image per school, and it goes over the portrait rather
+  than under it — the game's portraits come with a generic grey shirt, and the
+  jersey covers exactly that, leaving the head above the collar in your kit.
+
+### Fixed
+
+- **Helmets on the scoreboard.** The big game at the top of the Schedule had two
+  empty boxes where the helmets belong. It was handing the image a file path
+  where every other screen builds a `dccart://` URL, so the browser had nothing
+  to fetch. They are helmets now rather than logos, which is what a scoreboard
+  wants.
+- **The two apps agree on the week.** The desktop's title bar said week 10 while
+  the phone said week 11 off the same save: one was reporting the last week
+  played and the other the first not played. The first not played is right — it
+  is the week the game is sitting on — and there is now one definition both use.
+
 ## [0.35.1] - 2026-09-05
 
 ### Fixed

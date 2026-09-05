@@ -79,6 +79,7 @@ __export(saveAnalysis_exports, {
   decodeFrames: () => decodeFrames,
   diffSaves: () => diffSaves,
   findDictionary: () => findDictionary,
+  readChampions: () => readChampions,
   readCoaches: () => readCoaches,
   readDepthCharts: () => readDepthCharts,
   readRoster: () => readRoster,
@@ -1251,6 +1252,21 @@ function storeTable(payload, name) {
     memberBits
   };
 }
+function readChampions(payload) {
+  const t = storeTable(payload, "YearSummaryStore");
+  if (!t || t.rowBytes < 20) return [];
+  const out = [];
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes;
+    if (o + t.rowBytes > payload.length) break;
+    const ref = (at) => payload.readUInt16BE(o + at) === TEAM_TAG ? payload.readUInt16BE(o + at + 2) : -1;
+    const championIndex = ref(8);
+    const runnerUpIndex = ref(16);
+    if (championIndex < 0) continue;
+    out.push({ season: r + 1, championIndex, runnerUpIndex });
+  }
+  return out;
+}
 function readSeasonOrdinal(payload) {
   const t = storeTable(payload, "YearSummaryStore");
   if (!t || t.rowBytes < 8) return null;
@@ -1370,6 +1386,7 @@ function readSeasonGames(payload, teams) {
   decodeFrames,
   diffSaves,
   findDictionary,
+  readChampions,
   readCoaches,
   readDepthCharts,
   readRoster,

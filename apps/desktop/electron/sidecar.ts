@@ -66,6 +66,16 @@ export function writeSettings(next: Record<string, unknown>) {
 let schoolColorCache: Record<string, string> = {}
 export const rememberSchoolColors = (c: Record<string, string>) => { schoolColorCache = c }
 
+/**
+ * Who won each season, last time a save was read.
+ *
+ * Kept for the same reason as the colours: the snapshot has to carry it, and
+ * the roster pass is where it comes from.
+ */
+let titleCache: { season: number; champion: string | null; runnerUp: string | null }[] = []
+export const rememberTitles = (t: typeof titleCache) => { titleCache = t }
+export const readTitles = () => titleCache
+
 const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
 const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
 
@@ -128,11 +138,15 @@ export function snapshotExtras(): {
       turns: t.turns,
     }))
     .sort((a, b) => b.interest - a.interest)
-  const champions = readSettings().champions
+  // Read out of the save first, then whatever the user has marked by hand for
+  // a title the save cannot know about.
+  const marked = readSettings().champions
+  const champions = new Set<string>(titleCache.map((t) => t.champion).filter((x): x is string => !!x))
+  if (Array.isArray(marked)) for (const m of marked) if (typeof m === 'string') champions.add(m)
   return {
     transfers,
     threads,
     schoolColors: schoolColorCache,
-    champions: Array.isArray(champions) ? champions.filter((x): x is string => typeof x === 'string') : [],
+    champions: [...champions],
   }
 }

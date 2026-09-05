@@ -19,6 +19,7 @@ import {
 import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
 import { teamTableOrder } from './saveAnalysis'
 import { TEAM_ID_NAMES } from './teamIds'
+import { currentWeek } from './season'
 
 export const SNAPSHOT_VERSION = 3
 
@@ -212,13 +213,7 @@ export function buildSnapshot(
   const userTeamIndex = userTeamName === null ? null
     : (teams.find((t) => t.name === userTeamName)?.index ?? null)
 
-  // The week the dynasty is on: the first week the user's team has not played.
-  let currentWeek: number | null = null
-  if (userTeamName) {
-    const mine = games.filter((g) => !g.postseason && (g.home === userTeamName || g.away === userTeamName))
-    const next = mine.filter((g) => !g.played).map((g) => g.week)
-    currentWeek = next.length ? Math.min(...next) : (mine.length ? Math.max(...mine.map((g) => g.week)) : null)
-  }
+  const week = currentWeek(games, userTeamName)
 
   const roster: SnapshotPlayer[] = []
   const recruits: SnapshotRecruit[] = []
@@ -245,7 +240,7 @@ export function buildSnapshot(
     version: SNAPSHOT_VERSION,
     generated: new Date().toISOString(),
     meta: {
-      currentWeek, userTeamName, userTeamIndex, userTeamId,
+      currentWeek: week, userTeamName, userTeamIndex, userTeamId,
       ratingNames: Object.keys(RATING_BITS), playerCount: players.length,
     },
     teams, games, players: roster, recruits,

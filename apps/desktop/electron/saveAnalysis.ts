@@ -1816,6 +1816,46 @@ export function storeTable(payload: Buffer, name: string): StoreTable | null {
   }
 }
 
+/** A season's title game, once it has been played. */
+export interface SeasonTitle {
+  /** 1 for the dynasty's first season. */
+  season: number
+  /** Rows in the team table, which `teamTableOrder` names. */
+  championIndex: number
+  runnerUpIndex: number
+}
+
+/**
+ * Who won each season, out of `YearSummaryStore`.
+ *
+ * The game table holds the bowls — 36 of them in a finished season — but not
+ * the playoff, and the champion is not among them. The year summary is where it
+ * lives: each row carries two references tagged `0x319e`, which is the team
+ * table's tag, at bytes 8 and 16. The first is the winner.
+ *
+ * Read straight off a real dynasty: season 1 gives Oklahoma over Texas A&M and
+ * season 2 gives Penn State over BYU, which is the title its coach says they
+ * won. The season being played has both empty, and a save taken a year earlier
+ * has season 2 empty too — so the row fills in when the game is played, and an
+ * empty row is a season not yet decided rather than a read that failed.
+ */
+export function readChampions(payload: Buffer): SeasonTitle[] {
+  const t = storeTable(payload, 'YearSummaryStore')
+  if (!t || t.rowBytes < 20) return []
+  const out: SeasonTitle[] = []
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes
+    if (o + t.rowBytes > payload.length) break
+    const ref = (at: number) =>
+      payload.readUInt16BE(o + at) === TEAM_TAG ? payload.readUInt16BE(o + at + 2) : -1
+    const championIndex = ref(8)
+    const runnerUpIndex = ref(16)
+    if (championIndex < 0) continue
+    out.push({ season: r + 1, championIndex, runnerUpIndex })
+  }
+  return out
+}
+
 /**
  * How many seasons the dynasty has reached, counting the one being played.
  *

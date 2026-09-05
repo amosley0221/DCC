@@ -1109,6 +1109,28 @@ that says "2027": the only run of calendar years is a fixed table at
 identical between them. DCC therefore counts seasons and lets the user name
 the current one if they want a year on the screen.
 
+### Who won it
+
+The game table carries the bowls — 36 played rows in a finished season, from
+December 12 to January 3 — and does **not** carry the playoff. The champion is
+not among them: a dynasty whose coach won the title last season has his school
+in none of those 37 rows.
+
+`YearSummaryStore` has it. Each row holds two references tagged `0x319e`, the
+team table's own tag, at bytes 8 and 16, and the first is the winner:
+
+| Season | Byte 8 | Byte 16 |
+| --- | --- | --- |
+| 1 | Oklahoma | Texas A&M |
+| 2 | Penn State | BYU |
+| 3 | — | — |
+
+Season 2 is the title the dynasty's own coach reports winning, and season 3 is
+the one being played. A save taken a year earlier has season 2 empty as well, so
+the row fills in when the game is played rather than being written in advance —
+which means an empty row is a season not yet decided rather than a read that
+failed. `readChampions` returns them.
+
 ### Identity across seasons
 
 Nothing that looks like a player id survives a season.

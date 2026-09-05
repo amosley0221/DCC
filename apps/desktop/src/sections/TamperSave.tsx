@@ -6,6 +6,7 @@ import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { playerKey } from '../../electron/transfers'
 import { TAMPER_OPENS_WEEK } from '../../electron/tamper'
 import { UNITS } from '../../electron/positions'
+import { currentWeek } from '../../electron/season'
 import type { DepthStanding, TamperTarget } from '../../electron/tamper'
 import type { TamperThreadView } from '../../electron/preload'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
@@ -84,7 +85,7 @@ export default function TamperSave() {
     const res = await window.dcc.roster(path, state.teamId)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players, season: res.season } })
+      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players, season: res.season, titles: res.titles } })
     }
   }
 
@@ -93,14 +94,7 @@ export default function TamperSave() {
   const me = state.teamId
   const myName = me === null ? null : nameOf(me)
 
-  /** The week the dynasty is on: your first unplayed game. */
-  const week = useMemo(() => {
-    if (!myName) return null
-    const mine = games.filter((g) => !g.postseason && (g.home === myName || g.away === myName))
-    const next = mine.filter((g) => !g.played).map((g) => g.week)
-    if (next.length) return Math.min(...next)
-    return mine.length ? Math.max(...mine.map((g) => g.week)) : null
-  }, [games, myName])
+  const week = useMemo(() => currentWeek(games, myName), [games, myName])
 
   /** Every school's record this season, as far as the save shows. */
   const records = useMemo(() => {

@@ -21,7 +21,8 @@ declare global {
       roster(path: string, teamId?: number | null): Promise<
         | { ok: true; count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
             schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]
-            players: RosterPlayer[]; season: number | null }
+            players: RosterPlayer[]; season: number | null
+            titles: { season: number; champion: string | null; runnerUp: string | null }[] }
         | { ok: false; message: string }
       >
       transfers(): Promise<TransferView>
