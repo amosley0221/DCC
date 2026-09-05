@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.28.0] - 2026-09-05
+
 ### Added
 
 - **Gold Standard**, a new theme and the default on both apps: warm cream ink
