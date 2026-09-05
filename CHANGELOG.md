@@ -10,6 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.39.1] - 2026-09-05
+
+### Fixed
+
+- **The art pack's face choices said the wrong thing.** "Every roster" left the
+  recruiting board out, and "my roster and the board" quietly packed the whole
+  country. They nest properly now — each is the one above it plus more — and the
+  widest is called **Everyone**, because that is what it is. Each choice also
+  shows how many faces it comes to before you build, so the decision is made on
+  the real number rather than on how big a word sounds.
+
 ## [0.39.0] - 2026-09-05
 
 ### Fixed

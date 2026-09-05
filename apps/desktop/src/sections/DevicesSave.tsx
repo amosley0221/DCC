@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { buildPack } from '../art'
+
+/** The recruiting board and the portal pool sit here rather than on a roster. */
+const UNASSIGNED = 255
 import { useStore } from '../store'
 import { Btn, Card, Chip, Input, Kicker, Meta, SectionHeader, Toggle } from '../ui'
 import type { RelayState } from '../../electron/relay'
@@ -48,27 +51,48 @@ export default function DevicesSave() {
    * plus the board, or the whole country, and the size is reported after so the
    * choice can be made on what it actually costs.
    */
+  /**
+   * Whose faces to carry, widening a step at a time.
+   *
+   * They nest on purpose: each one is the one before it plus more, so a choice
+   * further down never loses anything a choice above it had. The first version
+   * of these did not — "every roster" left out the board, and "my roster and the
+   * board" quietly packed the whole country — which is exactly the kind of thing
+   * a label has to be true about.
+   */
   const faceScopes = [
     ['mine', 'MY ROSTER'],
     ['board', 'MY ROSTER AND THE BOARD'],
-    ['all', 'EVERY ROSTER'],
+    ['all', 'EVERYONE'],
   ] as const
-  const [scope, setScope] = useState<(typeof faceScopes)[number][0]>('mine')
+  type Scope = (typeof faceScopes)[number][0]
+  const [scope, setScope] = useState<Scope>('mine')
   const [packing, setPacking] = useState(false)
   const [packNote, setPackNote] = useState<string | null>(null)
 
-  const assetIds = () => {
-    const players = save.roster?.players ?? []
+  /** Team 255 is not a roster: it is the recruiting board and the portal pool. */
+  const inScope = (p: { team: number }, s: Scope) =>
+    s === 'all' || (s === 'board' && (p.team === state.teamId || p.team === UNASSIGNED))
+    || p.team === state.teamId
+
+  const idsFor = (s: Scope) => {
     const ids = new Set<string>()
-    for (const p of players) {
-      if (!p.assetId) continue
-      const rostered = p.team !== 255
-      if (scope === 'all' ? rostered : scope === 'board' ? true : p.team === state.teamId) {
-        ids.add(p.assetId)
-      }
+    for (const p of save.roster?.players ?? []) {
+      if (p.assetId && inScope(p, s)) ids.add(p.assetId)
     }
-    return [...ids]
+    return ids
   }
+
+  // Counted up front and shown on the chips, so the choice is made on the real
+  // number rather than on how big "everyone" sounds.
+  const scopeCounts = useMemo(() => {
+    const out: Record<Scope, number> = { mine: 0, board: 0, all: 0 }
+    for (const [id] of faceScopes) out[id] = idsFor(id).size
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [save.roster, state.teamId])
+
+  const assetIds = () => [...idsFor(scope)]
 
   const [progress, setProgress] = useState<string | null>(null)
 
@@ -214,7 +238,9 @@ export default function DevicesSave() {
           </p>
           <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             {faceScopes.map(([id, label]) => (
-              <Chip key={id} on={scope === id} onClick={() => setScope(id)}>{label}</Chip>
+              <Chip key={id} on={scope === id} onClick={() => setScope(id)}>
+                {label} {scopeCounts[id].toLocaleString()}
+              </Chip>
             ))}
           </div>
           <div className="row" style={{ gap: 8, marginTop: 10, alignItems: 'center' }}>
