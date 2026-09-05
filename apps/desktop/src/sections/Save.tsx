@@ -256,17 +256,6 @@ export default function Save() {
         ]),
       ] : []),
 
-      ...(save.roster?.stores?.length ? [
-        '',
-        '## Tables in the save',
-        '',
-        'Every store the save declares, with its row and member counts.',
-        '',
-        '| Store | Rows | Members |',
-        '| --- | --- | --- |',
-        ...save.roster.stores.map((st) => `| ${st.name} | ${st.rows.toLocaleString()} | ${st.members} |`),
-      ] : []),
-
       // The extracted-art folder, described by name only. This is what makes a
       // category of art usable — helmets, logos, awards and bowls each have
       // their own scheme — and it travels as a few kilobytes of text rather
@@ -352,6 +341,35 @@ export default function Save() {
         r.preview,
         '```',
       ]),
+      // The structure of the save, and the closest thing it has to a table of
+      // contents. Both come off the analysis rather than the roster pass, so a
+      // report exported before a roster is read still carries them — which is
+      // the point of a report: it is what you send when you do not yet know
+      // what the save holds. This used to sit in the game-install scan, where
+      // nobody looking at a save would ever have found it.
+      ...(report.stores.length ? [
+        '',
+        '## Tables in the save',
+        '',
+        'Every store the save declares, with its row and member counts.',
+        '',
+        '| Store | Rows | Members |',
+        '| --- | --- | --- |',
+        ...report.stores.map((st) => `| ${st.name} | ${st.rows.toLocaleString()} | ${st.members} |`),
+      ] : []),
+
+      ...(report.classNames.length ? [
+        '',
+        '## Class names',
+        '',
+        "Every string shaped like one of the save's own class names, in full.",
+        'Most are declared once, so none of them reach the frequency list below.',
+        '',
+        '```',
+        ...report.classNames.map((c) => `${String(c.count).padStart(4)}  ${c.text}`),
+        '```',
+      ] : []),
+
       '',
       '## Strings',
       '```',

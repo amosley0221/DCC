@@ -71,6 +71,20 @@ export interface SaveReport {
   compressedRegions: SaveRegion[]
   totalInflatedBytes: number
   strings: { text: string; count: number }[]
+  /**
+   * Every string that looks like one of the save's own class names, whatever
+   * its frequency. The frequency list above is capped and sorted by count, so
+   * a class declared once — which most of them are — never appeared in it, and
+   * the class list is the map of what the save actually holds.
+   */
+  classNames: { text: string; count: number }[]
+  /**
+   * Every store the payload declares. Read here rather than in the roster pass
+   * so the report carries it whether or not a roster has been read: it is a
+   * scan for markers, not a decode, and it is the first thing worth knowing
+   * about an unfamiliar save.
+   */
+  stores: StoreRecord[]
   utf16Strings: string[]
   notes: string[]
 }
@@ -197,6 +211,32 @@ function extractStrings(buf: Buffer, min = 5, cap = 120): { text: string; count:
   return [...counts.entries()]
     .map(([text, count]) => ({ text, count }))
     .sort((a, b) => b.count - a.count || b.text.length - a.text.length)
+    .slice(0, cap)
+}
+
+/**
+ * Strings shaped like a Frostbite class name: capitalised, no spaces, possibly
+ * an array suffix. The registry names its classes this way, so this is the
+ * closest thing the save has to a table of contents.
+ */
+function extractClassNames(buf: Buffer, cap = 600): { text: string; count: number }[] {
+  const counts = new Map<string, number>()
+  let cur: number[] = []
+  const flush = () => {
+    if (cur.length >= 5 && cur.length <= 48) {
+      const s = Buffer.from(cur).toString('latin1')
+      if (/^[A-Z][A-Za-z0-9_]*(\[\])?$/.test(s)) counts.set(s, (counts.get(s) ?? 0) + 1)
+    }
+    cur = []
+  }
+  for (const b of buf) {
+    if (b >= 0x20 && b <= 0x7e) cur.push(b)
+    else flush()
+  }
+  flush()
+  return [...counts.entries()]
+    .map(([text, count]) => ({ text, count }))
+    .sort((a, b) => a.text.localeCompare(b.text))
     .slice(0, cap)
 }
 
@@ -377,6 +417,8 @@ export function analyzeSave(path: string): SaveReport {
     compressedRegions: regions,
     totalInflatedBytes: regions.reduce((s, r) => s + r.inflatedBytes, 0),
     strings: extractStrings(textSource),
+    classNames: extractClassNames(textSource),
+    stores: readStores(textSource),
     utf16Strings: extractUtf16(textSource),
     notes,
   }
