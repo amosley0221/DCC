@@ -1503,7 +1503,7 @@ export interface SeasonGame {
  * row and requiring the same position to reproduce nine games' worth — see
  * docs/SAVE-FORMAT.md.
  */
-const G = {
+export const GAME_BITS = {
   kickoff: [578, 11], attendance: [589, 19],
   homeScore: [640, 8], awayScore: [648, 8], temperature: [664, 8],
   homeOT: [676, 7], awayOT: [683, 7],
@@ -1513,6 +1513,8 @@ const G = {
   /** 1 for a simulated game, 0 for one the user played; bit 789 is the reverse. */
   simmed: [786, 1], userPlayed: [789, 1], overtime: [790, 1],
 } as const
+
+const G = GAME_BITS
 
 /** Byte offsets, within a row, of the two team references (tag 0x319e). */
 const G_AWAY_REF = 12
@@ -1544,13 +1546,24 @@ export function teamTableOrder(teams: TeamRecord[]): TeamRecord[] {
  * midnight, temperature is Fahrenheit plus 40 (the schema's floor is -40), and
  * the final score already includes overtime, which is also kept separately.
  */
-export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGame[] {
+/**
+ * Byte offset of the first game row, and the number of rows, or null when the
+ * store is not present. The rows follow the store's `BSFT` header words and its
+ * one word per member.
+ */
+export function seasonGameTable(payload: Buffer): { data: number; rows: number } | null {
   const store = readStores(payload).find((s) => s.name === 'SeasonGameStore')
-  if (!store) return []
+  if (!store) return null
   const bsft = payload.indexOf(Buffer.from('BSFT', 'latin1'), store.offset)
-  if (bsft < 0) return []
-  // Header words, then one word per member, then the rows.
-  const data = bsft + 28 + store.members * 4
+  if (bsft < 0) return null
+  return { data: bsft + 28 + store.members * 4, rows: store.rows }
+}
+
+export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGame[] {
+  const table = seasonGameTable(payload)
+  if (!table) return []
+  const { data, rows: rowCount } = table
+  const store = { rows: rowCount }
   const order = teamTableOrder(teams)
   const nameOf = (i: number) => (i >= 0 && i < order.length ? order[i].name : null)
 

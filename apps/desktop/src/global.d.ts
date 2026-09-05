@@ -1,6 +1,7 @@
 import type { UpdateStatus } from './updates'
 import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
+import type { GameEdit, WriteResult } from '../electron/saveWrite'
 
 declare global {
   interface Window {
@@ -18,6 +19,7 @@ declare global {
             schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]; players: RosterPlayer[] }
         | { ok: false; message: string }
       >
+      writeGames(path: string, edits: GameEdit[]): Promise<WriteResult>
       pickInstall(): Promise<string | null>
       pickFaces(): Promise<string | null>
       indexFaces(

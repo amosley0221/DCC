@@ -1,7 +1,7 @@
 {
   "name": "@dcc/desktop",
   "productName": "Dynasty Command Center",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "private": true,
   "description": "Dynasty Command Center — Windows workspace and save agent.",
   "author": {
@@ -15,7 +15,8 @@
     "dist": "npm run build && electron-builder --win --publish never",
     "dist:dir": "npm run build && electron-builder --win --dir --publish never",
     "check:assets": "esbuild electron/gameAssets.ts --bundle --platform=node --format=cjs --outfile=.tmp-assets.cjs --log-level=error && node check-assets.cjs ./.tmp-assets.cjs",
-    "check:save": "esbuild electron/saveAnalysis.ts --bundle --platform=node --format=cjs --outfile=.tmp-save.cjs --log-level=error && node check-save.cjs ./.tmp-save.cjs"
+    "check:save": "esbuild electron/saveAnalysis.ts --bundle --platform=node --format=cjs --outfile=.tmp-save.cjs --log-level=error && node check-save.cjs ./.tmp-save.cjs",
+    "check:write": "esbuild electron/saveWrite.ts --bundle --platform=node --format=cjs --outfile=.tmp-write.cjs --log-level=error && esbuild electron/saveAnalysis.ts --bundle --platform=node --format=cjs --outfile=.tmp-save.cjs --log-level=error && node check-write.cjs ./.tmp-write.cjs ./.tmp-save.cjs"
   },
   "dependencies": {
     "electron-updater": "6.3.9"

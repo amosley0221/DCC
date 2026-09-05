@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Card, Chip, Empty, Kicker, Meta, SchoolArt } from '../ui'
+import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SchoolArt } from '../ui'
 import type { SeasonGame } from '../../electron/saveAnalysis'
-import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
+import { WEATHER, dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
+
+/** Kickoff times the game offers, in minutes after midnight. */
+const KICKOFFS = [720, 750, 810, 840, 900, 960, 1020, 1080, 1110, 1170, 1215, 1260, 1290, 1365]
+/** Conditions the Weather field can actually hold; the dynamic and random ones are not offered. */
+const CONDITIONS = [0, 2, 1, 4, 5, 6, 7, 8, 9]
 
 /**
  * Schedule and results, read from the save's game table.
@@ -12,10 +17,13 @@ import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
  * own game and keeps those scores out of sight until it is played, so showing
  * them here would spoil the week.
  */
-export default function Schedule({ games, team, art }: {
+export default function Schedule({ games, team, art, savePath, onEdited, log }: {
   games: SeasonGame[]
   team: string | null
   art: Record<string, string>
+  savePath: string | null
+  onEdited: () => void
+  log: (text: string, kind?: 'good' | 'bad') => void
 }) {
   const [open, setOpen] = useState<number | null>(null)
   const [spoilers, setSpoilers] = useState(false)
@@ -51,7 +59,8 @@ export default function Schedule({ games, team, art }: {
           </div>
           {mine.filter((g) => !g.postseason).map((g) => (
             <GameRow key={g.row} g={g} team={team} icon={icon} open={open === g.row}
-              onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={false} />
+              onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={false}
+              savePath={savePath} onEdited={onEdited} log={log} />
           ))}
         </Card>
       ) : null}
@@ -71,16 +80,19 @@ export default function Schedule({ games, team, art }: {
         {league.length === 0 ? <Empty>no games that week</Empty> : null}
         {league.map((g) => (
           <GameRow key={g.row} g={g} team={team} icon={icon} open={open === g.row}
-            onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={hidden(g)} />
+            onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={hidden(g)}
+            savePath={savePath} onEdited={onEdited} log={log} />
         ))}
       </Card>
     </>
   )
 }
 
-function GameRow({ g, team, icon, open, onToggle, hidden }: {
+function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, log }: {
   g: SeasonGame; team: string | null; icon: (n: string | null) => string | undefined
   open: boolean; onToggle: () => void; hidden: boolean
+  savePath: string | null; onEdited: () => void
+  log: (text: string, kind?: 'good' | 'bad') => void
 }) {
   const mineHome = team !== null && g.home === team
   const mineAway = team !== null && g.away === team
@@ -118,12 +130,16 @@ function GameRow({ g, team, icon, open, onToggle, hidden }: {
           {g.userPlayed ? <Meta size={9} color="var(--accent)">YOU PLAYED</Meta> : null}
         </div>
       </button>
-      {open && !hidden ? <BoxScore g={g} /> : null}
+      {open && !hidden ? <BoxScore g={g} savePath={savePath} onEdited={onEdited} log={log} /> : null}
     </div>
   )
 }
 
-function BoxScore({ g }: { g: SeasonGame }) {
+function BoxScore({ g, savePath, onEdited, log }: {
+  g: SeasonGame; savePath: string | null; onEdited: () => void
+  log: (text: string, kind?: 'good' | 'bad') => void
+}) {
+  const [editing, setEditing] = useState(false)
   const kickoff = kickoffLabel(g.kickoff)
   const weather = weatherName(g.weather)
   const facts = [
@@ -157,6 +173,86 @@ function BoxScore({ g }: { g: SeasonGame }) {
           <Meta size={9}>Team and player statistics are only kept by the game for the current week; DCC shows what the save still holds.</Meta>
         </div>
       ) : null}
+      {savePath && !g.played ? (
+        editing
+          ? <Conditions g={g} savePath={savePath} onDone={() => { setEditing(false); onEdited() }}
+              onCancel={() => setEditing(false)} log={log} />
+          : (
+            <div style={{ marginTop: 8 }}>
+              <Btn size="sm" onClick={() => setEditing(true)}>Change kickoff and conditions</Btn>
+            </div>
+          )
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * The editor for an upcoming game.
+ *
+ * Only the four fields DCC can write are offered, and only the conditions the
+ * game's own Weather field can hold — offering one it cannot is exactly the
+ * failure that makes a save refuse the write.
+ */
+function Conditions({ g, savePath, onDone, onCancel, log }: {
+  g: SeasonGame; savePath: string; onDone: () => void; onCancel: () => void
+  log: (text: string, kind?: 'good' | 'bad') => void
+}) {
+  const [kickoff, setKickoff] = useState(g.kickoff)
+  const [weather, setWeather] = useState(g.weather)
+  const [temp, setTemp] = useState(String(g.temperatureF))
+  const [wind, setWind] = useState(String(g.windMph))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const save = async () => {
+    setBusy(true); setError(null)
+    const res = await window.dcc.writeGames(savePath, [{
+      row: g.row, kickoff, weather,
+      temperatureF: Number(temp), windMph: Number(wind),
+    }])
+    setBusy(false)
+    if (!res.ok) { setError(res.message); log(`schedule edit refused: ${res.message}`, 'bad'); return }
+    log(`${g.away} at ${g.home}: ${res.message}. Backup at ${res.backup}`, 'good')
+    onDone()
+  }
+
+  return (
+    <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--accent)', borderRadius: 4 }}>
+      <Kicker>Kickoff</Kicker>
+      <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+        {KICKOFFS.map((k) => (
+          <Chip key={k} on={k === kickoff} onClick={() => setKickoff(k)}>{kickoffLabel(k)}</Chip>
+        ))}
+      </div>
+      <div style={{ marginTop: 10 }}><Kicker>Conditions</Kicker></div>
+      <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+        {CONDITIONS.map((w) => (
+          <Chip key={w} on={w === weather} onClick={() => setWeather(w)}>{WEATHER[w]}</Chip>
+        ))}
+      </div>
+      <div className="row" style={{ gap: 14, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="row" style={{ gap: 6, alignItems: 'center' }}>
+          <Meta size={9}>TEMPERATURE °F</Meta>
+          <Input style={{ width: 70 }} value={temp} onChange={(e) => setTemp(e.target.value)} />
+        </span>
+        <span className="row" style={{ gap: 6, alignItems: 'center' }}>
+          <Meta size={9}>WIND MPH</Meta>
+          <Input style={{ width: 70 }} value={wind} onChange={(e) => setWind(e.target.value)} />
+        </span>
+      </div>
+      <p className="body-serif" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
+        The game decides a week's weather when that week begins, so conditions set before
+        then are replaced when you advance. Kickoff holds whenever it is set. A timestamped
+        backup of the save is written first.
+      </p>
+      {error ? <Meta size={9} color="var(--warn)">{error}</Meta> : null}
+      <div className="row" style={{ gap: 8, marginTop: 10 }}>
+        <Btn variant="primary" size="sm" onClick={save} disabled={busy}>
+          {busy ? 'Writing…' : 'Write to the save'}
+        </Btn>
+        <Btn size="sm" onClick={onCancel}>Cancel</Btn>
+      </div>
     </div>
   )
 }

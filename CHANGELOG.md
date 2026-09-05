@@ -10,6 +10,28 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.23.0] - 2026-09-05
+
+### Added
+
+- **DCC can write to your save.** Kickoff time, conditions, temperature and
+  wind can be changed on an upcoming game, from the Schedule tab. A timestamped
+  backup is taken first, and the write is refused unless the rebuilt save reads
+  back with exactly the change asked for and nothing else moved.
+- **Only conditions the game can store are offered.** The save's `Weather`
+  field has no Fog, so DCC does not offer one.
+
+### Notes
+
+- The container has no checksum, which is what makes writing safe: the only
+  field to update alongside the stream is its compressed length.
+- Verified against an independent writer. The same edit made in another tool
+  changed seven bytes of the game table; DCC changes five, and all five hold
+  the same values. The two it does not write are that tool's own bookkeeping,
+  one of which lands in a neighbouring game's record.
+- Weather set before a week begins is replaced when you advance to it, because
+  the game generates that week's weather itself. Kickoff holds whenever set.
+
 ## [0.22.0] - 2026-09-05
 
 ### Added

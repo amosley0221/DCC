@@ -264,7 +264,14 @@ export default function TeamSave() {
             ))}
           </Card>
         ) : tab === 'SCHEDULE' && roster ? (
-          <Schedule games={roster.games ?? []} team={mine ? nameOf(mine.id) : null} art={save.schoolArt} />
+          <Schedule
+            games={roster.games ?? []}
+            team={mine ? nameOf(mine.id) : null}
+            art={save.schoolArt}
+            savePath={path}
+            onEdited={load}
+            log={(text, kind) => dispatch({ type: 'log', line: { text, kind: kind ?? 'good' } })}
+          />
         ) : tab !== 'ROSTER' ? (
           <Card className="card-pad">
             <Kicker>{tab === 'SCHEDULE' ? 'Schedule' : 'Not decoded yet'}</Kicker>

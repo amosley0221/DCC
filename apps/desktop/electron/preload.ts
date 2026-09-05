@@ -22,6 +22,8 @@ const api = {
   pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   roster: (path: string) => ipcRenderer.invoke('save:roster', path),
+  writeGames: (path: string, edits: unknown[]) =>
+    ipcRenderer.invoke('save:writeGames', { path, edits }),
   pickInstall: () => ipcRenderer.invoke('assets:pickInstall') as Promise<string | null>,
   pickFaces: () => ipcRenderer.invoke('assets:pickFaces') as Promise<string | null>,
   indexFaces: (dir: string, assetIds: string[], schools: { name: string; fullName: string | null }[]) =>

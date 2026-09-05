@@ -12,6 +12,8 @@ import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
   indexFaces, matchFaces, matchSchools,
 } from './gameAssets'
+import { writeGameEdits } from './saveWrite'
+import type { GameEdit } from './saveWrite'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -219,6 +221,14 @@ ipcMain.handle('save:roster', (_e, path: string) => {
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:writeGames', (_e, { path, edits }: { path: string; edits: GameEdit[] }) => {
+  try {
+    return writeGameEdits(path, edits)
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

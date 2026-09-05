@@ -1121,3 +1121,45 @@ once.
   entries, not team references. It is not the schedule in any useful sense.
 - December rows carry week numbers from the regular-season range, so week alone
   does not separate bowls; the month does.
+
+
+## Writing to a save
+
+The container is a fixed-size file: an 82-byte `FBCHUNKS` header whose chunk
+record carries the compressed length at offset 74, one zlib stream, then slack.
+
+**There is no checksum.** Three saves of the same dynasty carry different
+amounts of stale data past the end of their streams — bytes left over from an
+earlier, longer save — which a verified file could not do. The only field that
+has to be updated alongside the stream is the length at offset 74. Node's zlib
+at level 9 compresses the payload smaller than the game's own stream, so a
+rebuilt save always fits back in its original file length.
+
+**Confirmed against an independent writer.** DynastyOS was used to change one
+game — Penn State at USC, kickoff 3:00 PM to 12:00, 71°F to 33, partly cloudy
+to overcast, 12 mph to 20 — and the resulting save was diffed against the
+original. Sixty bytes changed in the whole 31 MB payload, of which seven were
+in the game table. DCC's writer, asked for the same change, produces five
+changed bytes, and all five hold the same values DynastyOS wrote. That is
+simultaneously a confirmation of the bit positions for kickoff, temperature,
+weather and wind, and of the write path itself.
+
+The two bytes DCC does not write are worth recording. One is a single bit
+inside the unidentified region at bits 608–639, which reads 1 for every
+overcast and partly-cloudy game in the save; DynastyOS set it to 0 while
+setting the weather *to* overcast, which disagrees with every other overcast
+game. The other lands in byte 3 of the *following* game's record, a different
+fixture entirely. Neither is copied.
+
+**What the writer refuses.** The payload is edited in memory and then checked
+to differ from the original only at the bytes the edit was allowed to touch; the
+rebuilt file is re-read, re-inflated and re-decoded, and each edited field is
+confirmed to read back as the value asked for, with the other three confirmed
+unchanged. Any failure returns before the save is touched. The original is
+copied to a timestamped `.dccbak` first, and the new bytes are written beside
+it and renamed, so an interrupted write cannot leave a truncated save.
+
+Validation comes from the schema rather than from guesswork, which matters:
+DynastyOS offers Fog as a condition, and the game's `Weather` field has no Fog,
+so choosing it fails with *"Argument is not a valid enum value for this field.
+You passed in Fog."* DCC only offers values the field can hold.
