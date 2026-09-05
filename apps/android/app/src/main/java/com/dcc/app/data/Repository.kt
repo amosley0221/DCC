@@ -98,16 +98,28 @@ object Repository {
     }
 
     /**
-     * A newer snapshot is allowed through: added fields are ignored, and a
-     * version that genuinely broke the shape fails on its missing fields
-     * anyway. An older one is refused, because those fields are simply gone.
+     * Any snapshot this build can read is let through, new or old.
+     *
+     * This used to refuse anything older than the phone's own version, which
+     * meant every version bump on the desktop broke the phone until the user
+     * re-exported — and if the two apps updated a few minutes apart, a snapshot
+     * published seconds earlier was refused as out of date. That is the wrong
+     * trade: every field added since version 2 carries a default, so an older
+     * document parses and simply has nothing in the newer lists. What is
+     * missing is worth saying on the screen; it is not worth refusing the
+     * dynasty over.
+     *
+     * A newer one is let through for the same reason from the other side:
+     * unknown keys are ignored, and a version that genuinely broke the shape
+     * fails on its missing fields anyway.
      */
     private fun decodeSnapshot(document: String): DynastySnapshot {
         val snapshot = runCatching { json.decodeFromString(DynastySnapshot.serializer(), document) }
             .getOrElse { throw IllegalArgumentException("that is not a DCC snapshot") }
-        if (snapshot.version < SNAPSHOT_VERSION) {
+        if (snapshot.version < MIN_SNAPSHOT_VERSION) {
             throw IllegalArgumentException(
-                "snapshot version ${snapshot.version} — export it again from the desktop app",
+                "snapshot version ${snapshot.version} is older than this app can read — " +
+                    "export it again from the desktop app",
             )
         }
         return snapshot

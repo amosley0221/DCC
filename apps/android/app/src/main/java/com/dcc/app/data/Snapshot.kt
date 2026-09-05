@@ -19,6 +19,15 @@ import java.time.format.DateTimeFormatter
  */
 const val SNAPSHOT_VERSION = 4
 
+/**
+ * The oldest snapshot this build can still make sense of.
+ *
+ * Everything added since carries a default, so an older document opens with the
+ * newer lists empty rather than being turned away. Raise this only if a change
+ * ever makes an old snapshot unreadable rather than merely thinner.
+ */
+const val MIN_SNAPSHOT_VERSION = 2
+
 @Serializable
 data class DynastySnapshot(
     val version: Int,

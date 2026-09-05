@@ -10,6 +10,19 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.35.1] - 2026-09-05
+
+### Fixed
+
+- **The phone stopped refusing your dynasty.** It would only open a snapshot
+  written by a desktop build of exactly its own version or newer, so every
+  version bump broke the phone until you exported again — and if the two apps
+  updated minutes apart, a snapshot published seconds earlier came back as
+  "export it again from the desktop app". Every field added since the format
+  settled carries a default, so an older snapshot opens perfectly well with the
+  newer lists empty. It now does, and the Dynasty file screen says when one was
+  written by an older build rather than turning it away.
+
 ## [0.35.0] - 2026-09-05
 
 ### Fixed

@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.dcc.app.BuildConfig
 import com.dcc.app.data.Dynasty
 import com.dcc.app.data.Persisted
+import com.dcc.app.data.SNAPSHOT_VERSION
 import com.dcc.app.data.SaveLabels
 import com.dcc.app.state.AppViewModel
 import com.dcc.app.state.SnapshotView
@@ -91,6 +92,16 @@ fun SettingsSection(
                         "${s.players.size} players · ${s.recruits.size} recruits",
                     c.ink3, 10, maxLines = 3,
                 )
+                // An older snapshot is read rather than refused, so what it
+                // does not carry is said here instead of on an empty screen.
+                if (s.version < SNAPSHOT_VERSION) {
+                    Spacer(Modifier.height(5.dp))
+                    MetaText(
+                        "WRITTEN BY AN OLDER DESKTOP BUILD — SOME SCREENS WILL BE EMPTY " +
+                            "UNTIL YOU EXPORT IT AGAIN",
+                        c.warn, 10, maxLines = 3,
+                    )
+                }
             } else {
                 MetaText("NO SNAPSHOT IMPORTED", c.ink3, 10)
                 Spacer(Modifier.height(7.dp))
