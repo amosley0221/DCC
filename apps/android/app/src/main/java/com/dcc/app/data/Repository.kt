@@ -97,7 +97,7 @@ object Repository {
      */
     private fun decodeSnapshot(document: String): DynastySnapshot {
         val snapshot = runCatching { json.decodeFromString(DynastySnapshot.serializer(), document) }
-            .getOrElse { throw IllegalArgumentException("that file is not a DCC snapshot") }
+            .getOrElse { throw IllegalArgumentException("that is not a DCC snapshot") }
         if (snapshot.version < SNAPSHOT_VERSION) {
             throw IllegalArgumentException(
                 "snapshot version ${snapshot.version} — export it again from the desktop app",

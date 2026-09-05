@@ -251,8 +251,8 @@ fun SettingsSection(
             BodySerif(
                 "The relay is the Windows app itself: while its server is on, this phone reads " +
                     "the dynasty straight off that machine and nothing leaves the house. Its " +
-                    "address and code are entered under Dynasty snapshot, above, because " +
-                    "fetching one is the only thing they do so far.",
+                    "address and code go under Dynasty snapshot, above, since fetching the " +
+                    "dynasty is all they do so far.",
             )
             Spacer(Modifier.height(11.dp))
             MetaText(
