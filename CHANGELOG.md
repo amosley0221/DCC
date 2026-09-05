@@ -8,7 +8,26 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- **Gold Standard has its own shell on the phone.** 0.28.0 shipped the theme's
+  colours over the old left rail, which is not the design and read as a
+  repaint. The phone now gets the shell the design asks for: a centred
+  masthead with the week under it, five tabs within reach of a thumb — Home,
+  Board, Portal, League, Legacy — and one control in the masthead for
+  everything operational, so a screen meant to read as coverage carries none
+  of it. Night Wire and Field Office keep the rail they were built with.
+- **Home on the phone** is the feature, Saturday's results as cards you scroll
+  across, and your board with avatars, stars and a pill.
+- **Numbers are Bodoni on the phone too.** The shared components put numbers in
+  the mono slot, which under Gold Standard is Manrope — right for a label,
+  wrong for a score. Every number you read as data is Bodoni now, which is a
+  large part of why the old screen read as a palette swap.
+
+### Fixed
+
+- The launch check takes a screenshot and reads the words off the screen, so a
+  build that opens the wrong screen entirely fails rather than passing.
 
 ## [0.28.0] - 2026-09-05
 
