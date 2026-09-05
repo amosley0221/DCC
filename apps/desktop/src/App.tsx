@@ -21,6 +21,7 @@ import Transfers from './sections/Transfers'
 import Save from './sections/Save'
 import RecruitSave from './sections/RecruitSave'
 import TeamSave from './sections/TeamSave'
+import League from './sections/League'
 import TamperSave from './sections/TamperSave'
 import DevicesSave from './sections/DevicesSave'
 import { Meta, Tab } from './ui'
@@ -206,11 +207,16 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
               body="Not connected yet. DCC reads College Football 27 saves today and exports a draft class into Madden. This game joins the same shell once its save format is read."
             />
           ) : section === 'HOME' && save.report ? (
-            <WireSave />
+            <WireSave onOpenLeague={() => setSection('LEAGUE')} />
           ) : section === 'PROGRAM' && save.report ? (
             <TeamSave />
           ) : section === 'LEAGUE' && save.report ? (
-            <TeamSave view="schedule" />
+            // Its own screen rather than Team's schedule tab. Sharing a
+            // component put both branches in the same slot of one conditional
+            // chain, so React reused the instance and League opened on
+            // whichever tab Program was left on — which is why League said
+            // SCORES and showed the roster.
+            <League onOpenProgram={() => setSection('PROGRAM')} />
           ) : section === 'RECRUITING' && save.report ? (
             <RecruitSave />
           ) : section === 'PORTAL' && save.report ? (

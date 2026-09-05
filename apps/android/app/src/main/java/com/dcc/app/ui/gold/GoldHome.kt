@@ -1,5 +1,7 @@
 package com.dcc.app.ui.gold
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +22,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,13 +36,15 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dcc.app.data.League
 import com.dcc.app.data.Persisted
 import com.dcc.app.data.SnapshotGame
 import com.dcc.app.data.SnapshotRecruit
 import com.dcc.app.state.SnapshotView
+import com.dcc.app.ui.components.PlayerFace
+import com.dcc.app.ui.components.SchoolBadge
 import com.dcc.app.ui.theme.Dcc
-import com.dcc.app.ui.theme.initialsOf
-import com.dcc.app.ui.theme.toneFor
+import kotlinx.coroutines.delay
 
 /**
  * Home, as the handoff draws it for a phone: a feature, Saturday's scores
@@ -74,6 +83,43 @@ fun GoldHome(
         .filter { it.played && !snap.holds(it, false) }
         .sortedByDescending { snap.isUserGame(it) }
     val board = snap.recruits.take(6)
+
+    /**
+     * Saturday, either your league or the ranked games.
+     *
+     * The country plays a hundred and twenty games a week and a phone cannot
+     * show them all, so the rail carries the ones you would actually look for:
+     * your conference by default, the top 25 on a tap. Both are ordered with
+     * your own game first.
+     */
+    var ranked by rememberSaveable { mutableStateOf(false) }
+    val table = remember(snap) {
+        League.build(
+            League.visible(snap.snapshot.games, me?.index, snap.holdFrom, false),
+            snap.snapshot.teams,
+        )
+    }
+    val rankOf = remember(table) {
+        League.rankings(table).withIndex().associate { (i, r) -> r.index to i + 1 }
+    }
+    val bestRank = { g: SnapshotGame ->
+        minOf(rankOf[g.homeIndex] ?: 999, rankOf[g.awayIndex] ?: 999)
+    }
+    val shown = remember(saturday, ranked, table, rankOf) {
+        val conference = me?.conference
+        val picked = if (!ranked && !conference.isNullOrBlank()) {
+            saturday.filter {
+                table[it.homeIndex]?.conference == conference || table[it.awayIndex]?.conference == conference
+            }
+        } else {
+            saturday.filter { bestRank(it) <= 25 }
+        }
+        // Never an empty rail because a filter found nothing: the week itself is
+        // the fallback, and it is the honest one.
+        (if (picked.isEmpty()) saturday else picked).sortedWith(
+            compareByDescending<SnapshotGame> { snap.isUserGame(it) }.thenBy { bestRank(it) },
+        )
+    }
 
     Column(
         Modifier
@@ -136,15 +182,48 @@ fun GoldHome(
 
         // ── Saturday ──────────────────────────────────────────────────────
         if (saturday.isNotEmpty()) {
-            Label("SATURDAY", 10.0, c.ink3, 2.0, Modifier.padding(top = 2.dp))
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().padding(top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Label(
+                    if (ranked) "SATURDAY · RANKED"
+                    else "SATURDAY · ${(me?.conference ?: "AROUND THE COUNTRY").uppercase()}",
+                    10.0, c.ink3, 2.0, Modifier.weight(1f),
+                )
+                Label(
+                    if (ranked) "MY LEAGUE" else "TOP 25",
+                    10.0, c.accent, 1.5,
+                    Modifier.clickable { ranked = !ranked },
+                )
+            }
+
+            // It scrolls itself, slowly, so a glance at the phone gets more than
+            // the first two cards. A drag interrupts it and it picks up again.
+            val scroll = rememberScrollState()
+            LaunchedEffect(scroll.maxValue, ranked) {
+                if (scroll.maxValue <= 0) return@LaunchedEffect
+                while (true) {
+                    delay(2500)
+                    scroll.animateScrollTo(
+                        scroll.maxValue,
+                        tween(durationMillis = scroll.maxValue * 14 + 1200, easing = LinearEasing),
+                    )
+                    delay(2500)
+                    scroll.animateScrollTo(0, tween(durationMillis = 1100, easing = LinearEasing))
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(scroll),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                for (g in saturday.take(14)) {
-                    ScoreCard(g, mine = snap.isUserGame(g)) { onOpenGame(g) }
+                for (g in shown.take(18)) {
+                    ScoreCard(
+                        g,
+                        mine = snap.isUserGame(g),
+                        awayRank = rankOf[g.awayIndex],
+                        homeRank = rankOf[g.homeIndex],
+                    ) { onOpenGame(g) }
                 }
             }
         }
@@ -205,7 +284,7 @@ private fun featureStandfirst(g: SnapshotGame?, wins: Int?, losses: Int?): Strin
 
 /** One Saturday result, sized for a thumb to scroll past. */
 @Composable
-private fun ScoreCard(g: SnapshotGame, mine: Boolean, onOpen: () -> Unit) {
+private fun ScoreCard(g: SnapshotGame, mine: Boolean, awayRank: Int?, homeRank: Int?, onOpen: () -> Unit) {
     val c = Dcc.colors
     val homeWon = g.homeScore > g.awayScore
     Column(
@@ -217,16 +296,29 @@ private fun ScoreCard(g: SnapshotGame, mine: Boolean, onOpen: () -> Unit) {
             .clickable(onClick = onOpen)
             .padding(horizontal = 11.dp, vertical = 9.dp),
     ) {
-        ScoreLine(g.away ?: "", g.awayScore, dim = homeWon)
+        ScoreLine(g.away ?: "", g.awayScore, dim = homeWon, rank = awayRank)
         Spacer(Modifier.height(4.dp))
-        ScoreLine(g.home ?: "", g.homeScore, dim = !homeWon)
+        ScoreLine(g.home ?: "", g.homeScore, dim = !homeWon, rank = homeRank)
     }
 }
 
+/**
+ * One side of a score, with the school's helmet.
+ *
+ * Shared by Saturday's cards on Home and by the League tab's wider rows, so the
+ * helmet arrives in both at once. Without an art pack `SchoolBadge` draws its
+ * two-letter disc and the row reads exactly as it did before.
+ */
 @Composable
-private fun ScoreLine(team: String, score: Int, dim: Boolean) {
+private fun ScoreLine(team: String, score: Int, dim: Boolean, rank: Int? = null) {
     val c = Dcc.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
+        SchoolBadge(team.take(2).uppercase(), team, false, 17.dp, "helmet")
+        Spacer(Modifier.width(6.dp))
+        if (rank != null && rank <= 25) {
+            Label("$rank", 9.0, c.ink3, 0.5)
+            Spacer(Modifier.width(4.dp))
+        }
         Ui(team, 11.0, if (dim) c.ink3 else c.ink, FontWeight.SemiBold, Modifier.weight(1f), maxLines = 1)
         Spacer(Modifier.width(6.dp))
         GoldNum("$score", 15, if (dim) c.ink3 else c.ink)
@@ -235,7 +327,15 @@ private fun ScoreLine(team: String, score: Int, dim: Boolean) {
 
 /** A score row wide enough to stand on its own, for the League tab. */
 @Composable
-fun GoldScoreRow(away: String, awayScore: Int, home: String, homeScore: Int, modifier: Modifier = Modifier) {
+fun GoldScoreRow(
+    away: String,
+    awayScore: Int,
+    home: String,
+    homeScore: Int,
+    modifier: Modifier = Modifier,
+    awayRank: Int? = null,
+    homeRank: Int? = null,
+) {
     val c = Dcc.colors
     val homeWon = homeScore > awayScore
     Column(
@@ -246,9 +346,9 @@ fun GoldScoreRow(away: String, awayScore: Int, home: String, homeScore: Int, mod
             .background(c.surface)
             .padding(horizontal = 13.dp, vertical = 10.dp),
     ) {
-        ScoreLine(away, awayScore, dim = homeWon)
+        ScoreLine(away, awayScore, dim = homeWon, rank = awayRank)
         Spacer(Modifier.height(4.dp))
-        ScoreLine(home, homeScore, dim = !homeWon)
+        ScoreLine(home, homeScore, dim = !homeWon, rank = homeRank)
     }
 }
 
@@ -267,16 +367,7 @@ private fun BoardRow(r: SnapshotRecruit, scouted: Boolean, onOpen: () -> Unit) {
         Modifier.clickable(onClick = onOpen),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(toneFor(name, c.tones))
-                .border(1.dp, c.line, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            GoldNum(initialsOf(name), 10, c.ink)
-        }
+        PlayerFace(name, r.assetId, 30.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

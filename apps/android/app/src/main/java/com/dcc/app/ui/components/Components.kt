@@ -486,12 +486,39 @@ fun Portrait(name: String, size: Dp = 32.dp, generating: Boolean = false) {
 }
 
 /**
- * School badge. Real marks are licensed art the app cannot ship, so this is a
- * fictional monogram — the same slot an extracted logo would fill later.
+ * A school, wherever one is named: its own mark when the art pack has it, and
+ * the two-letter disc when it does not.
+ *
+ * Every screen that names a school already went through here, so teaching this
+ * one composable to look in the art pack put logos on all of them at once —
+ * standings, scores, the recruiting board, the transfer list. The first version
+ * of the pack shipped with a `SchoolMark` composable that nothing called, which
+ * is why 143 schools of art arrived on the phone and none of it appeared.
  */
 @Composable
-fun SchoolBadge(monogram: String, name: String, isUser: Boolean, size: Dp = 22.dp) {
+fun SchoolBadge(
+    monogram: String,
+    name: String,
+    isUser: Boolean,
+    size: Dp = 22.dp,
+    kind: String = "logo",
+) {
     val c = Dcc.colors
+    val context = LocalContext.current
+    val file = remember(name, kind) { ArtPack.school(context, name, kind) }
+
+    // A logo is drawn as itself, on nothing: these marks carry their own shape,
+    // and a coloured disc behind one only makes it harder to read.
+    if (file != null) {
+        Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            // A `return` here would be a non-local return out of a lambda that
+            // is not inline, which does not compile; the flag is the way.
+            val drawn = ArtImage(file, Modifier.size(size))
+            if (!drawn) MonoLabel(monogram, c.ink3, (size.value * 0.34f).toInt().coerceAtLeast(7))
+        }
+        return
+    }
+
     Box(
         Modifier.size(size).clip(CircleShape)
             .background(if (isUser) c.accent else toneFor(name, c.tones))
@@ -571,27 +598,6 @@ fun ArtImage(
     return true
 }
 
-/**
- * A school's mark at a given size, falling back to its two-letter monogram.
- * `kind` is "logo", "gold", "helmet" or "jersey".
- */
-@Composable
-fun SchoolMark(school: String?, monogram: String, size: Dp, kind: String = "logo") {
-    val context = LocalContext.current
-    val file = remember(school, kind) { ArtPack.school(context, school, kind) }
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        val drawn = ArtImage(file, Modifier.size(size))
-        if (!drawn) MonoLabel(monogram, Dcc.colors.ink3, (size.value * 0.34f).toInt().coerceAtLeast(7))
-    }
-}
-
-/**
- * A player's face out of the art pack, falling back to the initials disc.
- *
- * The fallback is what the app drew before there was a pack at all, so a phone
- * that has never been given one looks exactly as it did rather than looking
- * broken.
- */
 @Composable
 fun PlayerFace(name: String, assetId: String?, size: Dp) {
     val context = LocalContext.current

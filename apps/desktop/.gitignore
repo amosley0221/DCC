@@ -1,5 +1,1 @@
-.tmp-assets.cjs
-.tmp-save.cjs
-.tmp-write.cjs
-.tmp-relay.cjs
-.tmp-snapshot.cjs
+.tmp-*.cjs

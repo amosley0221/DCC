@@ -33,7 +33,7 @@ const UNASSIGNED = 255
  * link every list here is league-wide, and the screen says so plainly rather
  * than implying these are your players.
  */
-export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
+export default function TeamSave() {
   const { save, patch } = useSave()
   const { state, dispatch } = useStore()
   const { path, roster, rosterBusy } = save
@@ -50,7 +50,7 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
     return m
   }, [roster])
   const [schoolQuery, setSchoolQuery] = useState('')
-  const [tab, setTab] = useState<TabName>(view === 'schedule' ? 'SCHEDULE' : 'ROSTER')
+  const [tab, setTab] = useState<TabName>('ROSTER')
   const [query, setQuery] = useState('')
   const [pos, setPos] = useState<string | null>(null)
   const [open, setOpen] = useState<number | null>(null)
@@ -129,18 +129,14 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
   return (
     <>
       <SectionHeader
-        title={view === 'schedule' ? 'Scores' : 'Team'}
+        title="The program"
         mark={<SchoolArt size={22} file={
           mine ? (save.schoolArt[`${nameOf(mine.id) ?? ''}|logoLight`] ??
                   save.schoolArt[`${nameOf(mine.id) ?? ''}|icon`]) : undefined} />}
-        sub={<Meta>{view === 'schedule'
-          ? [mine ? coachOf.get(mine.id)?.conference : null, mine ? coachOf.get(mine.id)?.division : null]
-              .filter(Boolean).join(' · ').toUpperCase() || 'SEASON RESULTS'
-          : !roster ? (rosterBusy || save.restoring ? 'READING YOUR SAVE…' : 'ROSTER NOT READ YET')
+        sub={<Meta>{!roster ? (rosterBusy || save.restoring ? 'READING YOUR SAVE…' : 'ROSTER NOT READ YET')
           : mine ? `${(nameOf(mine.id) ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
           : `${teams.length} PROGRAMS — PICK YOURS`}</Meta>}
-        right={view === 'schedule' ? undefined
-          : <div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
+        right={<div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
 
       <div className="col" style={{ gap: 12, maxWidth: roster && (tab === 'ROSTER' || tab === 'SCHEDULE') ? undefined : 900 }}>

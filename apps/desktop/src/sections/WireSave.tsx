@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Kicker, Meta, PlayerFace } from '../ui'
+import { Btn, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
+import { buildLeague, rankings, visibleGames, winPct } from '../../electron/league'
+import { currentWeek } from '../../electron/season'
 
 const UNASSIGNED = 255
 
@@ -53,25 +55,42 @@ function Face({ p, size }: { p: { first: string; last: string; assetId?: string 
 
 const ratingTone = (v: number) => (v >= 85 ? 'is-high' : v >= 75 ? 'is-mid' : 'is-low')
 
+const SLIDES = ['GAME', 'COUNTRY', 'HEISMAN', 'CLASS'] as const
+type Slide = (typeof SLIDES)[number]
+
+/** How long the feature holds on one story before turning over. */
+const TURN_MS = 11000
+
+/** The positions a Heisman is given to, and how much the award favours each. */
+const HEISMAN_WEIGHT: Record<string, number> = { QB: 1, HB: 0.86, WR: 0.8, TE: 0.68 }
+
 /**
  * Home.
  *
  * Your program and your board on the left, the feature in the middle, the
- * week's results on the right. Opening a score or a board row swaps the middle
+ * week's results on the right. Opening a score or a player swaps the middle
  * column rather than navigating away, so the rails stay put and you keep your
  * place — which is the whole reason the layout is three columns.
+ *
+ * The feature turns over: your game, the country's biggest results, the Heisman
+ * watch, the class. It stops the moment you pick one, because a page that moves
+ * while you are reading it is a page you cannot read.
  *
  * Everything here is read out of the save. The one thing written rather than
  * read is the lead story, generated on demand from a fact sheet of these same
  * numbers, so it can describe the game but cannot invent one.
  */
-export default function WireSave() {
+export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void } = {}) {
   const { save } = useSave()
   const { state, dispatch } = useStore()
   const roster = save.roster
-  const me = state.teamId === null ? null : (state.teamNames[state.teamId] ?? TEAM_ID_NAMES[state.teamId] ?? null)
+  const nameOf = (id: number) => state.teamNames[id] ?? TEAM_ID_NAMES[id] ?? null
+  const me = state.teamId === null ? null : nameOf(state.teamId)
 
   const [open, setOpen] = useState<{ kind: 'game'; row: number } | { kind: 'player'; index: number } | null>(null)
+  const [slide, setSlide] = useState<Slide>('GAME')
+  const [holding, setHolding] = useState(false)
+  const [rail, setRail] = useState<'CONF' | 'TOP25'>('CONF')
 
   const games = roster?.games ?? []
   const mine = useMemo(
@@ -81,49 +100,82 @@ export default function WireSave() {
   const last = [...mine].reverse().find((g) => g.played) ?? null
   const next = mine.find((g) => !g.played) ?? null
 
-  /** Every program's record, so the rail can place you in the country. */
-  const table = useMemo(() => {
-    const t = new Map<string, { w: number; l: number; cw: number; cl: number; pf: number; pa: number }>()
-    const get = (n: string) => {
-      let r = t.get(n)
-      if (!r) { r = { w: 0, l: 0, cw: 0, cl: 0, pf: 0, pa: 0 }; t.set(n, r) }
-      return r
-    }
-    const conf = new Map<string, string | null>()
-    for (const c of roster?.coaches ?? []) {
-      const n = state.teamNames[c.teamId] ?? TEAM_ID_NAMES[c.teamId]
-      if (n) conf.set(n, c.conference)
-    }
-    for (const g of games) {
-      if (!g.played || g.postseason || !g.home || !g.away) continue
-      const h = get(g.home), a = get(g.away)
-      h.pf += g.homeScore; h.pa += g.awayScore
-      a.pf += g.awayScore; a.pa += g.homeScore
-      const homeWon = g.homeScore > g.awayScore
-      if (homeWon) { h.w++; a.l++ } else { h.l++; a.w++ }
-      const sameConf = conf.get(g.home) && conf.get(g.home) === conf.get(g.away)
-      if (sameConf) { if (homeWon) { h.cw++; a.cl++ } else { h.cl++; a.cw++ } }
-    }
-    return { t, conf }
-  }, [games, roster, state.teamNames])
+  /** The league table, the same one the League screen stands on. */
+  const teams = useMemo(() => (roster?.coaches ?? [])
+    .map((c) => ({ name: nameOf(c.teamId) ?? '', conference: c.conference, division: c.division }))
+    .filter((t) => t.name), [roster, state.teamNames])
+  // Built from what you have reached. The game sims the country before your own
+  // Saturday, so a save on week 11 already holds week 11's scores — a record or
+  // a ranking taken from those would spoil a week you have not played.
+  const holdFrom = useMemo(() => currentWeek(games, me), [games, me])
+  const table = useMemo(
+    () => buildLeague(visibleGames(games, me, holdFrom), teams),
+    [games, teams, me, holdFrom],
+  )
+  const order = useMemo(() => rankings(table), [table])
+  const rankOf = useMemo(() => {
+    const m = new Map<string, number>()
+    order.forEach((r, i) => m.set(r.name, i + 1))
+    return m
+  }, [order])
 
-  const record = me ? table.t.get(me) : undefined
-  const conference = me ? table.conf.get(me) ?? null : null
-  const nationalRank = useMemo(() => {
-    if (!me || !record) return null
-    const pct = (r: { w: number; l: number }) => r.w / Math.max(1, r.w + r.l)
-    const ordered = [...table.t.entries()]
-      .sort((a, b) => pct(b[1]) - pct(a[1]) || (b[1].w - b[1].l) - (a[1].w - a[1].l) || a[0].localeCompare(b[0]))
-    return ordered.findIndex(([n]) => n === me) + 1 || null
-  }, [table, me, record])
+  const record = me ? table.get(me) : undefined
+  const conference = record?.conference ?? null
+  const nationalRank = me ? rankOf.get(me) ?? null : null
 
   /** The week you have reached, and everyone else's results from it. */
-  const saturday = useMemo(() => {
+  const week = useMemo(() => {
     const played = games.filter((g) => g.played && !g.postseason)
-    if (!played.length) return []
-    const wk = last ? last.week : Math.max(...played.map((g) => g.week))
-    return played.filter((g) => g.week === wk).sort((a, b) => (a.home === me || a.away === me ? -1 : 0) - (b.home === me || b.away === me ? -1 : 0))
-  }, [games, last, me])
+    if (!played.length) return null
+    return last ? last.week : Math.max(...played.map((g) => g.week))
+  }, [games, last])
+
+  const weekGames = useMemo(
+    () => games.filter((g) => g.played && !g.postseason && g.week === week),
+    [games, week],
+  )
+
+  const bestRank = (g: { home: string | null; away: string | null }) =>
+    Math.min(rankOf.get(g.home ?? '') ?? 999, rankOf.get(g.away ?? '') ?? 999)
+
+  /** The rail: your league, or the ranked games. Yours always leads. */
+  const railGames = useMemo(() => {
+    const mineFirst = (a: typeof weekGames[number], b: typeof weekGames[number]) =>
+      (b.home === me || b.away === me ? 1 : 0) - (a.home === me || a.away === me ? 1 : 0)
+    if (rail === 'CONF' && conference) {
+      const inConf = (n: string | null) => !!n && table.get(n)?.conference === conference
+      return weekGames.filter((g) => inConf(g.home) || inConf(g.away))
+        .sort((a, b) => mineFirst(a, b) || bestRank(a) - bestRank(b))
+    }
+    return weekGames.filter((g) => bestRank(g) <= 25)
+      .sort((a, b) => mineFirst(a, b) || bestRank(a) - bestRank(b))
+  }, [weekGames, rail, conference, table, me, rankOf])
+
+  /** The country's game of the week: the best team on the field, then the score. */
+  const topGames = useMemo(
+    () => [...weekGames].sort((a, b) =>
+      bestRank(a) - bestRank(b) ||
+      (b.homeScore + b.awayScore) - (a.homeScore + a.awayScore)).slice(0, 5),
+    [weekGames, rankOf],
+  )
+
+  /**
+   * The Heisman watch.
+   *
+   * No season statistics are decoded — the save's per-player game totals are not
+   * placed yet — so this cannot be yards and touchdowns. It is the field by
+   * rating, by the positions the award actually goes to, and by whether their
+   * team is winning, and the panel says so rather than implying a stat line.
+   */
+  const heisman = useMemo(() => (roster?.players ?? [])
+    .filter((p) => p.team !== UNASSIGNED && HEISMAN_WEIGHT[p.position])
+    .map((p) => {
+      const school = nameOf(p.team)
+      const row = school ? table.get(school) : undefined
+      return { p, school, score: p.overall * HEISMAN_WEIGHT[p.position] + (row ? winPct(row) : 0) * 14 }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5), [roster, table, state.teamNames])
 
   const scouted = (p: RosterPlayer) => state.revealAllRecruits || state.revealedRecruits.includes(p.playerId)
 
@@ -139,6 +191,17 @@ export default function WireSave() {
     () => (roster?.players ?? []).filter((p) => p.team === state.teamId).sort((a, b) => b.overall - a.overall),
     [roster, state.teamId],
   )
+
+  // The feature turns over on its own until you pick a story, and never while
+  // something is open in the middle column — that is the one thing you asked for.
+  useEffect(() => {
+    if (holding || open) return
+    const t = window.setInterval(
+      () => setSlide((s) => SLIDES[(SLIDES.indexOf(s) + 1) % SLIDES.length]),
+      TURN_MS,
+    )
+    return () => window.clearInterval(t)
+  }, [holding, open])
 
   if (!roster) {
     return (
@@ -160,6 +223,14 @@ export default function WireSave() {
     ? (roster.players ?? []).find((p) => p.index === open.index) ?? null
     : null
 
+  const artOf = (name: string | null | undefined, kind: 'logoLight' | 'helmet' = 'logoLight') =>
+    (name
+      ? save.schoolArt[`${name}|${kind}`] ?? save.schoolArt[`${name}|logoLight`] ??
+        save.schoolArt[`${name}|icon`] ?? save.schoolArt[`${name}|logoGold`]
+      : undefined)
+
+  const pick = (s: Slide) => { setSlide(s); setHolding(true) }
+
   return (
     <div className="gs-shell">
       {/* ── your program ────────────────────────────────────────────── */}
@@ -169,24 +240,35 @@ export default function WireSave() {
           <h1 className="screen-title" style={{ marginTop: 10 }}>{me ?? 'Pick your team'}</h1>
           <div style={{ marginTop: 8 }}>
             <Meta>
-              {[record ? `${record.w}-${record.l}` : null, conference, nationalRank ? `No. ${nationalRank} by record` : null]
+              {[record ? `${record.wins}-${record.losses}` : null, conference,
+                nationalRank ? `No. ${nationalRank} by record` : null]
                 .filter(Boolean).join(' · ')}
             </Meta>
           </div>
         </div>
 
         <div className="grid-2" style={{ gap: 12 }}>
-          <div className="card card-pad">
-            <Kicker>Conference</Kicker>
-            <div className="gs-tile-val is-high" style={{ fontSize: 32 }}>
-              {record ? <>{record.cw}<i className="gs-dash" />{record.cl}</> : '—'}
+          {/* The conference tile opens the League screen: it is a standing, and
+              a standing is a table you should be able to walk into. */}
+          <button onClick={onOpenLeague}
+            style={{ all: 'unset', cursor: onOpenLeague ? 'pointer' : 'default', display: 'block' }}>
+            <div className="card card-pad" style={{ height: '100%' }}>
+              <div className="card-head">
+                <Kicker>Conference</Kicker>
+                {onOpenLeague ? <Meta size={9} color="var(--accent-ui)">TABLE →</Meta> : null}
+              </div>
+              <div className="gs-tile-val is-high" style={{ fontSize: 32 }}>
+                {record ? <>{record.confWins}<i className="gs-dash" />{record.confLosses}</> : '—'}
+              </div>
+              <div style={{ marginTop: 6 }}><Meta size={10}>{conference ?? 'Not read'}</Meta></div>
             </div>
-            <div style={{ marginTop: 6 }}><Meta size={10}>{conference ?? 'Not read'}</Meta></div>
-          </div>
+          </button>
           <div className="card card-pad">
             <Kicker>Scoring</Kicker>
-            <div className="gs-tile-val is-mid" style={{ fontSize: 32 }}>{record ? record.pf : '—'}</div>
-            <div style={{ marginTop: 6 }}><Meta size={10}>{record ? `${record.pa} allowed` : 'Not read'}</Meta></div>
+            <div className="gs-tile-val is-mid" style={{ fontSize: 32 }}>{record ? record.pointsFor : '—'}</div>
+            <div style={{ marginTop: 6 }}>
+              <Meta size={10}>{record ? `${record.pointsAgainst} allowed` : 'Not read'}</Meta>
+            </div>
           </div>
         </div>
 
@@ -218,35 +300,151 @@ export default function WireSave() {
         </div>
       </aside>
 
-      {/* ── the middle column: feature, or whatever you opened ─────────── */}
+      {/* ── the middle column: the feature, or whatever you opened ─────── */}
       <div className="gs-main-col">
         {openGame ? (
           <BoxScore g={openGame} onClose={() => setOpen(null)} />
         ) : openPlayer ? (
           <ProspectCard
             p={openPlayer}
-            revealed={state.revealAllRecruits || state.revealedRecruits.includes(openPlayer.playerId)}
+            teamName={nameOf(openPlayer.team)}
+            revealed={openPlayer.team !== UNASSIGNED || state.revealAllRecruits ||
+              state.revealedRecruits.includes(openPlayer.playerId)}
             onReveal={() => dispatch({ type: 'revealRecruit', playerId: openPlayer.playerId })}
             onClose={() => setOpen(null)}
           />
-        ) : last ? (
-          <Feature
-            g={last}
-            team={me}
-            apiKey={state.anthropicKey}
-            log={(text, kind) => dispatch({ type: 'log', line: { text, kind: kind ?? 'good' } })}
-            onBoxScore={() => setOpen({ kind: 'game', row: last.row })}
-          />
         ) : (
-          <div className="gs-figure"><Meta>NOTHING PLAYED YET</Meta></div>
+          <>
+            <div className="gs-feature-dots">
+              {SLIDES.map((s) => (
+                <button key={s} aria-label={s} title={s.toLowerCase()}
+                  className={`gs-feature-dot${slide === s ? ' is-on' : ''}`}
+                  onClick={() => pick(s)} />
+              ))}
+            </div>
+
+            {slide === 'GAME' && last ? (
+              <Feature
+                g={last}
+                team={me}
+                bg={artOf(last.home)}
+                tint={save.schoolColors[last.home ?? ''] ?? null}
+                apiKey={state.anthropicKey}
+                log={(text, kind) => dispatch({ type: 'log', line: { text, kind: kind ?? 'good' } })}
+                onBoxScore={() => setOpen({ kind: 'game', row: last.row })}
+              />
+            ) : slide === 'COUNTRY' || (slide === 'GAME' && !last) ? (
+              <FeatureList
+                kicker={week ? `Around the country · week ${week}` : 'Around the country'}
+                headline={topGames.length
+                  ? `${topGames[0].away} ${topGames[0].awayScore}, ${topGames[0].home} ${topGames[0].homeScore}`
+                  : 'Nothing played yet'}
+                standfirst="The week's biggest games, best team on the field first. Open one for the box score."
+                bg={artOf(topGames[0]?.home)}
+                tint={save.schoolColors[topGames[0]?.home ?? ''] ?? null}
+              >
+                {topGames.map((g) => {
+                  const homeWon = g.homeScore > g.awayScore
+                  return (
+                    <button key={g.row} className="gs-feature-row"
+                      onClick={() => setOpen({ kind: 'game', row: g.row })}>
+                      <span className="row" style={{ gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                        <SchoolArt size={20} file={artOf(g.away, 'helmet')} />
+                        <span className="gs-feature-name" style={{ color: homeWon ? 'var(--ink3)' : 'var(--ink)' }}>
+                          {rankOf.get(g.away ?? '') && rankOf.get(g.away ?? '')! <= 25
+                            ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(g.away ?? '')} </span> : null}
+                          {g.away}
+                        </span>
+                      </span>
+                      <span className="gs-feature-num" style={{ color: homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.awayScore}</span>
+                      <span style={{ color: 'var(--ink3)', fontSize: 11 }}>at</span>
+                      <span className="row" style={{ gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                        <SchoolArt size={20} file={artOf(g.home, 'helmet')} />
+                        <span className="gs-feature-name" style={{ color: homeWon ? 'var(--ink)' : 'var(--ink3)' }}>
+                          {rankOf.get(g.home ?? '') && rankOf.get(g.home ?? '')! <= 25
+                            ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(g.home ?? '')} </span> : null}
+                          {g.home}
+                        </span>
+                      </span>
+                      <span className="gs-feature-num" style={{ color: homeWon ? 'var(--ink)' : 'var(--ink3)' }}>{g.homeScore}</span>
+                    </button>
+                  )
+                })}
+              </FeatureList>
+            ) : slide === 'HEISMAN' ? (
+              <FeatureList
+                kicker="Heisman watch"
+                headline={heisman.length ? `${heisman[0].p.first} ${heisman[0].p.last}` : 'Nobody yet'}
+                standfirst={'No season statistics are decoded out of the save yet, so this is not yards ' +
+                  'and touchdowns. It is the field by rating, by the positions the award goes to, and by ' +
+                  'whether their team is winning.'}
+                bg={artOf(heisman[0]?.school)}
+                tint={save.schoolColors[heisman[0]?.school ?? ''] ?? null}
+              >
+                {heisman.map(({ p, school }) => (
+                  <button key={p.index} className="gs-feature-row"
+                    onClick={() => setOpen({ kind: 'player', index: p.index })}>
+                    <Face p={p} size={30} />
+                    <span className="gs-feature-name">
+                      {p.first} {p.last}
+                      <span style={{ color: 'var(--ink3)' }}>{'  '}{p.position} · {school ?? '—'}</span>
+                    </span>
+                    <SchoolArt size={18} file={artOf(school, 'helmet')} />
+                    <span className="gs-feature-num" style={{ color: 'var(--accent)' }}>{p.overall}</span>
+                  </button>
+                ))}
+              </FeatureList>
+            ) : (
+              <FeatureList
+                kicker="The class"
+                headline={board.length ? `${board[0].first} ${board[0].last}` : 'Nobody on the board'}
+                standfirst={'Your board, best first. Who has committed is not decoded out of the save yet, ' +
+                  'so this is the class as it stands rather than a signing list.'}
+                bg={artOf(me)}
+                tint={save.schoolColors[me ?? ''] ?? null}
+              >
+                {board.slice(0, 5).map((p) => (
+                  <button key={p.index} className="gs-feature-row"
+                    onClick={() => setOpen({ kind: 'player', index: p.index })}>
+                    <Face p={p} size={30} />
+                    <span className="gs-feature-name">
+                      {p.first} {p.last}
+                      <span style={{ color: 'var(--ink3)' }}>{'  '}{p.position} · {p.homeState ?? p.hometown}</span>
+                    </span>
+                    <span className="gs-stars">{'★'.repeat(p.stars)}</span>
+                    <span className="gs-feature-num" style={{ color: scouted(p) ? 'var(--accent)' : 'var(--ink3)' }}>
+                      {scouted(p) ? p.overall : '—'}
+                    </span>
+                  </button>
+                ))}
+              </FeatureList>
+            )}
+          </>
         )}
       </div>
 
       {/* ── the week, and what is next ────────────────────────────────── */}
       <aside className="gs-rail-right">
-        <Kicker>Saturday</Kicker>
-        {saturday.slice(0, 9).map((g) => {
+        <div className="card-head">
+          <Kicker>{rail === 'CONF' ? conference ?? 'Saturday' : 'Top 25'}</Kicker>
+          <div className="row" style={{ gap: 4 }}>
+            <Tab on={rail === 'CONF'} onClick={() => setRail('CONF')}>MINE</Tab>
+            <Tab on={rail === 'TOP25'} onClick={() => setRail('TOP25')}>TOP 25</Tab>
+          </div>
+        </div>
+        {railGames.slice(0, 9).map((g) => {
           const homeWon = g.homeScore > g.awayScore
+          const row = (name: string | null, score: number, lost: boolean) => (
+            <div className={`gs-score-row${lost ? ' is-lost' : ''}`}>
+              <SchoolArt size={17} file={artOf(name, 'helmet')} />
+              <span className="gs-score-team" style={{ color: name === me ? 'var(--accent)' : undefined }}>
+                {rankOf.get(name ?? '') && rankOf.get(name ?? '')! <= 25
+                  ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(name ?? '')} </span> : null}
+                {name}
+              </span>
+              <span className="gs-score-num">{score}</span>
+            </div>
+          )
           return (
             <button
               key={g.row}
@@ -254,24 +452,24 @@ export default function WireSave() {
               aria-selected={open?.kind === 'game' && open.row === g.row}
               onClick={() => setOpen(open?.kind === 'game' && open.row === g.row ? null : { kind: 'game', row: g.row })}
             >
-              <div className={`gs-score-row${homeWon ? ' is-lost' : ''}`}>
-                <span className="gs-score-team">{g.away}</span>
-                <span className="gs-score-num">{g.awayScore}</span>
-              </div>
-              <div className={`gs-score-row${homeWon ? '' : ' is-lost'}`}>
-                <span className="gs-score-team">{g.home}</span>
-                <span className="gs-score-num">{g.homeScore}</span>
-              </div>
+              {row(g.away, g.awayScore, homeWon)}
+              {row(g.home, g.homeScore, !homeWon)}
             </button>
           )
         })}
+        {!railGames.length ? (
+          <Meta size={10}>{rail === 'CONF' ? 'NOTHING IN YOUR LEAGUE THAT WEEK' : 'NO RANKED GAME THAT WEEK'}</Meta>
+        ) : null}
 
         {next ? (
           <>
             <div style={{ marginTop: 6 }}><Kicker>Next up</Kicker></div>
             <div className="card card-pad">
-              <div className="gs-row-title" style={{ fontSize: 22, fontFamily: 'var(--serif)', fontWeight: 600 }}>
-                {(next.home === me ? next.away : next.home) ?? 'TBD'}
+              <div className="row" style={{ gap: 9, alignItems: 'center' }}>
+                <SchoolArt size={26} file={artOf(next.home === me ? next.away : next.home, 'helmet')} />
+                <div className="gs-row-title" style={{ fontSize: 22, fontFamily: 'var(--serif)', fontWeight: 600 }}>
+                  {(next.home === me ? next.away : next.home) ?? 'TBD'}
+                </div>
               </div>
               <div style={{ marginTop: 6 }}>
                 <Meta size={10}>
@@ -290,19 +488,77 @@ export default function WireSave() {
           <>
             <div style={{ marginTop: 6 }}><Kicker>Top of the roster</Kicker></div>
             <div className="card card-pad">
+              {/* These open the player, and they carry his face. Both were
+                  missing: the one list on the page that did neither. */}
               {squad.slice(0, 5).map((p) => (
-                <div key={p.index} className="gs-row" style={{ cursor: 'default' }}>
-                  <span className="gs-tile-val is-high" style={{ fontSize: 18, margin: 0, minWidth: 28 }}>{p.overall}</span>
+                <button key={p.index} className="gs-row"
+                  aria-selected={open?.kind === 'player' && open.index === p.index}
+                  onClick={() => setOpen(open?.kind === 'player' && open.index === p.index
+                    ? null : { kind: 'player', index: p.index })}>
+                  <Face p={p} size={30} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="gs-row-title">{p.first} {p.last}</span>
-                    <span className="gs-row-sub" style={{ display: 'block' }}>{p.position}</span>
+                    <span className="gs-row-sub" style={{ display: 'block' }}>
+                      {[p.position, p.classYear].filter(Boolean).join(' · ')}
+                    </span>
                   </span>
-                </div>
+                  <span className="gs-tile-val is-high" style={{ fontSize: 18, margin: 0, minWidth: 28, textAlign: 'right' }}>
+                    {p.overall}
+                  </span>
+                </button>
               ))}
             </div>
           </>
         ) : null}
       </aside>
+    </div>
+  )
+}
+
+/**
+ * The ground behind a feature: the school's mark, blown up and out of focus,
+ * over the colour DCC read out of that same mark.
+ *
+ * There is no stadium in the save and no trophy in the art DCC has been pointed
+ * at, so this is the honest version of a photograph — the right colour and the
+ * right shape, with nothing invented in it.
+ */
+function FeatureGround({ bg, tint }: { bg?: string; tint?: string | null }) {
+  return (
+    <>
+      {bg ? (
+        <div className="gs-figure-bg" style={{
+          backgroundImage: `url("dccart://art/${bg.split(/[\\/]/).map(encodeURIComponent).join('/')}")`,
+        }} />
+      ) : null}
+      <div className="gs-figure-wash" style={{
+        background: tint
+          ? `linear-gradient(155deg, ${tint}cc, var(--surface) 78%)`
+          : 'linear-gradient(160deg, var(--surfaceStrong), var(--surface))',
+        opacity: bg ? 0.82 : 1,
+      }} />
+    </>
+  )
+}
+
+/** A feature that is a list rather than a scoreline: the country, the watch, the class. */
+function FeatureList({ kicker, headline, standfirst, bg, tint, children }: {
+  kicker: string; headline: string; standfirst: string
+  bg?: string; tint?: string | null; children: React.ReactNode
+}) {
+  return (
+    <div className="fade-in">
+      <div className="gs-figure is-list">
+        <FeatureGround bg={bg} tint={tint} />
+        <div className="gs-figure-body">
+          <Kicker>{kicker}</Kicker>
+          <div className="gs-feature-list">{children}</div>
+        </div>
+      </div>
+      <div style={{ paddingTop: 20 }}>
+        <h2 className="hero-headline" style={{ maxWidth: 560 }}>{headline}</h2>
+        <p className="body-serif" style={{ margin: '12px 0 0', maxWidth: 520 }}>{standfirst}</p>
+      </div>
     </div>
   )
 }
@@ -314,10 +570,11 @@ export default function WireSave() {
  * the save has no images, and a fabricated one would be the only invented thing
  * on the page.
  */
-function Feature({ g, team, apiKey, log, onBoxScore }: {
+function Feature({ g, team, apiKey, log, onBoxScore, bg, tint }: {
   g: SeasonGame; team: string | null; apiKey: string
   log: (text: string, kind?: 'good' | 'bad') => void
   onBoxScore: () => void
+  bg?: string; tint?: string | null
 }) {
   const [story, setStory] = useState<{ headline: string; standfirst: string; body: string } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -338,15 +595,16 @@ function Feature({ g, team, apiKey, log, onBoxScore }: {
   }
 
   return (
-    <>
+    <div className="fade-in">
       <div className="gs-figure">
-        <div className="gs-figure-kicker"><Kicker>{won ? 'Won' : 'Lost'} · week {g.week}</Kicker></div>
-        <div className="gs-figure-score">
+        <FeatureGround bg={bg} tint={tint} />
+        <div className="gs-figure-kicker" style={{ zIndex: 1 }}><Kicker>{won ? 'Won' : 'Lost'} · week {g.week}</Kicker></div>
+        <div className="gs-figure-score" style={{ position: 'relative', zIndex: 1 }}>
           <span className={won ? '' : 'is-lost'}>{us}</span>
           <i className="gs-dash" />
           <span className={won ? 'is-lost' : ''}>{them}</span>
         </div>
-        <div className="gs-figure-caption">
+        <div className="gs-figure-caption" style={{ zIndex: 1 }}>
           {[home ? `vs ${other}` : `at ${other}`, dateLabel(g.month, g.day),
             g.attendance ? `${g.attendance.toLocaleString()} in attendance` : null,
             weatherName(g.weather) ? `${g.temperatureF}°F ${weatherName(g.weather)?.toLowerCase()}` : null]
@@ -384,7 +642,7 @@ function Feature({ g, team, apiKey, log, onBoxScore }: {
           {error ? <Meta size={10} color="var(--accent-ui)">{error.toUpperCase()}</Meta> : null}
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -490,16 +748,23 @@ function BoxScore({ g, onClose }: { g: SeasonGame; onClose: () => void }) {
 }
 
 /** A recruit opened from the board. */
-function ProspectCard({ p, revealed, onReveal, onClose }: {
+function ProspectCard({ p, revealed, onReveal, onClose, teamName }: {
   p: RosterPlayer; revealed: boolean; onReveal: () => void; onClose: () => void
+  teamName?: string | null
 }) {
+  const { save } = useSave()
   const picks = cardRatings(p.position)
   const top = picks.map((k) => [k, p.ratings[k] ?? 0] as const)
+  // A rostered player is not a prospect, and the card should not call him one.
+  const rostered = p.team !== UNASSIGNED
+  const logo = teamName
+    ? save.schoolArt[`${teamName}|logoLight`] ?? save.schoolArt[`${teamName}|icon`]
+    : undefined
 
   return (
     <div className="fade-in">
       <div className="row" style={{ gap: 14, alignItems: 'baseline' }}>
-        <Kicker>Prospect card</Kicker>
+        <Kicker>{rostered ? 'Player card' : 'Prospect card'}</Kicker>
         <button className="gs-close" onClick={onClose}>Close ✕</button>
       </div>
 
@@ -507,9 +772,13 @@ function ProspectCard({ p, revealed, onReveal, onClose }: {
         <Face p={p} size={54} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 className="headline">{p.first} {p.last}</h2>
-          <div style={{ marginTop: 4 }}>
-            <span className="gs-stars">{'★'.repeat(p.stars)}</span>{' '}
-            <Meta size={10}>{[p.position, p.archetype, p.hometown].filter(Boolean).join(' · ')}</Meta>
+          <div className="row" style={{ marginTop: 4, gap: 7, alignItems: 'center' }}>
+            <SchoolArt size={18} file={logo} />
+            {p.stars ? <span className="gs-stars">{'★'.repeat(p.stars)}</span> : null}
+            <Meta size={10}>
+              {[p.position, rostered ? p.classYear : null, p.archetype, p.hometown]
+                .filter(Boolean).join(' · ')}
+            </Meta>
           </div>
         </div>
         {revealed ? (

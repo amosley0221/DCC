@@ -249,6 +249,45 @@ app.whenReady().then(async () => {
   console.log('PORTAL TABS: ' + (portalTabs ?? 'transfers and tampering both render'))
   if (portalTabs) { console.log('SMOKE FAIL: ' + portalTabs); app.exit(1); return }
 
+  // League and The Program were the same component in the same slot of one
+  // conditional chain, so React reused the instance and League opened on
+  // whichever tab Program was left on — it said SCORES and showed the roster.
+  // Visit Program, leave it on a tab, then open League and read what is there.
+  const leagueIsLeague = await (async () => {
+    const program = r.nav.indexOf('Program')
+    const league = r.nav.indexOf('League')
+    if (league < 0) return 'League missing from the nav'
+    const go = async (i) => {
+      await win.webContents.executeJavaScript(`document.querySelectorAll('.gs-nav-item')[${i}].click()`)
+      await wait(500)
+    }
+    if (program >= 0) {
+      await go(program)
+      await win.webContents.executeJavaScript(`(() => {
+        const t = [...document.querySelectorAll('.subtabs .tab')].find(x => /TEAMS/i.test(x.textContent))
+        if (t) t.click()
+      })()`)
+      await wait(400)
+    }
+    await go(league)
+    const seen = await win.webContents.executeJavaScript(`(() => ({
+      title: (document.querySelector('.screen-title') || {}).textContent || '',
+      tabs: [...document.querySelectorAll('.subtabs .tab')].map(x => x.textContent.trim()),
+      text: ((document.querySelector('.gs-page-in') || {}).innerText || '').slice(0, 200),
+    }))()`)
+    if (!/league/i.test(seen.title)) return 'League showed "' + seen.title + '"'
+    // With a real save it has its own subtabs; with the smoke fixture there is
+    // no roster to stand a table on, and it says so. Either is the League
+    // screen. What it must never be again is the roster.
+    if (!seen.tabs.some((t) => /STANDINGS/i.test(t)) && !/standings/i.test(seen.text)) {
+      return 'no standings anywhere: ' + seen.tabs.join(',') + ' / ' + seen.text.slice(0, 100)
+    }
+    if (/\bPLAYERS\b/i.test(seen.text)) return 'League is still showing the roster'
+    return null
+  })()
+  console.log('LEAGUE TAB: ' + (leagueIsLeague ?? 'is the league, not the roster'))
+  if (leagueIsLeague) { console.log('SMOKE FAIL: ' + leagueIsLeague); app.exit(1); return }
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))

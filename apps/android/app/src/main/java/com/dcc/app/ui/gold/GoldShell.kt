@@ -39,10 +39,9 @@ import com.dcc.app.data.Persisted
 import com.dcc.app.state.AppViewModel
 import com.dcc.app.state.Derived
 import com.dcc.app.state.SnapshotView
-import com.dcc.app.ui.components.Kicker
-import com.dcc.app.ui.components.MetaText
 import com.dcc.app.ui.components.MonoLabel
 import com.dcc.app.ui.sections.CoachSection
+import com.dcc.app.ui.sections.LeagueSnapshotSection
 import com.dcc.app.ui.sections.NationalSection
 import com.dcc.app.ui.sections.PortalSnapshotSection
 import com.dcc.app.ui.sections.QueueSection
@@ -259,9 +258,13 @@ fun GoldShell(
                                 Standby("The portal", "Who moved, and who you are working on. Both land here with your save.") { ops = "dynasty" }
                             }
 
-                            "league" -> if (snapshot != null || (dynasty != null && derived != null)) {
-                                if (dynasty != null && derived != null) NationalSection(dynasty, derived, snapshot)
-                                else GoldLeague(snapshot!!)
+                            // The snapshot wins: standings, a ranking and every
+                            // other school's schedule all come out of the real
+                            // season's game rows, which only it carries.
+                            "league" -> if (snapshot != null) {
+                                LeagueSnapshotSection(snapshot)
+                            } else if (dynasty != null && derived != null) {
+                                NationalSection(dynasty, derived, null)
                             } else {
                                 Standby("The league", "Scores and standings from around the country land here with your save.") { ops = "dynasty" }
                             }
@@ -368,31 +371,5 @@ fun Standby(title: String, body: String, onOpenSettings: () -> Unit) {
         ) {
             MonoLabel("BRING YOUR SAVE ACROSS", c.onAccent, 12)
         }
-    }
-}
-
-/** Scores from around the country, when only the snapshot is loaded. */
-@Composable
-private fun GoldLeague(snap: SnapshotView) {
-    val c = Dcc.colors
-    val week = snap.weeks.lastOrNull { w -> snap.gamesIn(w).any { it.played } }
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(top = 14.dp),
-    ) {
-        Kicker("Around the country", c.accent)
-        Spacer(Modifier.height(4.dp))
-        MetaText(week?.let { "WEEK $it" } ?: "NOTHING PLAYED YET", c.ink3, 10)
-        Spacer(Modifier.height(14.dp))
-        for (g in week?.let { snap.gamesIn(it) }.orEmpty().filter { it.played }.take(40)) {
-            GoldScoreRow(
-                away = g.away ?: "", awayScore = g.awayScore,
-                home = g.home ?: "", homeScore = g.homeScore,
-                modifier = Modifier.padding(bottom = 10.dp),
-            )
-        }
-        Spacer(Modifier.height(20.dp))
     }
 }

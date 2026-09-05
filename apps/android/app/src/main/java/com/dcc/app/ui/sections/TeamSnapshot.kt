@@ -40,6 +40,9 @@ import com.dcc.app.ui.theme.Dcc
 
 private val TABS = listOf("ROSTER", "CARDS", "SCHEDULE", "LEAGUE", "TEAMS")
 
+/** Two letters for a school with no art, the way the team table would write them. */
+private fun mono(name: String?) = (name ?: "?").take(2).uppercase()
+
 /** A hex colour from the snapshot, or null when the PC had no logo to read. */
 private fun parseHex(hex: String?): Color? {
     val h = hex?.removePrefix("#") ?: return null
@@ -326,6 +329,8 @@ private fun TeamGameRow(g: SnapshotGame, teamIndex: Int, next: Boolean, open: Bo
             }
             Spacer(Modifier.width(6.dp))
             MonoLabel(if (home) "VS" else "@", c.ink4, 9, Modifier.width(22.dp))
+            SchoolBadge(mono(opponent), opponent, false, 22.dp, "helmet")
+            Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(opponent, c.ink, 15)
                 Spacer(Modifier.height(2.dp))
@@ -360,6 +365,14 @@ private fun LeagueGameRow(
     val c = Dcc.colors
     DccCard(borderColor = if (isUser) c.accent else c.surfaceLine, onClick = onToggle) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Helmets rather than logos on a scoreboard, which is what a
+            // scoreboard has always had.
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                SchoolBadge(mono(g.away), g.away.orEmpty(), false, 22.dp, "helmet")
+                Spacer(Modifier.height(4.dp))
+                SchoolBadge(mono(g.home), g.home.orEmpty(), false, 22.dp, "helmet")
+            }
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(g.away.orEmpty().ifEmpty { "TBD" }, c.ink, 14)
                 Spacer(Modifier.height(2.dp))

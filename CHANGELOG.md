@@ -10,6 +10,67 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.40.0] - 2026-09-05
+
+### Added
+
+- **The League tab is the league.** Standings for every conference, a ranking of
+  the whole country, the week's scores, team scoring, and any other school's
+  season week by week. Click a name anywhere and its schedule opens; click your
+  own conference record on Home and you land here.
+
+  The ranking is DCC's own and says so. There is no poll in the save — no AP
+  number, no coaches' number — so it is record first, with scoring margin as the
+  tie-break and a cap on it, so a 98-0 win over nobody cannot outrank a second
+  win. A record is also credited against four imaginary games at .500, which is
+  what keeps a 1-0 team in September out of the top spot.
+
+  The same arithmetic runs on both apps, out of one module each side, so the
+  phone and the PC cannot disagree about who is 7-2.
+
+- **Home's feature turns over.** Your game, then the country's biggest results,
+  then the Heisman watch, then your class — each over the school's own mark,
+  blurred, on the colour DCC read out of that mark. Tap a dot to hold one.
+
+  There is no stadium photograph and no trophy in the art, so neither is
+  invented: the ground is the right colour with the right shape in it. And no
+  season statistics are decoded yet, so the Heisman panel is the field by
+  rating, by the positions the award goes to, and by whose team is winning — it
+  says as much rather than implying a stat line.
+
+- **Saturday's scores, filtered the way you would look for them.** The rail on
+  the PC and the scroller on the phone both open on your conference and toggle
+  to the top 25, with a rank beside every ranked team. The phone's scroller
+  moves on its own, slowly, so a glance gets more than the first two cards.
+
+### Fixed
+
+- **The League tab showed your roster.** It said SCORES at the top and listed
+  your players underneath. The tab and The Program were the same component in
+  the same slot of one conditional chain, so React kept the instance alive and
+  League opened on whichever tab Program had been left on. It is its own screen
+  now, and the smoke test walks Program → League and reads what is actually
+  there.
+
+- **Logos and helmets never appeared on the phone.** The art pack installed 143
+  schools and drew none of them: the composable that read a school's mark was
+  written and then never called from anywhere. Every screen that names a school
+  goes through one badge, so teaching that badge to look in the pack put logos
+  on all of them at once — standings, scores, the board, the transfer list, the
+  schedule. The dead composable is gone.
+
+- **Results you have not reached could leak into a table.** The game sims the
+  rest of the country before your own Saturday, so a save on week 11 already
+  holds week 11's scores. Standings, rankings and the Heisman watch are all
+  built from the weeks you have played, with the same held line the schedule
+  already used, and the League screen carries the toggle if you want to see
+  past it.
+
+- **Home's top of the roster did nothing.** No faces, and clicking a name did
+  not open the player — the one list on the page that did neither. Both now do,
+  and the card it opens knows the difference between a prospect and someone on
+  your roster.
+
 ## [0.39.2] - 2026-09-05
 
 ### Fixed
