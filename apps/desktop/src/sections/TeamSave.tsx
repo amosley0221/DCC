@@ -6,6 +6,7 @@ import type { RosterPlayer } from '../../electron/saveAnalysis'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import Schedule from './Schedule'
 import DepthChart from './DepthChart'
+import Roster from './Roster'
 
 const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
@@ -317,17 +318,19 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
               {rosterBusy || save.restoring ? 'Reading…' : 'Read the roster'}
             </Btn>
           </Card>
+        ) : mine ? (
+          <Roster
+            players={mine.list}
+            teamName={nameOf(mine.id)}
+            mine
+            onChangeTeam={() => dispatch({ type: 'teamId', id: null })}
+            onSaved={load}
+          />
         ) : (
           <div className="rail">
             <Card className="card-pad">
               <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
-                <Kicker>{mine ? (names[mine.id] ?? `Team ${mine.id}`) : 'Every school'}{pos ? ` — ${pos}` : ''}, best first</Kicker>
-                {mine ? (
-                  <button onClick={() => dispatch({ type: 'teamId', id: null })}
-                    style={{ all: 'unset', cursor: 'pointer' }}>
-                    <Meta size={9} color="var(--accent)">CHANGE TEAM</Meta>
-                  </button>
-                ) : null}
+                <Kicker>Every school{pos ? ` — ${pos}` : ''}, best first</Kicker>
               </div>
               {shown.length === 0 ? <Empty>nobody matches</Empty> : null}
               {shown.map((p) => (

@@ -537,6 +537,9 @@ function checkPlayerEdits(edits, playerCount) {
       }
     };
     check("overall", e.overall);
+    if (e.nilK !== void 0 && (!Number.isInteger(e.nilK) || e.nilK < -255 || e.nilK > 256)) {
+      out.push({ row: e.index, field: "nilK", message: "the field holds -255 to 256 (in thousands)" });
+    }
     for (const [name, v] of Object.entries(e.ratings ?? {})) {
       if (!(name in RATING_BITS)) {
         out.push({ row: e.index, field: name, message: "not a rating DCC can place" });
@@ -558,8 +561,18 @@ function readPlayerNumbers(payload, index) {
     return v;
   };
   const ratings = {};
-  for (const [name, bit] of Object.entries(RATING_BITS)) ratings[name] = rd(bit);
-  return { overall: rd(OVERALL_BIT), ratings };
+  for (const [name, bit2] of Object.entries(RATING_BITS)) ratings[name] = rd(bit2);
+  const bit = (b, w) => {
+    let v = 0;
+    for (let i = b; i < b + w; i++) v = v << 1 | payload[at + (i >> 3)] >> 7 - (i & 7) & 1;
+    return v;
+  };
+  return {
+    overall: rd(OVERALL_BIT),
+    ratings,
+    redshirt: bit(REDSHIRT_BIT, 1) === 1,
+    nilK: bit(NIL_BIT, 9) - 255
+  };
 }
 function applyPlayerEdits(payload, edits) {
   const next = Buffer.from(payload);
@@ -575,6 +588,14 @@ function applyPlayerEdits(payload, edits) {
     for (const [name, v] of Object.entries(e.ratings ?? {})) {
       const bit = RATING_BITS[name];
       if (bit !== void 0) write(bit, v);
+    }
+    if (e.redshirt !== void 0) {
+      putBits(next, at, REDSHIRT_BIT, 1, e.redshirt ? 1 : 0);
+      touched.add(at + (REDSHIRT_BIT >> 3));
+    }
+    if (e.nilK !== void 0) {
+      putBits(next, at, NIL_BIT, 9, e.nilK + 255);
+      for (let b = NIL_BIT; b < NIL_BIT + 9; b++) touched.add(at + (b >> 3));
     }
   }
   return { next, touched };
@@ -612,6 +633,19 @@ function writePlayerEdits(path, edits, playerCount) {
       if (got !== want) return { ok: false, message: `player ${e.index}: ${field} read back as ${got}, not ${want}; nothing was written` };
       const before = field === "overall" ? was.overall : was.ratings[field];
       if (before !== got) changed.push({ index: e.index, field, before, after: got });
+    }
+    for (const [field, want, before, after] of [
+      ["redshirt", e.redshirt, was.redshirt, now.redshirt],
+      ["nilK", e.nilK, was.nilK, now.nilK]
+    ]) {
+      if (want !== void 0) {
+        if (after !== want) {
+          return { ok: false, message: `player ${e.index}: ${field} read back as ${after}, not ${want}; nothing was written` };
+        }
+        if (before !== after) changed.push({ index: e.index, field, before: Number(before), after: Number(after) });
+      } else if (before !== after) {
+        return { ok: false, message: `player ${e.index}: ${field} changed without being asked to; nothing was written` };
+      }
     }
     if (!wanted.has("overall") && was.overall !== now.overall) {
       return { ok: false, message: `player ${e.index}: overall changed without being asked to; nothing was written` };

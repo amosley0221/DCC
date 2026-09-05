@@ -712,6 +712,7 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
 .gs-tiles { display: grid; gap: 8px; margin-top: 16px; }
 .gs-tiles-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .gs-tiles-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gs-tiles-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .gs-tile { border: 1px solid var(--line); border-radius: 6px; padding: 11px 12px; min-width: 0; }
 .gs-tile-label {
   font-family: var(--sans); font-weight: 500; font-size: 10px; letter-spacing: 0.16em;

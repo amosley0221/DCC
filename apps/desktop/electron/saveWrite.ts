@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path'
 import { deflateSync, inflateSync } from 'node:zlib'
 import {
   DEPTH_REF_TAG, DEPTH_SLOT_BYTES, DEPTH_SLOT_FIELDS, DEPTH_SLOTS_PER_TEAM,
-  GAME_BITS, OVERALL_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE,
+  GAME_BITS, NIL_BIT, OVERALL_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE, REDSHIRT_BIT,
   readDepthCharts, readRoster, seasonGameTable,
 } from './saveAnalysis'
 import { WEATHER } from './gameEnums'
@@ -272,6 +272,10 @@ export interface PlayerEdit {
   overall?: number
   /** Rating name to value, using the names `RATING_BITS` keys. */
   ratings?: Record<string, number>
+  /** The redshirt flag — one bit, and the first field this format gave up. */
+  redshirt?: boolean
+  /** NIL in thousands. Nine bits with a 255 floor, so -255 to 256. */
+  nilK?: number
 }
 
 /** Ratings and overall are 7-bit fields, so 0 to 99 is the whole usable range. */
@@ -292,6 +296,9 @@ export function checkPlayerEdits(edits: PlayerEdit[], playerCount: number): Edit
       }
     }
     check('overall', e.overall)
+    if (e.nilK !== undefined && (!Number.isInteger(e.nilK) || e.nilK < -255 || e.nilK > 256)) {
+      out.push({ row: e.index, field: 'nilK', message: 'the field holds -255 to 256 (in thousands)' })
+    }
     for (const [name, v] of Object.entries(e.ratings ?? {})) {
       if (!(name in RATING_BITS)) { out.push({ row: e.index, field: name, message: 'not a rating DCC can place' }); continue }
       check(name, v)
@@ -312,7 +319,9 @@ export function checkPlayerEdits(edits: PlayerEdit[], playerCount: number): Edit
 const PLAYER_FIELD_WIDTH = 7
 const startOf = (endBit: number) => endBit - PLAYER_FIELD_WIDTH + 1
 
-export function readPlayerNumbers(payload: Buffer, index: number): { overall: number; ratings: Record<string, number> } | null {
+export function readPlayerNumbers(
+  payload: Buffer, index: number,
+): { overall: number; ratings: Record<string, number>; redshirt: boolean; nilK: number } | null {
   const at = (RECORD_BASE + index) * RECORD_STRIDE
   if (at + RECORD_STRIDE > payload.length) return null
   const rd = (endBit: number) => {
@@ -322,7 +331,16 @@ export function readPlayerNumbers(payload: Buffer, index: number): { overall: nu
   }
   const ratings: Record<string, number> = {}
   for (const [name, bit] of Object.entries(RATING_BITS)) ratings[name] = rd(bit)
-  return { overall: rd(OVERALL_BIT), ratings }
+  const bit = (b: number, w: number) => {
+    let v = 0
+    for (let i = b; i < b + w; i++) v = (v << 1) | ((payload[at + (i >> 3)] >> (7 - (i & 7))) & 1)
+    return v
+  }
+  return {
+    overall: rd(OVERALL_BIT), ratings,
+    redshirt: bit(REDSHIRT_BIT, 1) === 1,
+    nilK: bit(NIL_BIT, 9) - 255,
+  }
 }
 
 export function applyPlayerEdits(payload: Buffer, edits: PlayerEdit[]): { next: Buffer; touched: Set<number> } {
@@ -339,6 +357,15 @@ export function applyPlayerEdits(payload: Buffer, edits: PlayerEdit[]): { next: 
     for (const [name, v] of Object.entries(e.ratings ?? {})) {
       const bit = RATING_BITS[name]
       if (bit !== undefined) write(bit, v)
+    }
+    // These two are their own widths rather than the seven-bit rating field.
+    if (e.redshirt !== undefined) {
+      putBits(next, at, REDSHIRT_BIT, 1, e.redshirt ? 1 : 0)
+      touched.add(at + (REDSHIRT_BIT >> 3))
+    }
+    if (e.nilK !== undefined) {
+      putBits(next, at, NIL_BIT, 9, e.nilK + 255)
+      for (let b = NIL_BIT; b < NIL_BIT + 9; b++) touched.add(at + (b >> 3))
     }
   }
   return { next, touched }
@@ -398,6 +425,21 @@ export function writePlayerEdits(path: string, edits: PlayerEdit[], playerCount:
       const before = field === 'overall' ? was.overall : was.ratings[field]
       if (before !== got) changed.push({ index: e.index, field, before, after: got })
     }
+    // The two fields that are not seven-bit ratings, verified the same way.
+    for (const [field, want, before, after] of [
+      ['redshirt', e.redshirt, was.redshirt, now.redshirt],
+      ['nilK', e.nilK, was.nilK, now.nilK],
+    ] as [string, unknown, unknown, unknown][]) {
+      if (want !== undefined) {
+        if (after !== want) {
+          return { ok: false, message: `player ${e.index}: ${field} read back as ${after}, not ${want}; nothing was written` }
+        }
+        if (before !== after) changed.push({ index: e.index, field, before: Number(before), after: Number(after) })
+      } else if (before !== after) {
+        return { ok: false, message: `player ${e.index}: ${field} changed without being asked to; nothing was written` }
+      }
+    }
+
     // Every field not named must be exactly as it was.
     if (!wanted.has('overall') && was.overall !== now.overall) {
       return { ok: false, message: `player ${e.index}: overall changed without being asked to; nothing was written` }
