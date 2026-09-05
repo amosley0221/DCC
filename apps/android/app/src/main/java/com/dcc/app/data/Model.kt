@@ -266,6 +266,16 @@ data class Persisted(
      * type again.
      */
     val snapshotSource: String = "",
+    /**
+     * The recruits whose overall the user has chosen to see. The game keeps it
+     * hidden until a recruit is scouted, so the app does too rather than handing
+     * over a mechanic the dynasty is built on. Keyed by the save's own player
+     * id, so fetching the snapshot again does not move the reveals onto other
+     * players.
+     */
+    val revealedRecruits: List<Int> = emptyList(),
+    /** Every overall at once, for a user who does not want the mechanic. */
+    val revealAllRecruits: Boolean = false,
     val queue: List<QueueItem> = emptyList(),
     val storyStatus: Map<String, String> = emptyMap(),
     val board: List<String> = emptyList(),

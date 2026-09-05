@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
                                 } else if (section == "TEAM" && snap != null) {
                                     TeamSnapshotSection(snap)
                                 } else if (section == "RECRUIT" && snap != null) {
-                                    RecruitSnapshotSection(snap)
+                                    RecruitSnapshotSection(vm, state, snap)
                                 } else if (dy == null || d == null) {
                                     NoDynasty(section.lowercase().replaceFirstChar { it.uppercase() }, state) {
                                         section = "SETTINGS"

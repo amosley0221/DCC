@@ -39,7 +39,7 @@ object SnapshotFetch {
     /** "owner/name", the same shape the desktop app validates before publishing. */
     private val REPO = Regex("""^[\w.-]+/[\w.-]+$""")
 
-    // Long enough for six megabytes over a tired hotel connection, short enough
+    // Long enough for nine megabytes over a tired hotel connection, short enough
     // that a wrong address gives up while the user is still looking at the screen.
     private const val CONNECT_MS = 10_000
     private const val READ_MS = 45_000
@@ -170,8 +170,8 @@ object SnapshotFetch {
                     return@repeat
                 }
                 return when (code) {
-                    // Six megabytes of JSON compresses to well under one, which
-                    // is the whole reason the desktop gzips it.
+                    // Nine megabytes of JSON compresses to a megabyte and a half,
+                    // which is the whole reason the desktop gzips it.
                     200 -> GZIPInputStream(conn.inputStream).bufferedReader().readText()
                     401, 403 -> throw Refused("GitHub refused the download — the token may have expired")
                     404 -> throw Refused("the published snapshot has gone — publish it again from the desktop app")

@@ -138,6 +138,13 @@ data class SnapshotRecruit(
     val pipeline: String? = null,
     val dealbreaker: String? = null,
     val idealPitch: String? = null,
+    /**
+     * The same fifty-two ratings a roster row carries, so scouting a recruit has
+     * something to give up beyond the overall. Snapshots written before the
+     * desktop started sending them simply have no key here, and an empty map
+     * rather than a missing field keeps those opening on this build.
+     */
+    val ratings: Map<String, Int> = emptyMap(),
 )
 
 /** The recruit and portal pool sits on this team id rather than a real roster. */

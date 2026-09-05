@@ -125,6 +125,21 @@ class SnapshotView(val snapshot: DynastySnapshot) {
     val recruits: List<SnapshotRecruit> = snapshot.recruits
         .sortedWith(compareByDescending<SnapshotRecruit> { it.stars ?: 0 }.thenByDescending { it.overall })
 
+    /**
+     * The same pool by stars and then name, for while the overalls are hidden.
+     * Ordering by a hidden number would give it away — the best recruits would
+     * sit at the top whether or not their number is on screen — and stars are
+     * public in the game anyway. Sorted here with everything else so flipping
+     * the toggle never puts eleven thousand rows through a sort on the main
+     * thread.
+     */
+    val recruitsByName: List<SnapshotRecruit> = snapshot.recruits
+        .sortedWith(
+            compareByDescending<SnapshotRecruit> { it.stars ?: 0 }
+                .thenBy { it.last }
+                .thenBy { it.first },
+        )
+
     val recruitPositions: List<String> = snapshot.recruits.map { it.position }.distinct().sorted()
 
     fun rosterOf(index: Int): List<SnapshotPlayer> =
@@ -180,7 +195,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val saved = withContext(Dispatchers.IO) { Repository.loadState(getApplication()) }
             _state.value = saved
-            // Six megabytes of snapshot is far too much JSON for the main thread.
+            // Nine megabytes of snapshot is far too much JSON for the main thread.
             _snapshot.value = withContext(Dispatchers.IO) {
                 Repository.loadSnapshot(getApplication())?.let { SnapshotView(it) }
             }
@@ -300,7 +315,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Carries across the settings that describe this phone rather than the
      * dynasty on it: the theme, and everything about how a snapshot gets here.
      * Clearing a dynasty should not cost the user an address and two tokens
-     * typed in again to get back to where they already were.
+     * typed in again to get back to where they already were. Which recruits have
+     * been scouted comes too, because it belongs to the snapshot and none of
+     * these paths take the snapshot away.
      */
     private fun Persisted.keepingSettings(): Persisted {
         val kept = _state.value
@@ -311,6 +328,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             githubRepo = kept.githubRepo,
             githubToken = kept.githubToken,
             snapshotSource = kept.snapshotSource,
+            revealedRecruits = kept.revealedRecruits,
+            revealAllRecruits = kept.revealAllRecruits,
         )
     }
 
@@ -414,6 +433,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (running) "game launched — save locked, writes held" else "game closed — save unlocked",
                 if (running) "warn" else "good",
             ),
+        )
+    }
+
+    /**
+     * Scouts one recruit, or puts him back. His overall is in the snapshot
+     * either way — this only decides whether the screen shows it.
+     */
+    fun toggleRecruitReveal(playerId: Int) = update {
+        val scouted = it.revealedRecruits
+        it.copy(
+            revealedRecruits = if (playerId in scouted) scouted - playerId else scouted + playerId,
+        )
+    }
+
+    /**
+     * Hiding the overalls again forgets the recruits scouted one at a time too,
+     * so hidden means hidden rather than hidden except the handful already
+     * opened and since forgotten about.
+     */
+    fun setRevealAllRecruits(on: Boolean) = update {
+        it.copy(
+            revealAllRecruits = on,
+            revealedRecruits = if (on) it.revealedRecruits else emptyList(),
         )
     }
 
