@@ -10,6 +10,20 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.30.0] - 2026-09-05
+
+### Added
+
+- **The depth chart, read out of your save.** Every position in the order the
+  game plays them — offence, defence and special teams — with the starter on
+  the card and the rest a click away. It used to sort by overall and admit it
+  could not read your real ordering.
+- **Reorder it and commit.** Open a position, drag or use the arrows, and the
+  changes are held until you press commit. What gets written is a reorder of
+  the players already in that position, never a change of who is in it, which
+  is what makes it safe to write.
+
+
 ## [0.29.6] - 2026-09-05
 
 ### Changed

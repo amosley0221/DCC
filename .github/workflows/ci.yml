@@ -66,6 +66,10 @@ jobs:
         run: npm run check:write
         working-directory: apps/desktop
 
+      - name: Check the depth chart reader and writer
+        run: npm run check:depth
+        working-directory: apps/desktop
+
       - name: Check the relay
         run: npm run check:relay
         working-directory: apps/desktop
