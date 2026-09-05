@@ -13,6 +13,7 @@ import { SEMANTICS, THEMES } from './theme'
 export const blankPersisted = (): Persisted => ({
   dynastySource: 'none',
   savePath: null,
+  artPath: null,
   teamId: null,
   teamNames: {},
   anthropicKey: '',
@@ -93,6 +94,7 @@ export type Action =
   | { type: 'clearDynasty' }
   | { type: 'relay'; url: string; token: string }
   | { type: 'savePath'; path: string | null }
+  | { type: 'artPath'; path: string | null }
   | { type: 'teamId'; id: number | null }
   | { type: 'teamName'; id: number; name: string | null }
   | { type: 'anthropicKey'; key: string }
@@ -202,15 +204,17 @@ export function reducer(state: Persisted, action: Action): Persisted {
     case 'log':
       return { ...state, log: log(state, action.line.text, action.line.kind) }
     case 'reset':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'loadSample':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'clearDynasty':
-      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'relay':
       return { ...state, relayUrl: action.url, relayToken: action.token }
     case 'savePath':
       return { ...state, savePath: action.path }
+    case 'artPath':
+      return { ...state, artPath: action.path }
     case 'teamId':
       return { ...state, teamId: action.id }
     case 'anthropicKey':

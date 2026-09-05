@@ -126,6 +126,12 @@ export interface Persisted {
    */
   savePath: string | null
   /**
+   * The folder of extracted game art the faces and logos were last read from.
+   * Indexing it is a scan of the folder rather than a decode of the save, so
+   * it is re-run on launch and never asked for twice.
+   */
+  artPath: string | null
+  /**
    * The save's id for the team the user follows. The save does not say which
    * team is theirs and the ids are not linked to school names yet, so this is
    * chosen once and remembered.

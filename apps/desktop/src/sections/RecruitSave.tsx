@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSave } from '../saveStore'
+import { indexArt, useSave } from '../saveStore'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SectionHeader, Tab } from '../ui'
 import { useOps, useStore } from '../store'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
@@ -62,29 +62,19 @@ export default function RecruitSave() {
     const dir = await window.dcc.pickFaces()
     if (!dir || !save.roster) return
     patch({ facesBusy: true })
-    const ids = save.roster.players.map((p) => p.assetId)
-    const schools = save.roster.schools.map((s) => ({ name: s.name, fullName: s.fullName }))
-    const res = await window.dcc.indexFaces(dir, ids, schools)
+    const art = await indexArt(dir, save.roster)
     patch({ facesBusy: false })
-    if (!res.ok) {
-      dispatch({ type: 'log', line: { text: res.message, kind: 'bad' } })
+    if (!art.ok) {
+      dispatch({ type: 'log', line: { text: art.message, kind: 'bad' } })
       return
     }
-    patch({
-      faces: {
-        root: dir, files: res.files, bytes: res.bytes,
-        matched: res.match.matched, players: res.match.players,
-        sample: res.sample, unmatchedSample: res.match.unmatchedSample,
-        byExtension: res.byExtension, dirs: res.dirs,
-      },
-      facePaths: res.paths,
-      schoolArt: res.schoolArt.art,
-      schoolArtMissing: res.schoolArt.missing,
-    })
+    patch(art.patch)
+    // Remembered, so the folder is chosen once rather than on every launch.
+    dispatch({ type: 'artPath', path: dir })
     dispatch({ type: 'log', line: {
-      text: `matched ${res.match.matched.toLocaleString()} of ${res.match.players.toLocaleString()} players to faces` +
-        `, and ${res.schoolArt.matched.length} of ${schools.length} schools to logos`,
-      kind: res.match.matched ? 'good' : 'bad',
+      text: `matched ${art.matched.toLocaleString()} of ${art.players.toLocaleString()} players to faces` +
+        `, and ${art.schools} of ${save.roster.schools.length} schools to logos`,
+      kind: art.matched ? 'good' : 'bad',
     } })
   }
   const [group, setGroup] = useState('ALL')

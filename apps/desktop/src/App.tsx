@@ -322,10 +322,17 @@ function Standby({ title, body }: { title: string; body: string }) {
 function SaveGate({ update, version }: { update: UpdateStatus | null; version: string }) {
   const { state, dispatch } = useStore()
   const remembered = useRef(state.savePath).current
+  const rememberedArt = useRef(state.artPath).current
   const forget = useCallback(() => dispatch({ type: 'savePath', path: null }), [dispatch])
+  const forgetArt = useCallback(() => dispatch({ type: 'artPath', path: null }), [dispatch])
 
   return (
-    <SaveProvider remembered={remembered} onPathChange={forget}>
+    <SaveProvider
+      remembered={remembered}
+      rememberedArt={rememberedArt}
+      onPathChange={forget}
+      onArtChange={forgetArt}
+    >
       <Shell update={update} version={version} />
     </SaveProvider>
   )

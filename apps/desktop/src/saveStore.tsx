@@ -69,15 +69,52 @@ interface Ctx {
 
 const SaveCtx = createContext<Ctx | null>(null)
 
+/**
+ * Read a folder of extracted game art and shape the result for the store.
+ *
+ * Shared by the folder picker and the restore on launch, because the two used
+ * to differ only in that one of them existed: the chosen folder was held in
+ * memory, so every launch asked for it again.
+ */
+export async function indexArt(
+  dir: string,
+  roster: NonNullable<SaveState['roster']>,
+): Promise<{ ok: true; patch: Partial<SaveState>; matched: number; players: number; schools: number }
+  | { ok: false; message: string }> {
+  const ids = roster.players.map((p) => p.assetId)
+  const schools = roster.schools.map((s) => ({ name: s.name, fullName: s.fullName }))
+  const res = await window.dcc.indexFaces(dir, ids, schools)
+  if (!res.ok) return { ok: false, message: res.message }
+  return {
+    ok: true,
+    matched: res.match.matched,
+    players: res.match.players,
+    schools: res.schoolArt.matched.length,
+    patch: {
+      faces: {
+        root: dir, files: res.files, bytes: res.bytes,
+        matched: res.match.matched, players: res.match.players,
+        sample: res.sample, unmatchedSample: res.match.unmatchedSample,
+        byExtension: res.byExtension, dirs: res.dirs,
+      },
+      facePaths: res.paths,
+      schoolArt: res.schoolArt.art,
+      schoolArtMissing: res.schoolArt.missing,
+    },
+  }
+}
+
 export function useSave(): Ctx {
   const ctx = useContext(SaveCtx)
   if (!ctx) throw new Error('useSave outside SaveProvider')
   return ctx
 }
 
-export function SaveProvider({ remembered, onPathChange, children }: {
+export function SaveProvider({ remembered, rememberedArt, onPathChange, onArtChange, children }: {
   remembered: string | null
+  rememberedArt: string | null
   onPathChange: (path: string | null) => void
+  onArtChange: (path: string | null) => void
   children: React.ReactNode
 }) {
   const [save, setSave] = useState<SaveState>(blank)
@@ -119,8 +156,23 @@ export function SaveProvider({ remembered, onPathChange, children }: {
         restoring: false,
       })
       patch({ dict: await window.dcc.dictionaryState() })
+
+      // The art folder is a scan of a directory, not a decode of the save, so
+      // re-reading it costs little and asking for it again costs the user a
+      // dialog on every single launch. A folder that has gone is forgotten
+      // rather than reported.
+      if (r.ok && rememberedArt) {
+        patch({ facesBusy: true })
+        const art = await indexArt(rememberedArt, {
+          count: r.count, ratingNames: r.ratingNames, unverifiedPairs: r.unverifiedPairs,
+          schools: r.schools, coaches: r.coaches, stores: r.stores, games: r.games,
+          players: r.players,
+        })
+        patch({ facesBusy: false, ...(art.ok ? art.patch : {}) })
+        if (!art.ok) onArtChange(null)
+      }
     })()
-  }, [remembered, patch, onPathChange])
+  }, [remembered, rememberedArt, patch, onPathChange, onArtChange])
 
   const value = useMemo(() => ({ save, patch }), [save, patch])
   return <SaveCtx.Provider value={value}>{children}</SaveCtx.Provider>
