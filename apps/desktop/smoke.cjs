@@ -81,6 +81,15 @@ app.whenReady().then(async () => {
       writeFileSync(path.join(toastShots, `toast-${label}.png`), (await win.webContents.capturePage()).toPNG())
     }
   }
+  // The toast is fixed to the window. A shell rule matching it at the same
+  // specificity once turned that into `relative`, which dropped it out of the
+  // corner and pushed it off the left edge — visible only in a screenshot, so
+  // assert the property rather than trusting the eye.
+  const toastFixed = await win.webContents.executeJavaScript(
+    `(() => { const el = document.querySelector('.update-toast')
+        return el ? getComputedStyle(el).position : 'missing' })()`)
+  console.log('UPDATE TOAST POSITION: ' + toastFixed)
+
   console.log('UPDATE TOAST:')
   seen.forEach((x) => console.log('  ' + x))
   if (seen.some((x) => x.includes('NOT SHOWN'))) {
@@ -188,6 +197,31 @@ app.whenReady().then(async () => {
   console.log('ART OVER dccart://: ' + (artLoads ?? 'a real image loads'))
   if (artLoads) { console.log('SMOKE FAIL: ' + artLoads); app.exit(1); return }
 
+  // The game switcher hangs off the topbar, and every shell child sits in its
+  // own stacking context at the same level — so main, later in source order,
+  // painted straight over it and the menu read as see-through. Hit-test it:
+  // whatever is at the middle of a row has to belong to the menu.
+  const menuOnTop = await (async () => {
+    const opened = await win.webContents.executeJavaScript(
+      `(() => { const b = document.querySelector('.gs-mark'); if (b) b.click(); return !!b })()`)
+    if (!opened) return 'no wordmark to click'
+    // React renders the menu on the next tick, so the click and the hit test
+    // cannot live in the same evaluation.
+    await wait(400)
+    return win.webContents.executeJavaScript(`(() => {
+      const menu = document.querySelector('.gs-games')
+      if (!menu) return 'the menu did not open'
+      const row = menu.querySelector('.gs-game')
+      const b = row.getBoundingClientRect()
+      const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)
+      const covered = !menu.contains(hit)
+      document.querySelector('.gs-mark').click()
+      return covered ? 'the menu is painted over by ' + (hit ? hit.className : 'nothing') : null
+    })()`)
+  })()
+  console.log('GAME SWITCHER: ' + (menuOnTop ?? 'opens above the page'))
+  if (menuOnTop) { console.log('SMOKE FAIL: ' + menuOnTop); app.exit(1); return }
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))
@@ -200,6 +234,7 @@ app.whenReady().then(async () => {
   console.log('ZSTD: node ' + process.versions.node + ' -> ' + (zstdOk ? 'supported' : 'MISSING'))
 
   const ok = errors.length === 0 && r.nav.length >= 6 && zstdOk && !savePersist &&
+    toastFixed === 'fixed' &&
     visited.every((v) => !v.includes('title=""'))
   console.log(ok ? 'SMOKE OK' : 'SMOKE FAIL')
   app.exit(ok ? 0 : 1)

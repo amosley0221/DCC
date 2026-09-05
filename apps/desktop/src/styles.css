@@ -418,12 +418,28 @@ body[data-theme='gold'] .effect { border-left-color: var(--accent-ui); font-fami
     radial-gradient(ellipse 60% 50% at 70% 12%, var(--haze), transparent 70%),
     radial-gradient(ellipse 40% 40% at 12% 92%, var(--haze2), transparent 70%);
 }
-.gs > * { position: relative; z-index: 1; }
+/* Lift the shell's own children above the haze — but not the update toast,
+   which is fixed to the window rather than placed in the shell. This rule
+   matches it too and, being later in the file at the same specificity, was
+   quietly turning its `position: fixed` into `relative`: it left the bottom
+   right corner, became the last item in the column, and `right: 18px` then
+   pushed it off the left edge of the window. */
+.gs > *:not(.update-toast) { position: relative; z-index: 1; }
 
+/* Above main, not merely above the haze. The rule above gives every child a
+   stacking context at the same level, so the topbar's own z-indexes — the game
+   switcher, the search results — were sealed inside it and main, coming later
+   in source order, painted straight over them. A dropdown that reads as
+   transparent is usually this and not a colour.
+
+   Written as a child selector on purpose: the rule above is `.gs > *:not(...)`,
+   which outranks a bare `.gs-topbar`, so a plain class rule here would set a
+   z-index that never applies. */
 .gs-topbar {
   display: flex; align-items: center; gap: 30px; padding: 0 34px; height: 66px;
   border-bottom: 1px solid var(--line); flex: none;
 }
+.gs > .gs-topbar { position: relative; z-index: 5; }
 
 .gs-mark { all: unset; cursor: pointer; display: flex; align-items: center; gap: 9px; flex: none; }
 .gs-mark-name {
