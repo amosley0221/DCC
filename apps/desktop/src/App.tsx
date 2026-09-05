@@ -86,7 +86,7 @@ const Icon = {
 }
 
 function Shell({ update, version }: { update: UpdateStatus | null; version: string }) {
-  const { state, d } = useStore()
+  const { state, d, dispatch } = useStore()
   const { save } = useSave()
   const [game, setGame] = useState<GameId>('CFB27')
   const [games, setGames] = useState(false)
@@ -101,6 +101,24 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
   const ops = state.theme !== 'gold'
 
   const me = state.teamId === null ? null : (state.teamNames[state.teamId] ?? TEAM_ID_NAMES[state.teamId] ?? null)
+
+  // Publish once the launch read has finished, so the phone is current without
+  // anybody remembering to press a button. Once per run of the app: the roster
+  // is re-read after every write and republishing on each of those would be a
+  // GitHub upload per edit.
+  const published = useRef(false)
+  useEffect(() => {
+    if (published.current || !state.autoPublish) return
+    if (!save.path || !save.roster || save.restoring) return
+    if (!state.publishRepo.trim() || !state.githubToken.trim()) return
+    published.current = true
+    void window.dcc.publishSnapshot(save.path, state.teamId, state.publishRepo.trim())
+      .then((res) => dispatch({
+        type: 'log',
+        line: { text: `snapshot published on launch — ${res.message}`, kind: res.ok ? 'good' : 'bad' },
+      }))
+  }, [save.path, save.roster, save.restoring, state.autoPublish, state.publishRepo,
+      state.githubToken, state.teamId, dispatch])
 
   // The week the dynasty is on, which is the one you are about to play. This
   // used to be the last week played, so the bar said 10 while the phone said 11

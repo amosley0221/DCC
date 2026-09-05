@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Card, Input, Kicker, Meta, SectionHeader } from '../ui'
+import { Btn, Card, Input, Kicker, Meta, SectionHeader, Toggle } from '../ui'
 import type { RelayState } from '../../electron/relay'
 
 /**
@@ -110,11 +110,21 @@ export default function DevicesSave() {
               <Btn onClick={() => dispatch({ type: 'githubToken', token: token.trim() })}>Save the token</Btn>
             </div>
           </div>
-          <div className="row" style={{ gap: 8, marginTop: 10 }}>
+          <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <Btn variant="primary" onClick={publish} disabled={busy || !path || !repo.trim() || !state.githubToken}>
               {busy ? 'Publishing…' : 'Publish the snapshot'}
             </Btn>
+            <Toggle
+              on={state.autoPublish}
+              onChange={(on) => dispatch({ type: 'autoPublish', on })}
+              label="Publish on launch"
+            />
           </div>
+          <Meta size={9} color="var(--ink4)">
+            {state.autoPublish
+              ? 'THE SAVE IS RE-READ WHEN THE APP OPENS AND THE SNAPSHOT GOES UP WITH IT, ONCE A RUN'
+              : 'NOTHING IS PUBLISHED UNTIL YOU PRESS THE BUTTON'}
+          </Meta>
           {!state.githubToken ? <Meta size={9} color="var(--warn)">SAVE A TOKEN FIRST</Meta> : null}
           {note ? <div className="effect" style={{ marginTop: 10 }}>{note.toUpperCase()}</div> : null}
         </Card>

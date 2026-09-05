@@ -22,6 +22,7 @@ export const blankPersisted = (): Persisted => ({
   revealAllRecruits: false,
   githubToken: '',
   publishRepo: '',
+  autoPublish: true,
   relayUrl: '',
   relayToken: '',
   theme: 'gold',
@@ -104,6 +105,7 @@ export type Action =
   | { type: 'revealAllRecruits'; on: boolean }
   | { type: 'githubToken'; token: string }
   | { type: 'publishRepo'; repo: string }
+  | { type: 'autoPublish'; on: boolean }
 
 let seq = 0
 const nextId = () => `q${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -206,11 +208,11 @@ export function reducer(state: Persisted, action: Action): Persisted {
     case 'log':
       return { ...state, log: log(state, action.line.text, action.line.kind) }
     case 'reset':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, autoPublish: state.autoPublish, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'loadSample':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, autoPublish: state.autoPublish, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'clearDynasty':
-      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, autoPublish: state.autoPublish, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'relay':
       return { ...state, relayUrl: action.url, relayToken: action.token }
     case 'savePath':
@@ -249,6 +251,8 @@ export function reducer(state: Persisted, action: Action): Persisted {
       return { ...state, githubToken: action.token }
     case 'publishRepo':
       return { ...state, publishRepo: action.repo }
+    case 'autoPublish':
+      return { ...state, autoPublish: action.on }
     case 'teamName': {
       const next = { ...state.teamNames }
       if (action.name) next[action.id] = action.name

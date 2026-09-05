@@ -10,6 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.37.0] - 2026-09-05
+
+### Added
+
+- **The snapshot publishes itself on launch.** The app already re-reads your
+  save when it opens; now it sends the snapshot up with it, so the phone is
+  current without anybody pressing a button. Once per run — the roster is
+  re-read after every write, and republishing on each of those would be an
+  upload per edit. It needs a repository and a token, and there is a switch
+  beside the Publish button on Devices to turn it off.
+
 ## [0.36.0] - 2026-09-05
 
 ### Added

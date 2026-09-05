@@ -169,6 +169,12 @@ export interface Persisted {
   githubToken: string
   /** "owner/name" of the repository the snapshot is published to. */
   publishRepo: string
+  /**
+   * Publish the snapshot to GitHub whenever the app opens and re-reads the
+   * save, so the phone is current without anybody remembering to press a
+   * button. Needs a repository and a token; without them it does nothing.
+   */
+  autoPublish: boolean
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string
