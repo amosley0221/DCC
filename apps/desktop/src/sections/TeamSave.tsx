@@ -5,6 +5,7 @@ import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, Sec
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import Schedule from './Schedule'
+import DepthChart from './DepthChart'
 
 const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
@@ -268,30 +269,7 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
             <Meta size={9}>{Object.keys(names).length} of {teams.length} named</Meta>
           </Card>
         ) : tab === 'DEPTH' && mine ? (
-          <Card className="card-pad">
-            <Kicker>Depth chart</Kicker>
-            <p className="body-serif" style={{ marginTop: 7 }}>
-              Ordered by overall within each position, which is how the game seeds a depth chart
-              before anyone reorders it. DCC cannot yet read your actual ordering.
-            </p>
-            {GROUPS.map(([label, list]) => (
-              <div key={label} style={{ marginTop: 12 }}>
-                <Meta size={9}>{label}</Meta>
-                {list.map((posName) => {
-                  const at = mine.list.filter((p) => p.position === posName)
-                  if (!at.length) return null
-                  return (
-                    <div key={posName} className="row" style={{ gap: 10, alignItems: 'baseline', marginTop: 4 }}>
-                      <Meta size={9}>{posName}</Meta>
-                      <span style={{ color: 'var(--ink2)', fontSize: 12 }}>
-                        {at.map((p) => `${p.first} ${p.last} ${p.overall}`).join('  ·  ')}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-          </Card>
+          <DepthChart team={mine.id} players={roster?.players ?? []} />
         ) : tab === 'SCHEDULE' && roster ? (
           <Schedule
             games={roster.games ?? []}

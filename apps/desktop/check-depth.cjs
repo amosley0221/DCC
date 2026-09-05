@@ -53,4 +53,30 @@ assert.deepEqual(charts[1].slots[4].rows, [])
 // A payload with no region at all must say so rather than inventing one.
 assert.equal(S.readDepthCharts(Buffer.alloc(4000, 0x11), rows), null)
 
-console.log(`check-depth: ${TEAMS} teams x ${N} slots round-trip, empty slot kept, slot table alphabetical`)
+// The writer rewrites a slot in place: same 24 bytes, references packed at the
+// front, tail zeroed, and nothing outside the slot allowed to move.
+const W2 = require(process.argv[3])
+const base = charts[0].slots[0].offset
+const target = charts[2].slots[9]
+const reordered = [...target.rows].reverse()
+const { next, touched } = W2.applyDepthEdits(payload, [{ block: 2, slot: 9, rows: reordered }], base)
+assert.equal(next.length, payload.length, 'the payload must not change size')
+for (let i = 0; i < next.length; i++) {
+  if (next[i] !== payload[i]) assert.ok(touched.has(i), `byte 0x${i.toString(16)} moved outside the slot`)
+}
+const back = S.readDepthCharts(next, rows)
+assert.deepEqual(back[2].slots[9].rows, reordered, 'the reorder did not read back')
+for (let b = 0; b < TEAMS; b++) {
+  for (let s = 0; s < N; s++) {
+    if (b === 2 && s === 9) continue
+    assert.deepEqual(back[b].slots[s].rows, charts[b].slots[s].rows, `slot ${s} of ${b} moved and should not have`)
+  }
+}
+// Shortening a slot has to zero the tail, not leave a stale reference behind.
+const short = target.rows.slice(0, 1)
+const trimmed = S.readDepthCharts(
+  W2.applyDepthEdits(payload, [{ block: 2, slot: 9, rows: short }], base).next, rows)
+assert.deepEqual(trimmed[2].slots[9].rows, short, 'the tail was not cleared')
+
+console.log(`check-depth: ${TEAMS} teams x ${N} slots round-trip, empty slot kept, slot table alphabetical,`)
+console.log('            reorder rewrites only its own 24 bytes and reads back')

@@ -21,6 +21,15 @@ declare global {
             schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]; players: RosterPlayer[] }
         | { ok: false; message: string }
       >
+      depth(path: string): Promise<
+        | { ok: true; slots: { abbr: string; name: string; side: 'offence' | 'defence' | 'special' }[]
+            charts: { block: number; slots: number[][] }[] }
+        | { ok: false; message: string }
+      >
+      writeDepth(path: string, edits: { block: number; slot: number; rows: number[] }[]): Promise<{
+        ok: boolean; message: string; backup?: string
+        changed?: { block: number; slot: number; before: number[]; after: number[] }[]
+      }>
       writeGames(path: string, edits: GameEdit[]): Promise<WriteResult>
       writePlayers(path: string, edits: PlayerEdit[], playerCount: number): Promise<PlayerWriteResult>
       publishSnapshot(path: string, teamId: number | null, repo: string): Promise<

@@ -18,7 +18,9 @@ import { copyFileSync, readFileSync, renameSync, unlinkSync, writeFileSync } fro
 import { dirname, join } from 'node:path'
 import { deflateSync, inflateSync } from 'node:zlib'
 import {
-  GAME_BITS, OVERALL_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE, seasonGameTable,
+  DEPTH_REF_TAG, DEPTH_SLOT_BYTES, DEPTH_SLOT_FIELDS, DEPTH_SLOTS_PER_TEAM,
+  GAME_BITS, OVERALL_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE,
+  readDepthCharts, readRoster, seasonGameTable,
 } from './saveAnalysis'
 import { WEATHER } from './gameEnums'
 
@@ -419,4 +421,140 @@ export function writePlayerEdits(path: string, edits: PlayerEdit[], playerCount:
     return { ok: false, message: `could not write the save: ${String((err as Error)?.message ?? err)}`, backup }
   }
   return { ok: true, message: `updated ${changed.length} value${changed.length === 1 ? '' : 's'}`, backup, changed }
+}
+
+// ── the depth chart ───────────────────────────────────────────────────────────
+
+export interface DepthEdit {
+  /** The team's block in the depth chart region. */
+  block: number
+  /** 0-34, indexing DEPTH_SLOTS. */
+  slot: number
+  /** Roster rows in the order they should sit, first string first. */
+  rows: number[]
+}
+
+export interface DepthWriteResult {
+  ok: boolean
+  message: string
+  backup?: string
+  changed?: { block: number; slot: number; before: number[]; after: number[] }[]
+}
+
+/**
+ * Rewrites depth chart slots.
+ *
+ * A slot is a fixed 24 bytes, so a reorder is a rewrite of the same span and
+ * never moves anything: the six fields are written from the front and the tail
+ * is zeroed. The edit is refused rather than truncated if it carries more names
+ * than a slot can hold.
+ */
+export function applyDepthEdits(
+  payload: Buffer,
+  edits: DepthEdit[],
+  base: number,
+): { next: Buffer; touched: Set<number> } {
+  const next = Buffer.from(payload)
+  const touched = new Set<number>()
+  for (const e of edits) {
+    const at = base + (e.block * DEPTH_SLOTS_PER_TEAM + e.slot) * DEPTH_SLOT_BYTES
+    for (let k = 0; k < DEPTH_SLOT_FIELDS; k++) {
+      const o = at + k * 4
+      const row = e.rows[k]
+      if (row === undefined) { next.writeUInt32BE(0, o) } else {
+        next.writeUInt16BE(DEPTH_REF_TAG, o)
+        next.writeUInt16BE(row, o + 2)
+      }
+      for (let b = 0; b < 4; b++) touched.add(o + b)
+    }
+  }
+  return { next, touched }
+}
+
+export function writeDepthEdits(path: string, edits: DepthEdit[]): DepthWriteResult {
+  if (!edits.length) return { ok: false, message: 'nothing to change' }
+  for (const e of edits) {
+    if (e.rows.length > DEPTH_SLOT_FIELDS) {
+      return { ok: false, message: `a slot holds at most ${DEPTH_SLOT_FIELDS} players; slot ${e.slot} was given ${e.rows.length}` }
+    }
+    if (new Set(e.rows).size !== e.rows.length) {
+      return { ok: false, message: `slot ${e.slot} lists the same player twice` }
+    }
+    if (e.rows.some((r) => !Number.isInteger(r) || r < 0 || r > 0xffff)) {
+      return { ok: false, message: `slot ${e.slot} has a player row outside the table` }
+    }
+  }
+
+  const file = readFileSync(path)
+  const c = readContainer(file)
+  if (!c) return { ok: false, message: 'this file is not a save DCC can read' }
+
+  const rows = new Set(readRoster(c.payload).map((p) => p.index))
+  const charts = readDepthCharts(c.payload, rows)
+  if (!charts) return { ok: false, message: 'this save has no depth chart DCC can find' }
+  // The reader hands back where every slot starts, so the writer never
+  // recomputes the region and the two cannot disagree about it.
+  const base = charts[0].slots[0].offset
+
+  for (const e of edits) {
+    if (!charts[e.block]) return { ok: false, message: `there is no team block ${e.block}` }
+    if (e.slot < 0 || e.slot >= DEPTH_SLOTS_PER_TEAM) return { ok: false, message: `there is no slot ${e.slot}` }
+    const was = charts[e.block].slots[e.slot].rows
+    // Reordering is safe because it cannot put a player somewhere the game did
+    // not already have them. Adding or removing names is a different edit and
+    // is not what this writes.
+    if ([...was].sort().join() !== [...e.rows].sort().join()) {
+      return { ok: false, message: `slot ${e.slot} of block ${e.block}: this writes a reorder, not a change of who is in the slot` }
+    }
+  }
+
+  const { next, touched } = applyDepthEdits(c.payload, edits, base)
+  if (next.length !== c.payload.length) return { ok: false, message: 'the edit changed the payload size' }
+  for (let i = 0; i < next.length; i++) {
+    if (next[i] !== c.payload[i] && !touched.has(i)) {
+      return { ok: false, message: `refusing to write: byte 0x${i.toString(16)} changed and should not have` }
+    }
+  }
+
+  const rebuilt = packContainer(c, next)
+  if (!rebuilt) return { ok: false, message: 'the edited save does not compress small enough to fit its file' }
+  const check = readContainer(rebuilt)
+  if (!check || !check.payload.equals(next)) {
+    return { ok: false, message: 'the rebuilt save did not read back identically; nothing was written' }
+  }
+
+  // Read every chart back the way the game will, and confirm the slots asked
+  // for hold what was asked and no other slot moved at all.
+  const after = readDepthCharts(check.payload, rows)
+  if (!after) return { ok: false, message: 'the rebuilt save no longer has a readable depth chart; nothing was written' }
+  const asked = new Map(edits.map((e) => [`${e.block}:${e.slot}`, e.rows]))
+  const changed: { block: number; slot: number; before: number[]; after: number[] }[] = []
+  for (let b = 0; b < charts.length; b++) {
+    for (let s = 0; s < DEPTH_SLOTS_PER_TEAM; s++) {
+      const was = charts[b].slots[s].rows
+      const now = after[b].slots[s].rows
+      const want = asked.get(`${b}:${s}`)
+      if (want) {
+        if (now.join() !== want.join()) {
+          return { ok: false, message: `slot ${s} of block ${b} read back as ${now.join(',')}, not ${want.join(',')}; nothing was written` }
+        }
+        if (was.join() !== now.join()) changed.push({ block: b, slot: s, before: was, after: now })
+      } else if (was.join() !== now.join()) {
+        return { ok: false, message: `slot ${s} of block ${b} changed without being asked to; nothing was written` }
+      }
+    }
+  }
+  if (!changed.length) return { ok: false, message: 'the save already holds that order' }
+
+  const backup = backupPath(path)
+  copyFileSync(path, backup)
+  const tmp = `${path}.dccnew`
+  try {
+    writeFileSync(tmp, rebuilt)
+    renameSync(tmp, path)
+  } catch (err) {
+    try { unlinkSync(tmp) } catch { /* nothing to clean up */ }
+    return { ok: false, message: `could not write the save: ${String((err as Error)?.message ?? err)}`, backup }
+  }
+  return { ok: true, message: `reordered ${changed.length} slot${changed.length === 1 ? '' : 's'}`, backup, changed }
 }

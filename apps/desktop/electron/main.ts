@@ -7,6 +7,7 @@ import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
+  readDepthCharts, DEPTH_SLOTS,
 } from './saveAnalysis'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
@@ -17,8 +18,8 @@ import type { PressRequest } from './press'
 import { buildSnapshot } from './snapshot'
 import { publishSnapshot } from './publish'
 import { relayState, startRelay, stopRelay } from './relay'
-import { writeGameEdits, writePlayerEdits } from './saveWrite'
-import type { GameEdit, PlayerEdit } from './saveWrite'
+import { writeGameEdits, writePlayerEdits, writeDepthEdits } from './saveWrite'
+import type { GameEdit, PlayerEdit, DepthEdit } from './saveWrite'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -206,6 +207,28 @@ ipcMain.handle('save:analyze', (_e, path: string) => {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
 })
+
+ipcMain.handle('save:depth', (_e, path: string) => {
+  try {
+    const payload = readSavePayload(path)
+    if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
+    const rows = new Set(readRoster(payload).map((p) => p.index))
+    const charts = readDepthCharts(payload, rows)
+    if (!charts) return { ok: false as const, message: 'DCC could not find a depth chart in this save.' }
+    // Offsets are the writer's business, not the renderer's — it works in team
+    // blocks and slot numbers, and sending them would only invite a UI to do
+    // arithmetic on a file it cannot see.
+    return {
+      ok: true as const,
+      slots: DEPTH_SLOTS,
+      charts: charts.map((c) => ({ block: c.block, slots: c.slots.map((s) => s.rows) })),
+    }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:writeDepth', (_e, path: string, edits: DepthEdit[]) => writeDepthEdits(path, edits))
 
 ipcMain.handle('save:roster', (_e, path: string) => {
   try {
