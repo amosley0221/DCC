@@ -50,11 +50,48 @@ async function gh(target: PublishTarget, url: string, init: RequestInit = {}): P
   })
 }
 
+/**
+ * A release has to hang off a commit, and a repository made through the "new
+ * repository" button has none at all — no commit, no default branch. Creating a
+ * release there fails with a message about an invalid target that says nothing
+ * about the real cause, so the first publish writes a README and lets GitHub
+ * make the default branch as a side effect.
+ */
+async function ensureInitialised(target: PublishTarget): Promise<string | null> {
+  const commits = await gh(target, `${API}/repos/${target.repo}/commits?per_page=1`)
+  if (commits.status === 200) return null
+  if (commits.status === 404) return `No repository called ${target.repo}, or the token cannot see it.`
+  if (commits.status === 401 || commits.status === 403) {
+    return 'GitHub refused the token. It needs repo access to that repository.'
+  }
+  // 409 is GitHub's way of saying the repository is empty.
+  if (commits.status !== 409) return `GitHub returned ${commits.status} checking the repository.`
+
+  const readme = [
+    '# Dynasty snapshots',
+    '',
+    'Written by Dynasty Command Center so the phone can read the dynasty away',
+    'from home. The current snapshot is the release asset, not a file here.',
+    '',
+  ].join('\n')
+  const made = await gh(target, `${API}/repos/${target.repo}/contents/README.md`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      message: 'Start the repository so snapshots have somewhere to hang off',
+      content: Buffer.from(readme, 'utf8').toString('base64'),
+    }),
+  })
+  if (made.status === 201) return null
+  return `Could not start the empty repository (${made.status}). ${await made.text().catch(() => '')}`.trim()
+}
+
 /** Finds the reusable release, creating it the first time. */
 async function releaseId(target: PublishTarget): Promise<{ id: number } | { error: string }> {
   const got = await gh(target, `${API}/repos/${target.repo}/releases/tags/${RELEASE_TAG}`)
   if (got.status === 200) return { id: (await got.json() as { id: number }).id }
   if (got.status === 404) {
+    // A 404 here means either the release does not exist yet or the repository
+    // does not. Creating it settles which, and says so in its own error.
     const made = await gh(target, `${API}/repos/${target.repo}/releases`, {
       method: 'POST',
       body: JSON.stringify({
@@ -65,10 +102,10 @@ async function releaseId(target: PublishTarget): Promise<{ id: number } | { erro
       }),
     })
     if (made.status === 201) return { id: (await made.json() as { id: number }).id }
-    return { error: `could not create the release (${made.status}). ${await made.text().catch(() => '')}`.trim() }
+    if (made.status === 404) return { error: `No repository called ${target.repo}, or the token cannot see it.` }
+    return { error: `Could not create the release (${made.status}). ${await made.text().catch(() => '')}`.trim() }
   }
   if (got.status === 401 || got.status === 403) return { error: 'GitHub refused the token. It needs repo access to that repository.' }
-  if (got.status === 404) return { error: `no such repository: ${target.repo}` }
   return { error: `GitHub returned ${got.status} looking for the release.` }
 }
 
@@ -81,6 +118,9 @@ export async function publishSnapshot(target: PublishTarget, snapshot: unknown):
     return { ok: false, message: 'The repository should look like owner/name.' }
   }
   if (!target.token.trim()) return { ok: false, message: 'No GitHub token set.' }
+
+  const notReady = await ensureInitialised(target)
+  if (notReady) return { ok: false, message: notReady }
 
   const rel = await releaseId(target)
   if ('error' in rel) return { ok: false, message: rel.error }
