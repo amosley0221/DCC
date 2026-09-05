@@ -31,10 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
-import com.dcc.app.data.Derived
 import com.dcc.app.data.Dynasty
 import com.dcc.app.data.Persisted
 import com.dcc.app.state.AppViewModel
+import com.dcc.app.state.Derived
 import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.Kicker
 import com.dcc.app.ui.components.MetaText
