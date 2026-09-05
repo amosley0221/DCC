@@ -1458,6 +1458,155 @@ export interface StoreRecord {
  * fields that are references to other tables are not stored inline — but it
  * says what exists, how much of it there is, and where to start looking.
  */
+/**
+ * The depth chart.
+ *
+ * `DepthChartStore` holds only a reference table — 143 chart records and 5,005
+ * slot records, one chart and exactly 35 slots per team. The slots' contents
+ * are a flat run of fixed-size records elsewhere in the payload, and this reads
+ * those.
+ *
+ * A slot is 24 bytes: six four-byte fields, each either all-zero or a player
+ * reference — the tag 0x213e followed by the player's row in the roster table.
+ * References are packed at the front and depth order is array order, so the
+ * first field is the first string. Teams run in blocks of 35 slots.
+ *
+ * See docs/SAVE-FORMAT.md for how it was derived; the short version is a pair
+ * of saves either side of one swapped centre, which moved four bytes.
+ */
+export const DEPTH_REF_TAG = 0x213e
+export const DEPTH_SLOT_BYTES = 24
+export const DEPTH_SLOT_FIELDS = 6
+export const DEPTH_SLOTS_PER_TEAM = 35
+
+/**
+ * What each slot is, in the order the save stores them — which is alphabetical
+ * by abbreviation, and is the rule that identified them. Confirmed against a
+ * dynasty's own depth chart screen: 28 of the 35 could be checked by name and
+ * all 28 agreed.
+ */
+export const DEPTH_SLOTS: { abbr: string; name: string; side: 'offence' | 'defence' | 'special' }[] = [
+  { abbr: '3DRB', name: 'Third-down back', side: 'offence' },
+  { abbr: 'C', name: 'Center', side: 'offence' },
+  { abbr: 'CB', name: 'Cornerback', side: 'defence' },
+  { abbr: 'DT', name: 'Defensive tackle', side: 'defence' },
+  { abbr: 'FB', name: 'Fullback', side: 'offence' },
+  { abbr: 'FS', name: 'Free safety', side: 'defence' },
+  { abbr: 'GAD', name: 'Gadget receiver', side: 'offence' },
+  { abbr: 'HB', name: 'Running back', side: 'offence' },
+  { abbr: 'K', name: 'Kicker', side: 'special' },
+  { abbr: 'KOS', name: 'Kickoff specialist', side: 'special' },
+  { abbr: 'KR', name: 'Kick returner', side: 'special' },
+  { abbr: 'LE', name: 'Left end', side: 'defence' },
+  { abbr: 'LG', name: 'Left guard', side: 'offence' },
+  { abbr: 'LOLB', name: 'Left outside linebacker', side: 'defence' },
+  { abbr: 'LS', name: 'Long snapper', side: 'special' },
+  { abbr: 'LT', name: 'Left tackle', side: 'offence' },
+  { abbr: 'MLB', name: 'Middle linebacker', side: 'defence' },
+  { abbr: 'NT', name: 'Nose tackle', side: 'defence' },
+  { abbr: 'P', name: 'Punter', side: 'special' },
+  { abbr: 'PR', name: 'Punt returner', side: 'special' },
+  { abbr: 'PWHB', name: 'Power back', side: 'offence' },
+  { abbr: 'QB', name: 'Quarterback', side: 'offence' },
+  { abbr: 'RDT', name: 'Tackle (3-4)', side: 'defence' },
+  { abbr: 'RE', name: 'Right end', side: 'defence' },
+  { abbr: 'RG', name: 'Right guard', side: 'offence' },
+  { abbr: 'RLE', name: 'Left end (3-4)', side: 'defence' },
+  { abbr: 'ROLB', name: 'Right outside linebacker', side: 'defence' },
+  { abbr: 'RRE', name: 'Right end (3-4)', side: 'defence' },
+  { abbr: 'RT', name: 'Right tackle', side: 'offence' },
+  { abbr: 'SLCB', name: 'Slot corner', side: 'defence' },
+  { abbr: 'SLWR', name: 'Slot receiver', side: 'offence' },
+  { abbr: 'SS', name: 'Strong safety', side: 'defence' },
+  { abbr: 'SUBLB', name: 'Sub-package linebacker', side: 'defence' },
+  { abbr: 'TE', name: 'Tight end', side: 'offence' },
+  { abbr: 'WR', name: 'Receiver', side: 'offence' },
+]
+
+export interface DepthChartSlot {
+  /** 0-34, indexing DEPTH_SLOTS. */
+  slot: number
+  /** Roster rows, first string first. */
+  rows: number[]
+  /** Where the record starts, so an edit knows what to rewrite. */
+  offset: number
+}
+
+export interface DepthChart {
+  /** The block's position in the region — the team table's order, not a team id. */
+  block: number
+  slots: DepthChartSlot[]
+}
+
+/**
+ * How many references a 24-byte record holds, or -1 if it is not one.
+ *
+ * A record of six zero fields is legitimate — a team with no fullback has one —
+ * so an empty record counts as valid rather than ending the region. Requiring
+ * the references to be packed at the front is what stops a stretch of unrelated
+ * bytes reading as a run of slots.
+ */
+function depthSlotSize(payload: Buffer, at: number, rows: (r: number) => boolean): number {
+  if (at < 0 || at + DEPTH_SLOT_BYTES > payload.length) return -1
+  let n = 0
+  let ended = false
+  for (let k = 0; k < DEPTH_SLOT_FIELDS; k++) {
+    const o = at + k * 4
+    const tag = payload.readUInt16BE(o)
+    const row = payload.readUInt16BE(o + 2)
+    if (tag === 0 && row === 0) { ended = true; continue }
+    if (tag !== DEPTH_REF_TAG || ended || !rows(row)) return -1
+    n++
+  }
+  return n
+}
+
+/**
+ * Reads every team's depth chart. Returns null when the region cannot be found
+ * or does not come out as a whole number of teams, rather than guessing.
+ */
+export function readDepthCharts(payload: Buffer, rosterRows: Set<number>): DepthChart[] | null {
+  const has = (r: number) => rosterRows.has(r)
+  // Find the longest stretch of slot-shaped records, then extend it through the
+  // empty ones a scan alone would stop at.
+  let best = { at: -1, n: 0 }
+  let i = 0
+  while (i + DEPTH_SLOT_BYTES <= payload.length) {
+    if (depthSlotSize(payload, i, has) > 0) {
+      const at = i
+      let n = 0
+      while (depthSlotSize(payload, i, has) > 0) { n++; i += DEPTH_SLOT_BYTES }
+      if (n > best.n) best = { at, n }
+    } else i += 1
+  }
+  if (best.at < 0 || best.n < DEPTH_SLOTS_PER_TEAM) return null
+
+  let start = best.at
+  while (depthSlotSize(payload, start - DEPTH_SLOT_BYTES, has) >= 0) start -= DEPTH_SLOT_BYTES
+  let end = start
+  while (depthSlotSize(payload, end, has) >= 0) end += DEPTH_SLOT_BYTES
+
+  const count = (end - start) / DEPTH_SLOT_BYTES
+  if (count % DEPTH_SLOTS_PER_TEAM !== 0) return null
+
+  const charts: DepthChart[] = []
+  for (let block = 0; block < count / DEPTH_SLOTS_PER_TEAM; block++) {
+    const slots: DepthChartSlot[] = []
+    for (let s = 0; s < DEPTH_SLOTS_PER_TEAM; s++) {
+      const at = start + (block * DEPTH_SLOTS_PER_TEAM + s) * DEPTH_SLOT_BYTES
+      const rows: number[] = []
+      for (let k = 0; k < DEPTH_SLOT_FIELDS; k++) {
+        const o = at + k * 4
+        if (payload.readUInt16BE(o) !== DEPTH_REF_TAG) break
+        rows.push(payload.readUInt16BE(o + 2))
+      }
+      slots.push({ slot: s, rows, offset: at })
+    }
+    charts.push({ block, slots })
+  }
+  return charts
+}
+
 export function readStores(payload: Buffer): StoreRecord[] {
   const marker = Buffer.from('SPBF', 'latin1')
   const bsft = Buffer.from('BSFT', 'latin1')
