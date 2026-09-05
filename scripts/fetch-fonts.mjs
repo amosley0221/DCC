@@ -27,6 +27,11 @@ const FAMILIES = [
   { css: 'Public+Sans:wght@400;600;700;800', file: 'PublicSans', weights: [400, 600, 700, 800] },
   { css: 'Zilla+Slab:wght@400;500;600', file: 'ZillaSlab', weights: [400, 500, 600] },
   { css: 'Courier+Prime:wght@400;700', file: 'CourierPrime', weights: [400, 700] },
+  // Press Box uses one variable file per family rather than a file per weight:
+  // the theme leans on weight for its whole hierarchy, from 400 prose to 800
+  // headlines, and five static cuts would cost more than the axis does.
+  { css: 'Archivo:wght@400..800', file: 'Archivo', variable: true },
+  { css: 'Archivo+Narrow:wght@400..700', file: 'ArchivoNarrow', variable: true },
 ]
 
 /** A TTF/OTF starts with an sfnt version tag; anything else is the wrong format. */
@@ -51,6 +56,17 @@ async function fetchWoff2(fam) {
   // Keep only the latin block; the design has no non-latin copy.
   const blocks = css.split('@font-face').slice(1)
   const out = []
+  // A variable family is one file carrying the whole axis, so there is no
+  // per-weight block to look for — take the latin face and stop.
+  if (fam.variable) {
+    const block = blocks.find((b) => /U\+0000-00FF/.test(b)) ?? blocks[blocks.length - 1]
+    const url = /src:\s*url\(([^)]+)\)/.exec(block ?? '')?.[1]
+    if (!url) { console.warn(`  ! no latin face for ${fam.file}`); return out }
+    const buf = Buffer.from(await (await get(url, WOFF2_UA)).arrayBuffer())
+    const name = `${fam.file}.woff2`
+    writeFileSync(resolve(root, 'shared/fonts/woff2', name), buf)
+    return [{ name, weight: 'variable', bytes: buf.length }]
+  }
   for (const w of fam.weights) {
     const block = blocks.find(
       (b) => new RegExp(`font-weight:\\s*${w}\\b`).test(b) && /U\+0000-00FF/.test(b),
@@ -70,6 +86,9 @@ async function fetchTtf(fam) {
   // The v1 endpoint collapses a variable family to weight 400 when several
   // weights are asked for at once, so each weight is requested on its own.
   const out = []
+  // Android has its own theme colours and its own type; Press Box is a desktop
+  // theme, so its families are not pulled as TTF.
+  if (fam.variable) return out
   for (const w of fam.weights) {
     const css = await (await get(`https://fonts.googleapis.com/css?family=${fam.css.split(':')[0]}:${w}`, TTF_UA)).text()
     const url = /src:\s*url\(([^)]+)\)/.exec(css)?.[1]

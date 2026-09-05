@@ -1,6 +1,6 @@
 import tokens from '@shared/tokens.json'
 
-export type ThemeName = 'night' | 'field' | 'broadcast'
+export type ThemeName = 'night' | 'field' | 'press'
 export type Tokens = typeof tokens
 export type ThemeColors = Tokens['themes']['night']['colors']
 
@@ -19,14 +19,13 @@ const FONT_STACK: Record<ThemeName, { serif: string; mono: string; sans: string 
     mono: "'Courier Prime', 'Cascadia Mono', Consolas, monospace",
     sans: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
   },
-  // One family for everything. The serif headlines and monospace labels are
-  // what make the other two themes read as a newspaper and a terminal; a sports
-  // broadcast uses a single grotesk at several weights and lets size and weight
-  // carry the hierarchy instead.
-  broadcast: {
-    serif: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
-    mono: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
-    sans: "'Public Sans', 'Segoe UI', system-ui, sans-serif",
+  // Archivo carries the headlines and the numbers; Archivo Narrow carries every
+  // uppercase label and every score. A condensed face on the labels is most of
+  // what separates a scoreboard from a settings screen.
+  press: {
+    serif: "'Archivo', 'Segoe UI', system-ui, sans-serif",
+    mono: "'Archivo Narrow', 'Archivo', 'Segoe UI', system-ui, sans-serif",
+    sans: "'Archivo', 'Segoe UI', system-ui, sans-serif",
   },
 }
 

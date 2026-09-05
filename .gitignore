@@ -31,3 +31,6 @@ npm-debug.log*
 
 # smoke-test output
 smoke.png
+
+# screenshot harness (local only)
+apps/desktop/shot.cjs

@@ -14,6 +14,9 @@
 @font-face { font-family: 'Zilla Slab'; src: url('./fonts/ZillaSlab-600.woff2') format('woff2'); font-weight: 600; font-display: block; }
 @font-face { font-family: 'Courier Prime'; src: url('./fonts/CourierPrime-400.woff2') format('woff2'); font-weight: 400; font-display: block; }
 @font-face { font-family: 'Courier Prime'; src: url('./fonts/CourierPrime-700.woff2') format('woff2'); font-weight: 700; font-display: block; }
+/* Variable weight axes, so one file covers regular through black. */
+@font-face { font-family: 'Archivo'; src: url('./fonts/Archivo.woff2') format('woff2-variations'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Archivo Narrow'; src: url('./fonts/ArchivoNarrow.woff2') format('woff2-variations'); font-weight: 100 900; font-display: block; }
 
 * { box-sizing: border-box; }
 
@@ -73,35 +76,12 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 .fade-in { animation: dcc-fade 180ms ease-out; }
 
 /* ── layout ─────────────────────────────────────────────────────────────── */
-.app { display: grid; grid-template-columns: 168px 1fr; height: 100%; }
-.sidebar { background: var(--bg1); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .brand { padding: 16px 14px 12px; }
 .brand-name { font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 1.6px; color: var(--ink2); text-transform: uppercase; }
 .brand-ver { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; color: var(--ink4); margin-top: 3px; }
-.nav { flex: 1; overflow-y: auto; padding-top: 4px; }
-.nav-item {
-  display: block; width: 100%; text-align: left; padding: 9px 14px;
-  font-family: var(--mono); font-weight: 600; font-size: 10.5px; letter-spacing: 1.4px;
-  text-transform: uppercase; color: var(--ink4); border-left: 2px solid transparent;
-  position: relative;
-}
-.nav-item:hover { color: var(--ink3); }
-.nav-item[aria-current='true'] { color: var(--ink); border-left-color: var(--accent); background: rgba(255,255,255,0.02); }
-.nav-badge {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  background: var(--accent); color: var(--onAccent); border-radius: 99px;
-  font-size: 8.5px; padding: 1px 5px; letter-spacing: 0.5px;
-}
-.nav-alert { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--accent); }
-.agent-strip { border-top: 1px solid var(--line); padding: 10px 14px 12px; display: grid; gap: 5px; }
 .agent-row { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.8px; color: var(--ink3); }
 .dot { width: 6px; height: 6px; border-radius: 99px; flex: none; }
 
-.main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-.titlebar { display: flex; align-items: center; gap: 10px; padding: 9px 18px; border-bottom: 1px solid var(--line); background: var(--bg1); }
-.titlebar-name { font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 1.6px; color: var(--ink3); text-transform: uppercase; }
-.content { flex: 1; overflow-y: auto; padding: 20px 22px 40px; }
-.content-narrow { max-width: 1180px; }
 
 .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
 .section-rule { height: 2px; background: var(--rule); margin-bottom: 16px; }
@@ -221,90 +201,14 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 }
 
 
-/* ── Broadcast ────────────────────────────────────────────────────────────────
-   The other two themes are editorial: serif headlines, monospace labels, a
-   two-pixel white rule under every title. That reads as a report. A sports app
-   reads differently — one sans family at heavy weights, tight tracking on
-   anything large, cards that sit above the background rather than being drawn
-   on it, and numbers given room to be the loudest thing on screen.
-
-   Everything here is an override on the shared components, so no screen needs
-   to know which theme is running. */
-
-body[data-theme='broadcast'] .screen-title {
-  font-weight: 800;
-  font-size: 34px;
-  letter-spacing: -0.022em;
-}
-body[data-theme='broadcast'] .hero-headline { font-weight: 700; font-size: 21px; letter-spacing: -0.014em; }
-body[data-theme='broadcast'] .headline { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
-body[data-theme='broadcast'] .row-title { font-weight: 600; font-size: 15px; letter-spacing: -0.006em; }
-body[data-theme='broadcast'] .body-serif { font-size: 13.5px; line-height: 1.55; }
 
 /* Labels stop shouting in letterspaced monospace and become quiet small caps. */
-body[data-theme='broadcast'] .kicker,
-body[data-theme='broadcast'] .meta {
-  font-weight: 700;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-body[data-theme='broadcast'] .kicker { font-size: 10.5px; color: var(--ink3); }
 
 /* A hairline, not a headline. */
-body[data-theme='broadcast'] .section-rule { height: 1px; background: var(--line); margin-bottom: 18px; }
-body[data-theme='broadcast'] .rule { height: 1px; background: var(--line); }
 
-body[data-theme='broadcast'] .card {
-  border-color: var(--line);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
-}
-body[data-theme='broadcast'] .card-pad { padding: 16px 18px; }
 
-body[data-theme='broadcast'] .btn {
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  font-size: 12.5px;
-  min-height: 34px;
-  padding: 0 14px;
-}
-body[data-theme='broadcast'] .btn-sm { min-height: 28px; font-size: 11.5px; padding: 0 11px; }
-
-body[data-theme='broadcast'] .chip {
-  border-radius: 999px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  font-size: 11.5px;
-  padding: 5px 11px;
-  background: rgba(255, 255, 255, 0.04);
-  border-color: transparent;
-}
-body[data-theme='broadcast'] .chip:hover { background: rgba(255, 255, 255, 0.08); }
-
-body[data-theme='broadcast'] .tab {
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  font-size: 12.5px;
-}
 
 /* The nav becomes a set of rounded rows rather than a ruled list. */
-body[data-theme='broadcast'] .nav-item {
-  border-left: 0;
-  margin: 1px 8px;
-  border-radius: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  font-size: 11px;
-}
-body[data-theme='broadcast'] .nav-item[aria-current='true'] {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--ink);
-}
-body[data-theme='broadcast'] .brand-name { letter-spacing: 0.12em; font-weight: 800; }
-body[data-theme='broadcast'] .titlebar-name { letter-spacing: 0.1em; font-weight: 700; }
-body[data-theme='broadcast'] .input { border-radius: 10px; padding: 9px 12px; font-size: 13px; }
 
 /* ── Scoreboard ──────────────────────────────────────────────────────────────
    Numbers are the point of a sports screen, so they get a tabular figure and
@@ -348,3 +252,299 @@ body[data-theme='broadcast'] .input { border-radius: 10px; padding: 9px 12px; fo
 .linescore td { font-size: 13.5px; color: var(--ink2); text-align: right; padding: 5px 0; border-top: 1px solid var(--line); }
 .linescore td:first-child { text-align: left; color: var(--ink); font-weight: 600; }
 .linescore td.final { color: var(--ink); font-weight: 800; }
+
+/* ── Sports furniture ────────────────────────────────────────────────────────
+   Lifted from how broadcast and mobile sports apps actually lay out a number:
+   a ring when there is one figure that matters, a labelled bar when there are
+   many to compare, a shield when the number is an identity rather than a
+   measurement. Gold reads as a value worth looking at; the accent stays for
+   things you press. */
+
+.ring { display: grid; place-items: center; position: relative; flex: none; }
+.ring svg { transform: rotate(-90deg); display: block; }
+.ring-body { position: absolute; text-align: center; line-height: 1.05; }
+.ring-value { font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ring-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.09em; color: var(--ink3); text-transform: uppercase; }
+
+.statbar { display: grid; grid-template-columns: 78px 1fr 30px; align-items: center; gap: 10px; }
+.statbar-name { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+.statbar-track { height: 7px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.statbar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent2Soft), var(--accent2)); }
+.statbar-value { font-size: 12.5px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+.shield {
+  display: grid; place-items: center; flex: none; text-align: center;
+  background: linear-gradient(160deg, rgba(240, 200, 90, 0.18), rgba(240, 200, 90, 0.04));
+  border: 1px solid var(--accent2Soft);
+  border-radius: 12px;
+}
+.shield-label { font-size: 8px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent2); }
+.shield-value { font-weight: 800; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1; }
+
+/* A portrait reads as a person, not an avatar, once it is round and ringed. */
+.face-ring { border-radius: 999px; padding: 2px; background: var(--surfaceLine); flex: none; display: grid; }
+.face-ring > * { border-radius: 999px; overflow: hidden; }
+.face-ring-5 { background: linear-gradient(140deg, var(--accent2), var(--accent2Soft)); }
+.face-ring-4 { background: linear-gradient(140deg, #9AA3B2, #4A5160); }
+
+.tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--surfaceLine); border-radius: 999px;
+  padding: 3px 10px; font-size: 10.5px; font-weight: 800;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink2);
+  white-space: nowrap;
+}
+.tag-gold { border-color: var(--accent2Soft); color: var(--accent2); }
+.tag-good { border-color: rgba(50, 215, 75, 0.4); color: var(--good); }
+.tag-live { border-color: var(--accent); color: var(--accent); }
+
+/* Section heads inside a card, with the action sitting opposite. */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.card-head .kicker { color: var(--accent2); }
+
+/* ── The shell ───────────────────────────────────────────────────────────────
+   DCC is a place for several games at once, so the chrome is stacked the way a
+   sports network stacks it: which sport, then what is happening in it, then
+   where you are inside it.
+
+     ps-bar      which game — the only bar that is never about one dynasty
+     ps-scores   the week's results, the first thing a sports site ever shows
+     ps-nav      who you are, and the sections of the game you are in
+
+   All three sit on the chrome colours rather than the page colours, so the
+   page can be light while the chrome stays black. */
+
+.ps { display: flex; flex-direction: column; height: 100%; background: var(--bg0); }
+.ps-bar-in, .ps-nav-in, .ps-page-in, .ps-foot { max-width: 1400px; margin: 0 auto; width: 100%; }
+
+.ps-bar { background: var(--chrome); flex: none; }
+.ps-bar-in { display: flex; align-items: center; gap: 22px; height: 44px; padding: 0 24px; }
+.ps-mark {
+  font-family: var(--sans); font-weight: 800; font-size: 17px; letter-spacing: -0.03em;
+  color: var(--chromeInk); border-left: 3px solid var(--accent); padding-left: 8px; flex: none;
+}
+.ps-games { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
+.ps-game {
+  padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+  font-family: var(--mono); font-weight: 600; font-size: 11.5px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--chromeInk2);
+}
+.ps-game:hover { color: var(--chromeInk); background: var(--chromeRaised); }
+.ps-game[aria-current='true'] { color: var(--chromeInk); background: var(--chromeRaised); }
+.ps-bar-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.ps-pill {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: 999px;
+  background: var(--chromeRaised); color: var(--chromeInk2);
+  font-family: var(--mono); font-weight: 600; font-size: 10.5px; letter-spacing: 0.06em;
+}
+.ps-pill-live { background: var(--accent); color: var(--onAccent); }
+.ps-cog {
+  font-family: var(--mono); font-weight: 600; font-size: 11px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--chromeInk3);
+}
+.ps-cog:hover, .ps-cog[aria-current='true'] { color: var(--chromeInk); }
+
+.ps-scores {
+  display: flex; flex: none; overflow-x: auto;
+  background: var(--chrome); border-top: 1px solid var(--chromeLine);
+}
+.ps-score {
+  flex: none; min-width: 158px; padding: 9px 16px 8px; text-align: left;
+  border-right: 1px solid var(--chromeLine);
+}
+.ps-score:hover { background: var(--chromeRaised); }
+.ps-score-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.ps-score-row.is-lost { opacity: 0.5; }
+.ps-score-team {
+  font-family: var(--mono); font-weight: 600; font-size: 12.5px; color: var(--chromeInk);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 108px;
+}
+.ps-score-num {
+  font-family: var(--mono); font-weight: 700; font-size: 13.5px; color: var(--chromeInk);
+  font-variant-numeric: tabular-nums;
+}
+.ps-score-meta {
+  margin-top: 4px; font-family: var(--mono); font-weight: 600; font-size: 9px;
+  letter-spacing: 0.09em; color: var(--chromeInk3);
+}
+
+.ps-nav {
+  flex: none; background: var(--bg1);
+  border-bottom: 1px solid var(--line); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+}
+.ps-nav-in { display: flex; align-items: center; gap: 24px; height: 54px; padding: 0 24px; }
+.ps-id { display: flex; align-items: baseline; gap: 9px; flex: none; min-width: 0; }
+.ps-crest { width: 26px; height: 26px; object-fit: contain; align-self: center; flex: none; }
+.ps-crest-flat {
+  display: grid; place-items: center; border-radius: 6px; background: var(--ink);
+  color: var(--bg1); font-family: var(--mono); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.ps-id-name {
+  font-family: var(--sans); font-weight: 700; font-size: 16px; letter-spacing: -0.015em;
+  color: var(--ink); white-space: nowrap;
+}
+.ps-id-rec {
+  font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+.ps-id-week {
+  font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--ink4);
+}
+
+.ps-sections { display: flex; align-items: stretch; gap: 2px; height: 54px; flex: 1; min-width: 0; overflow-x: auto; justify-content: flex-end; }
+.ps-section {
+  position: relative; display: flex; align-items: center; gap: 6px; padding: 0 13px;
+  white-space: nowrap; font-family: var(--sans); font-weight: 600; font-size: 13.5px;
+  letter-spacing: -0.006em; color: var(--ink3);
+}
+.ps-section:hover { color: var(--ink); }
+.ps-section[aria-current='true'] { color: var(--ink); font-weight: 700; }
+.ps-section[aria-current='true']::after {
+  content: ''; position: absolute; left: 11px; right: 11px; bottom: 0;
+  height: 3px; background: var(--accent);
+}
+.ps-dot {
+  display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px;
+  border-radius: 999px; background: var(--accent); color: var(--onAccent);
+  font-family: var(--mono); font-weight: 700; font-size: 10px;
+}
+
+.ps-page { flex: 1; overflow-y: auto; }
+.ps-page-in { padding: 22px 24px 32px; }
+.ps-foot {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding: 16px 24px 26px; border-top: 1px solid var(--line);
+}
+.ps-foot-mark {
+  font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--ink4);
+}
+
+.ps-soon { padding: 64px 0 0; max-width: 560px; }
+.ps-soon-title { font-family: var(--sans); font-weight: 800; font-size: 40px; letter-spacing: -0.03em; margin: 0 0 12px; }
+.ps-soon-body { font-family: var(--sans); font-size: 15px; line-height: 1.62; color: var(--ink2); margin: 0; }
+
+/* ── Press Box ───────────────────────────────────────────────────────────────
+   The sports-site theme. Everything here is an override on the shared
+   components, so no screen knows which theme is running.
+
+   Three things do the work. The page is light and the chrome is black, which is
+   how every sports site on the web is built and nothing like a tool. Labels are
+   set in a condensed face, which is what a scoreboard uses and a settings
+   screen never does. And weight carries the hierarchy — 800 for a headline, 600
+   for a row, 400 for prose — instead of a serif doing it. */
+
+body[data-theme='press'] ::-webkit-scrollbar-thumb { background: #C9CDD3; border-color: var(--bg0); }
+body[data-theme='press'] ::-webkit-scrollbar-thumb:hover { background: #AEB4BC; }
+
+body[data-theme='press'] .screen-title { font-weight: 800; font-size: 36px; letter-spacing: -0.03em; }
+body[data-theme='press'] .hero-headline { font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
+body[data-theme='press'] .headline { font-weight: 700; font-size: 17px; letter-spacing: -0.014em; }
+body[data-theme='press'] .row-title { font-weight: 600; font-size: 15px; letter-spacing: -0.008em; }
+body[data-theme='press'] .body-serif { font-weight: 400; font-size: 14px; line-height: 1.6; }
+
+/* Condensed, tight, uppercase: a scoreboard label rather than a code comment. */
+body[data-theme='press'] .kicker,
+body[data-theme='press'] .meta {
+  font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+}
+body[data-theme='press'] .kicker { font-size: 11px; color: var(--ink3); }
+body[data-theme='press'] .meta { font-size: 11px; }
+
+body[data-theme='press'] .section-rule { height: 1px; background: var(--line); margin-bottom: 18px; }
+body[data-theme='press'] .rule { height: 1px; background: var(--line); }
+
+body[data-theme='press'] .card {
+  border-color: var(--surfaceLine);
+  box-shadow: 0 1px 2px rgba(11, 12, 14, 0.04), 0 6px 18px rgba(11, 12, 14, 0.05);
+}
+body[data-theme='press'] .card-pad { padding: 16px 18px; }
+
+body[data-theme='press'] .btn {
+  font-family: var(--sans); font-weight: 700; font-size: 13px;
+  letter-spacing: -0.006em; text-transform: none; min-height: 34px; padding: 0 15px;
+}
+body[data-theme='press'] .btn-sm { min-height: 27px; font-size: 12px; padding: 0 11px; }
+body[data-theme='press'] .btn-secondary:hover:not(:disabled) { background: rgba(11, 12, 14, 0.05); color: var(--ink); }
+
+body[data-theme='press'] .chip {
+  height: 26px; padding: 0 11px; font-size: 11px; letter-spacing: 0.04em;
+  background: #EDEFF2; border-color: transparent; color: var(--ink2);
+}
+body[data-theme='press'] .chip:hover { background: #E3E6EB; color: var(--ink); }
+
+body[data-theme='press'] .tab {
+  font-size: 12px; letter-spacing: 0.07em; padding: 5px 9px;
+}
+body[data-theme='press'] .input {
+  height: 36px; padding: 0 12px; font-size: 12.5px; letter-spacing: 0.01em;
+  background: #F5F6F8; border-color: transparent;
+}
+body[data-theme='press'] .input:focus { background: var(--surface); border-color: var(--ink4); }
+
+body[data-theme='press'] .tbl th { background: var(--surface); font-size: 10px; letter-spacing: 0.08em; }
+body[data-theme='press'] .tbl tbody tr:hover td { background: #F5F6F8; }
+body[data-theme='press'] .tbl tbody tr[aria-selected='true'] td { background: #EDF2FB; }
+
+body[data-theme='press'] .effect { background: var(--effectBg); font-size: 11.5px; letter-spacing: 0.02em; }
+body[data-theme='press'] .monogram { background: #EDEFF2; border-color: transparent; font-family: var(--mono); font-weight: 700; }
+body[data-theme='press'] .pill { font-size: 10.5px; letter-spacing: 0.06em; }
+
+/* The one dark surface on a light page: the game that matters this week. A
+   sports site gives its lead result the full contrast of a broadcast graphic
+   and lets everything else sit quietly under it. */
+.hero-game .scoreboard { max-width: 720px; margin: 0 auto; }
+
+body[data-theme='press'] .hero-game {
+  background: var(--heroBg); border-color: var(--heroBg);
+  padding: 26px 24px 22px;
+  box-shadow: 0 2px 4px rgba(11, 12, 14, 0.10), 0 14px 34px rgba(11, 12, 14, 0.16);
+}
+body[data-theme='press'] .hero-game .scoreboard-name { color: var(--heroInk); font-size: 19px; }
+body[data-theme='press'] .hero-game .scoreboard-sub { color: var(--heroMeta); }
+body[data-theme='press'] .hero-game .score-num { color: var(--heroInk); }
+body[data-theme='press'] .hero-game .scoreboard-dim .scoreboard-name,
+body[data-theme='press'] .hero-game .scoreboard-dim .score-num { color: var(--heroMeta); }
+body[data-theme='press'] .hero-game .meta { color: var(--heroMeta); }
+body[data-theme='press'] .hero-game .scoreboard-mark { background: rgba(255, 255, 255, 0.08); }
+
+/* ── The front page ──────────────────────────────────────────────────────────
+   A lead story, the rest of the week under it, and a rail of the things you
+   would otherwise have to open a section to see. */
+.wire-lead-head {
+  font-family: var(--sans); font-weight: 800; font-size: 30px; line-height: 1.1;
+  letter-spacing: -0.03em; color: var(--ink); margin: 8px 0 8px;
+}
+.wire-lead-stand {
+  font-family: var(--sans); font-size: 16px; line-height: 1.5; color: var(--ink2);
+  margin: 0 0 12px;
+}
+
+.wire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1px; background: var(--line); }
+.wire-box { background: var(--surface); padding: 11px 13px 9px; }
+.wire-box-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.wire-box-row.is-lost { opacity: 0.45; }
+.wire-box-team {
+  font-family: var(--mono); font-weight: 600; font-size: 13.5px; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wire-box-score { font-family: var(--mono); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.wire-box-meta {
+  margin-top: 5px; font-family: var(--mono); font-weight: 600; font-size: 9px;
+  letter-spacing: 0.1em; color: var(--ink4);
+}
+
+.wire-next-team { font-family: var(--sans); font-weight: 800; font-size: 22px; letter-spacing: -0.02em; margin-bottom: 4px; }
+
+.wire-line { display: flex; align-items: baseline; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.wire-line:last-child { border-bottom: none; }
+.wire-line-ovr { font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--ink); min-width: 24px; font-variant-numeric: tabular-nums; }
+.wire-line-stars { color: var(--accent); font-size: 10px; letter-spacing: -1px; min-width: 44px; }
+.wire-line-pos { font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 0.06em; color: var(--ink4); min-width: 30px; }
+.wire-line-name { font-family: var(--sans); font-weight: 600; font-size: 14px; color: var(--ink); flex: 1; min-width: 0; }
+.wire-line-tail {
+  font-family: var(--mono); font-size: 11px; color: var(--ink3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;
+}

@@ -5,7 +5,7 @@ import type {
   Convo, Dynasty, LogLine, Persisted, Player, Prospect, QueueItem, Stage, Story,
 } from './model'
 import { applyTheme, type ThemeName } from './theme'
-import { SEMANTICS } from './theme'
+import { SEMANTICS, THEMES } from './theme'
 
 // ── initial state ─────────────────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ export const blankPersisted = (): Persisted => ({
   publishRepo: '',
   relayUrl: '',
   relayToken: '',
-  theme: 'broadcast',
+  theme: 'press',
   themeChosen: false,
   week: 1,
   heat: 0,
@@ -44,7 +44,7 @@ export const blankPersisted = (): Persisted => ({
 export const emptyPersisted = (d: Dynasty): Persisted => ({
   ...blankPersisted(),
   dynastySource: 'sample',
-  theme: 'broadcast',
+  theme: 'press',
   week: d.meta.currentWeek,
   heat: 62,
   gameRunning: true,
@@ -319,6 +319,16 @@ export function useStore(): Ctx {
 }
 
 /**
+ * True when the running theme is one of the working ones. The press theme
+ * is meant to read as a sports site, so screens use this to leave out the
+ * notes about what has been decoded, which file is open and how a number was
+ * arrived at — everything is still editable, it just does not announce itself.
+ */
+export function useOps(): boolean {
+  return useStore().state.theme !== 'press'
+}
+
+/**
  * For sections that only ever render with a dynasty loaded. The shell shows the
  * empty state instead of mounting them, so this narrows the types in one place
  * rather than every section asserting non-null.
@@ -369,7 +379,11 @@ export function useBootstrap() {
         // A new default is worthless if it only reaches new installs, so anyone
         // who never chose a theme moves to the current one. Picking any theme
         // sets themeChosen and this stops touching it for good.
-        const initial: Persisted = merged.themeChosen
+        // A theme that no longer exists would leave every CSS variable unset, so
+        // a name this build does not know falls back the same way an unchosen
+        // one does.
+        const known = merged.theme in THEMES
+        const initial: Persisted = merged.themeChosen && known
           ? merged
           : { ...merged, theme: blankPersisted().theme }
         // Nothing is read until a dynasty is actually in use.

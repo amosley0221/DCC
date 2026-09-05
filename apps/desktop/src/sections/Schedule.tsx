@@ -27,8 +27,8 @@ function Hero({ g, team, icon }: {
   const kickoff = kickoffLabel(g.kickoff)
   const weather = weatherName(g.weather)
   return (
-    <Card className="card-pad">
-      <div className="row" style={{ gap: 10, alignItems: 'baseline', marginBottom: 14 }}>
+    <Card className="card-pad hero-game">
+      <div className="row" style={{ gap: 10, alignItems: 'baseline', marginBottom: 14, justifyContent: 'center' }}>
         <Meta size={9} color={g.played ? (won ? 'var(--good)' : 'var(--accent)') : 'var(--accent)'}>
           {g.played ? (won ? 'WON' : 'LOST') : 'NEXT UP'}
         </Meta>
@@ -67,7 +67,7 @@ function Hero({ g, team, icon }: {
           </div>
         </div>
       </div>
-      <div className="row" style={{ gap: 14, marginTop: 14, flexWrap: 'wrap' }}>
+      <div className="row" style={{ gap: 16, marginTop: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
         {[
           kickoff && g.played ? kickoff : null,
           weather ? `${g.temperatureF}°F ${weather}` : null,
@@ -135,7 +135,10 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
     <>
       {team && hero ? <Hero g={hero} team={team} icon={icon} /> : null}
 
-      {team ? (
+      {/* Their season and the rest of the country, side by side, the way a
+          scoreboard page carries them. */}
+      <div className="grid-2" style={{ alignItems: 'start' }}>
+        {team ? (
         <Card className="card-pad">
           <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
             <Kicker>{team} — {record.w}-{record.l}</Kicker>
@@ -148,9 +151,9 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
               players={players} records={records} apiKey={apiKey} />
           ))}
         </Card>
-      ) : null}
+        ) : null}
 
-      <Card className="card-pad">
+        <Card className="card-pad">
         <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
           <Kicker>Around the league</Kicker>
           {holdFrom !== Infinity ? (
@@ -169,7 +172,8 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
             savePath={savePath} onEdited={onEdited} log={log}
             players={players} records={records} apiKey={apiKey} />
         ))}
-      </Card>
+        </Card>
+      </div>
     </>
   )
 }

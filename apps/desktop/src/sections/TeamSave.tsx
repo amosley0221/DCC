@@ -31,7 +31,7 @@ const UNASSIGNED = 255
  * link every list here is league-wide, and the screen says so plainly rather
  * than implying these are your players.
  */
-export default function TeamSave() {
+export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
   const { save, patch } = useSave()
   const { state, dispatch } = useStore()
   const { path, roster, rosterBusy } = save
@@ -48,7 +48,7 @@ export default function TeamSave() {
     return m
   }, [roster])
   const [schoolQuery, setSchoolQuery] = useState('')
-  const [tab, setTab] = useState<TabName>('ROSTER')
+  const [tab, setTab] = useState<TabName>(view === 'schedule' ? 'SCHEDULE' : 'ROSTER')
   const [query, setQuery] = useState('')
   const [pos, setPos] = useState<string | null>(null)
   const [open, setOpen] = useState<number | null>(null)
@@ -127,17 +127,21 @@ export default function TeamSave() {
   return (
     <>
       <SectionHeader
-        title="Team"
+        title={view === 'schedule' ? 'Scores' : 'Team'}
         mark={<SchoolArt size={22} file={
           mine ? (save.schoolArt[`${nameOf(mine.id) ?? ''}|logoLight`] ??
                   save.schoolArt[`${nameOf(mine.id) ?? ''}|icon`]) : undefined} />}
-        sub={<Meta>{!roster ? 'ROSTER NOT READ YET'
+        sub={<Meta>{view === 'schedule'
+          ? [mine ? coachOf.get(mine.id)?.conference : null, mine ? coachOf.get(mine.id)?.division : null]
+              .filter(Boolean).join(' · ').toUpperCase() || 'SEASON RESULTS'
+          : !roster ? 'ROSTER NOT READ YET'
           : mine ? `${(nameOf(mine.id) ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
           : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
-        right={<div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
+        right={view === 'schedule' ? undefined
+          : <div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
 
-      <div className="col" style={{ gap: 12, maxWidth: 900 }}>
+      <div className="col" style={{ gap: 12, maxWidth: roster && (tab === 'ROSTER' || tab === 'SCHEDULE') ? undefined : 900 }}>
         {roster && naming !== null ? (
           <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
             <Kicker>
@@ -321,23 +325,7 @@ export default function TeamSave() {
             </Btn>
           </Card>
         ) : (
-          <>
-            <Card className="card-pad">
-              <Input placeholder="search every player by name" value={query} onChange={(e) => setQuery(e.target.value)} />
-              <div className="col" style={{ gap: 6, marginTop: 10 }}>
-                {GROUPS.map(([label, list]) => (
-                  <div key={label} className="row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <Meta size={9}>{label}</Meta>
-                    {list.map((p) => (
-                      <Chip key={p} on={pos === p} onClick={() => setPos(pos === p ? null : p)}>
-                        {p} {counts.get(p) ?? 0}
-                      </Chip>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </Card>
-
+          <div className="rail">
             <Card className="card-pad">
               <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
                 <Kicker>{mine ? (names[mine.id] ?? `Team ${mine.id}`) : 'Every school'}{pos ? ` — ${pos}` : ''}, best first</Kicker>
@@ -363,7 +351,30 @@ export default function TeamSave() {
                 <Meta size={9}>showing 60 — narrow it with a search or a position</Meta>
               ) : null}
             </Card>
-          </>
+
+            <div className="col" style={{ gap: 12 }}>
+              <Card className="card-pad">
+                <Kicker>Find a player</Kicker>
+                <div style={{ marginTop: 9 }}>
+                  <Input placeholder="search every player by name" value={query} onChange={(e) => setQuery(e.target.value)} />
+                </div>
+                <div className="col" style={{ gap: 8, marginTop: 12 }}>
+                  {GROUPS.map(([label, list]) => (
+                    <div key={label}>
+                      <Meta size={9}>{label}</Meta>
+                      <div className="row" style={{ gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
+                        {list.map((p) => (
+                          <Chip key={p} on={pos === p} onClick={() => setPos(pos === p ? null : p)}>
+                            {p} {counts.get(p) ?? 0}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
         )}
       </div>
     </>

@@ -65,7 +65,7 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
             ))}
           </div>
           <div style={{ marginTop: 9 }}>
-            <Meta size={10}>Night Wire is the default. The choice is saved and applies to both apps independently.</Meta>
+            <Meta size={10}>Press Box is the default and the one built to read as a sports site. Night Wire and Field Office are the working themes: same screens, plus what has been decoded, which file is open and how each number was arrived at.</Meta>
           </div>
         </Card>
 

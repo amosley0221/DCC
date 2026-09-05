@@ -160,7 +160,7 @@ export interface Persisted {
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string
-  theme: 'night' | 'field' | 'broadcast'
+  theme: 'night' | 'field' | 'press'
   /**
    * Whether the user has ever picked a theme themselves. Without this there is
    * no way to tell "chose Night Wire" from "has simply never touched it", and a
