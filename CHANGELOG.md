@@ -10,6 +10,40 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.26.0] - 2026-09-05
+
+### Added
+
+- **A recruit's overall is hidden until you scout them**, on both apps. The game
+  hides it, so DCC does too rather than handing over the mechanic a recruiting
+  class is built on. Each recruit has a Scout button, and one switch reveals the
+  whole pool at once. Stars, position, hometown, pipeline and archetype stay on
+  show, because those are public in the game.
+- **Scouting reveals the full ratings card**, on the phone as well as the
+  desktop. Recruits now carry their ratings in the snapshot, so the two apps show
+  the same thing off the same save.
+
+### Changed
+
+- **The recruit list no longer sorts by overall while overalls are hidden.**
+  Ordering by the hidden number would put the best players at the top and give
+  away the column that is hiding them. Hidden, it sorts by stars then name;
+  revealed, by overall as before.
+
+### Notes
+
+- Reveals are remembered per recruit by player id, so re-reading the save or
+  re-fetching a snapshot keeps them on the right players. Turning the global
+  switch off forgets the individual ones, so hidden means hidden.
+- Sorting by national ranking is not possible yet. The rank is not derivable
+  from anything DCC can read — it follows neither overall nor stars, rank 3 in
+  this class being a 74 while rank 5 is an 81 — and the field itself sits in the
+  Recruit record that has not been located. That same record holds recruiting
+  stage and commit score.
+- The snapshot grew from 6.0 MB to 9.1 MB carrying recruit ratings, or 1.43 MB
+  compressed, which is what the away-from-home route transfers. The relay still
+  serves the whole thing in about half a second.
+
 ## [0.25.1] - 2026-09-05
 
 ### Fixed
