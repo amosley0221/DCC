@@ -186,4 +186,26 @@ const table = L.buildLeague(games, teams)
   assert.deepEqual(fed, inFirst.sort((a, b) => a - b), 'every first-round game feeds a quarterfinal')
 }
 
-console.log('check-league: records, bowls, a school\'s season, the order, the standings, the spoiler line and the playoff field')
+/* ----------------------------------------------- the save's own ordering */
+{
+  // A poll ranks twenty-five and leaves everyone else level. The ranked teams
+  // have to come out in the poll's order, and the rest behind them — never
+  // mixed through, and never dropped.
+  const ranked = { 'Ohio State': 1, Iowa: 2, Alabama: 3 }
+  const order = L.orderByRanks(table, ranked)
+  assert.deepEqual(order.slice(0, 3).map((r) => r.name), ['Ohio State', 'Iowa', 'Alabama'],
+    'the poll decides the top, whatever the records say')
+  assert.equal(order.length, table.size, 'nobody is dropped for being unranked')
+  const rest = order.slice(3).map((r) => r.name)
+  assert.ok(rest.includes('Penn State'), 'an unranked team is still in the list')
+  // Penn State is 3-0 and the best of the unranked, so it leads them.
+  assert.equal(rest[0], 'Penn State', 'unranked teams fall in by the same arithmetic')
+
+  // No ranking at all is the ordering DCC would have used anyway.
+  assert.deepEqual(
+    L.orderByRanks(table, {}).map((r) => r.name),
+    L.rankings(table).map((r) => r.name),
+    'an empty ranking changes nothing')
+}
+
+console.log('check-league: records, bowls, a school\'s season, the order, the standings, the spoiler line, the playoff field and the save\'s own order')

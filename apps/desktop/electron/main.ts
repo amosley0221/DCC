@@ -12,7 +12,7 @@ import {
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
-  readChampions, teamTableOrder, dumpStore,
+  readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman,
 } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
@@ -36,7 +36,7 @@ import { buildSnapshot } from './snapshot'
 import { publishArt, publishSnapshot } from './publish'
 import { packManifest, zipChunk, zipDirectory } from './artPack'
 import type { ZipRecord } from './artPack'
-import { rememberPack } from './sidecar'
+import { rememberHeisman, rememberPack, rememberRanks } from './sidecar'
 import { relayState, startRelay, stopRelay } from './relay'
 import { writeGameEdits, writePlayerEdits, writeDepthEdits } from './saveWrite'
 import type { GameEdit, PlayerEdit, DepthEdit } from './saveWrite'
@@ -304,6 +304,49 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
     }))
     rememberTitles(titles)
 
+    // The game's own numbers, found rather than guessed at. A ranking is a
+    // column of TeamStore that holds every rank exactly once; the Heisman watch
+    // is the save's own five-row shortlist. Both are searched for by a property
+    // only the real thing has, so a wrong answer is not one of the outcomes —
+    // finding nothing is.
+    const rankColumns = findTeamRanks(payload).map((c) => ({
+      at: c.at, width: c.width, endian: c.endian, kind: c.kind,
+      ranks: Object.fromEntries(
+        Object.entries(c.ranks).map(([i, rank]) => [order[Number(i)]?.name ?? `Team ${i}`, rank]),
+      ),
+    }))
+    lastRankColumns = rankColumns
+    // One column and there is nothing to choose between; more than one and the
+    // user picks in League → Rankings, because nothing in the file says which
+    // of them is the AP and which is the coaches'.
+    rememberRanks(rankColumns.length === 1 ? rankColumns[0].ranks : chosenRanks(rankColumns))
+
+    const rows = new Set(players.map((p) => p.index))
+    const byRow = new Map(players.map((p) => [p.index, p]))
+    const heismanRows = readHeisman(payload, rows)
+    const heisman = heismanRows.map((h) => {
+      const p = byRow.get(h.playerIndex)
+      return {
+        rank: h.rank,
+        index: h.playerIndex,
+        first: p?.first ?? null,
+        last: p?.last ?? null,
+        position: p?.position ?? null,
+        overall: p?.overall ?? null,
+        team: p ? p.team : null,
+        words: h.words,
+      }
+    })
+
+    rememberHeisman(heisman
+      .filter((h) => h.index >= 0)
+      .map((h) => ({
+        rank: h.rank, index: h.index,
+        first: h.first ?? '', last: h.last ?? '',
+        position: h.position ?? '', overall: h.overall ?? 0,
+        team: h.team === null ? null : TEAM_ID_NAMES[h.team] ?? null,
+      })))
+
     // File the roster in the transfer ledger while the save is already open.
     // Doing it here rather than on demand is the whole point: a season the user
     // never opened DCC in is a season that can never be diffed, and the moment
@@ -333,10 +376,35 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       titles,
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
+      rankColumns,
+      heisman,
     }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
+})
+
+/**
+ * The ranking columns the last roster pass found, and which one the user picked.
+ *
+ * Held so the choice can be applied without re-reading the save: the phone's
+ * snapshot has to carry one ranking, and which one is a decision made on a
+ * screen rather than something the file states.
+ */
+let lastRankColumns: { ranks: Record<string, number> }[] = []
+let pollChoice = -1
+
+const chosenRanks = (columns: { ranks: Record<string, number> }[]) =>
+  (pollChoice >= 0 && pollChoice < columns.length ? columns[pollChoice].ranks : {})
+
+ipcMain.handle('poll:choose', (_e, index: number) => {
+  pollChoice = Number.isFinite(index) ? Number(index) : -1
+  rememberRanks(
+    lastRankColumns.length === 1 && pollChoice < 0
+      ? lastRankColumns[0].ranks
+      : chosenRanks(lastRankColumns),
+  )
+  return { ok: true as const }
 })
 
 /** The week a save is sitting on. Null without a team, since it is per team. */

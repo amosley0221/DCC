@@ -1,5 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame } from '../electron/saveAnalysis'
+import type {
+  SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
+  RankColumnView, HeismanView,
+} from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
 
@@ -38,6 +41,13 @@ export interface SaveState {
     season: number | null
     /** Who won each season, out of the save's own year summary. */
     titles: { season: number; champion: string | null; runnerUp: string | null }[]
+    /**
+     * The game's own rankings and Heisman shortlist, when the save gives them
+     * up. Both are found by a property only the real thing has, so these are
+     * either right or empty — never a guess.
+     */
+    rankColumns: RankColumnView[]
+    heisman: HeismanView[]
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -165,13 +175,7 @@ export function SaveProvider({ remembered, rememberedArt, rememberedTeam, onPath
       // A roster that fails to read is not worth an error on the front page:
       // the save is open, and The Program still offers the button.
       patch({
-        roster: r.ok
-          ? {
-              count: r.count, ratingNames: r.ratingNames, unverifiedPairs: r.unverifiedPairs,
-              schools: r.schools, coaches: r.coaches, stores: r.stores, games: r.games,
-              players: r.players, season: r.season, titles: r.titles,
-            }
-          : null,
+        roster: r.ok ? rosterPatch(r) : null,
         restoring: false,
       })
       patch({ dict: await window.dcc.dictionaryState() })
@@ -182,11 +186,7 @@ export function SaveProvider({ remembered, rememberedArt, rememberedTeam, onPath
       // rather than reported.
       if (r.ok && rememberedArt) {
         patch({ facesBusy: true })
-        const art = await indexArt(rememberedArt, {
-          count: r.count, ratingNames: r.ratingNames, unverifiedPairs: r.unverifiedPairs,
-          schools: r.schools, coaches: r.coaches, stores: r.stores, games: r.games,
-          players: r.players, season: r.season, titles: r.titles,
-        })
+        const art = await indexArt(rememberedArt, rosterPatch(r))
         patch({ facesBusy: false, ...(art.ok ? art.patch : {}) })
         if (!art.ok) onArtChange(null)
       }
@@ -212,4 +212,55 @@ export function useKit(names: Record<number, string> = {}) {
     if (!name) return {}
     return { jersey: save.schoolArt[`${name}|jersey`], tint: save.schoolColors[name] ?? null }
   }
+}
+
+/**
+ * The roster read, shaped for the store.
+ *
+ * Five screens read the roster and every one of them rebuilt this object by
+ * hand, so a field added to the read reached whichever of the five somebody
+ * remembered. One function now, and adding a field reaches all of them.
+ */
+export function rosterPatch(
+  res: Extract<Awaited<ReturnType<Window['dcc']['roster']>>, { ok: true }>,
+): NonNullable<SaveState['roster']> {
+  return {
+    count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs,
+    schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games,
+    players: res.players, season: res.season, titles: res.titles,
+    rankColumns: res.rankColumns ?? [], heisman: res.heisman ?? [],
+  }
+}
+
+/**
+ * Which ranking the screens use: one the save keeps, or DCC's own.
+ *
+ * The save has no poll table — a rank is a column of `TeamStore`, found by the
+ * shape only a ranking has — and it may hold more than one, because the sport
+ * has more than one poll. Nothing in the file says which is the AP and which is
+ * the coaches', so the choice is offered rather than guessed at, and remembered.
+ *
+ * It lives in the browser's own storage: it describes which column of your save
+ * you liked the look of, not anything about the dynasty.
+ */
+export function usePoll() {
+  const { save } = useSave()
+  const columns = save.roster?.rankColumns ?? []
+  const [choice, set] = useState<number>(() => Number(localStorage.getItem('dcc.poll') ?? -1))
+
+  const setChoice = useCallback((n: number) => {
+    localStorage.setItem('dcc.poll', String(n))
+    set(n)
+    // The phone shows the same ranking, so the choice has to reach the snapshot.
+    void window.dcc.choosePoll(n)
+  }, [])
+
+  // And on launch, so a remembered choice is in the next snapshot without
+  // anyone having to open the screen that set it.
+  useEffect(() => { void window.dcc.choosePoll(choice) }, [choice])
+
+  // A remembered choice that no longer exists — a different save, a column that
+  // stopped matching — falls back rather than showing an empty ranking.
+  const active = choice >= 0 && choice < columns.length ? columns[choice] : null
+  return { columns, choice: active ? choice : -1, setChoice, ranks: active?.ranks ?? null }
 }

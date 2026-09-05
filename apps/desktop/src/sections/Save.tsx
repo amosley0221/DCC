@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
-import { useSave } from '../saveStore'
+import { rosterPatch, useSave } from '../saveStore'
+import type { SaveState } from '../saveStore'
 import { Btn, Card, Empty, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
 import ArtFolder from './ArtFolder'
 
@@ -75,7 +76,7 @@ export default function Save() {
     const res = await window.dcc.roster(from, state.teamId)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players, season: res.season, titles: res.titles } })
+      patch({ roster: rosterPatch(res) })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     } else setError(res.message)
   }
@@ -397,6 +398,7 @@ export default function Save() {
       <div className="col" style={{ gap: 12, maxWidth: 860 }}>
         <ArtFolder />
 
+        {save.roster ? <Found roster={save.roster} /> : null}
         {report?.stores?.length ? <Stores stores={report.stores} path={path} /> : null}
 
         <Card className="card-pad">
@@ -857,6 +859,89 @@ function Stores({ stores, path }: {
         <Meta size={9}>SHOWING THE {shown.length} BIGGEST — SEARCH FOR THE REST</Meta>
       ) : null}
       {note ? <div style={{ marginTop: 9 }}><Meta size={9}>{note.toUpperCase()}</Meta></div> : null}
+    </Card>
+  )
+}
+
+/**
+ * The game's own numbers, and whether this save gave them up.
+ *
+ * Both of these are searched for rather than read from a known offset, so what
+ * matters is being able to see what the search found: a ranking that does not
+ * match the game's is a column that means something else, and the only way to
+ * tell is to look at the top of it beside the real thing.
+ */
+function Found({ roster }: { roster: NonNullable<SaveState['roster']> }) {
+  const columns = roster.rankColumns ?? []
+  const heisman = (roster.heisman ?? []).filter((h) => h.index >= 0)
+
+  return (
+    <Card className="card-pad">
+      <div className="card-head">
+        <Kicker>The game's own rankings</Kicker>
+        <Meta size={10}>
+          {columns.length ? `${columns.length} FOUND` : 'NONE FOUND'}
+          {heisman.length ? ` · HEISMAN ${heisman.length}` : ''}
+        </Meta>
+      </div>
+      <p className="body-serif" style={{ marginTop: 7 }}>
+        There is no poll table in the save: a team's rank is one of TeamStore's 424 members and
+        nothing says which. DCC finds them by the one shape a ranking has — every place filled
+        exactly once across all {Object.keys(columns[0]?.ranks ?? {}).length || 143} programs — and
+        rejects a plain counter, which is a perfect ordering by accident.
+      </p>
+
+      {columns.length === 0 ? (
+        <Meta size={9} color="var(--warn)">NOTHING IN THIS SAVE READS AS A RANKING</Meta>
+      ) : (
+        <div className="col" style={{ gap: 10, marginTop: 10 }}>
+          {columns.map((c, i) => {
+            const top = Object.entries(c.ranks)
+              .sort((a, b) => a[1] - b[1])
+              .slice(0, 10)
+            return (
+              <div key={i} style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+                <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+                  <Meta size={9} color="var(--accent)">#{i + 1}</Meta>
+                  <Meta size={9}>{c.kind === 'top25' ? 'A POLL — 25 RANKED' : 'A FULL ORDERING'}</Meta>
+                  <Meta size={9} color="var(--ink4)">
+                    BYTE {c.at} · {c.width === 1 ? '8-BIT' : `16-BIT ${c.endian.toUpperCase()}`}
+                  </Meta>
+                </div>
+                <div style={{ marginTop: 5, fontSize: 12, color: 'var(--ink2)' }}>
+                  {top.map(([name, rank]) => `${rank}. ${name}`).join('  ·  ')}
+                </div>
+              </div>
+            )
+          })}
+          <Meta size={9}>
+            COMPARE THESE WITH THE GAME AND PICK YOURS UNDER LEAGUE → RANKINGS
+          </Meta>
+        </div>
+      )}
+
+      <div style={{ marginTop: 14, borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+        <Kicker>The Heisman shortlist</Kicker>
+        {heisman.length === 0 ? (
+          <div style={{ marginTop: 6 }}>
+            <Meta size={9} color="var(--warn)">
+              NO SHORTLIST IN THIS SAVE YET — THE GAME FILLS IT LATER IN THE SEASON
+            </Meta>
+          </div>
+        ) : (
+          <div className="col" style={{ gap: 0, marginTop: 6 }}>
+            {heisman.map((h) => (
+              <div key={h.rank} className="row"
+                style={{ gap: 10, alignItems: 'baseline', borderTop: '1px solid var(--line)', padding: '5px 0' }}>
+                <span className="num" style={{ color: 'var(--accent)', width: 20 }}>{h.rank}</span>
+                <strong style={{ color: 'var(--ink)' }}>{h.first} {h.last}</strong>
+                <Meta size={9}>{h.position}</Meta>
+                <span className="num" style={{ color: 'var(--ink3)' }}>{h.overall}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Card>
   )
 }

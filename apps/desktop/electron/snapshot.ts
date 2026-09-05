@@ -131,6 +131,29 @@ export interface DynastySnapshot {
    */
   schoolColors: Record<string, string>
   champions: string[]
+  /**
+   * The game's own ranking, school name to rank, and its Heisman shortlist.
+   *
+   * Both are found on the PC — a rank is a column of `TeamStore` identified by
+   * the shape only a ranking has, and the shortlist is the save's own five-row
+   * table — so they travel rather than being worked out twice. Empty when the
+   * save did not give them up, and the phone falls back to the same arithmetic
+   * the PC would.
+   */
+  ranks: Record<string, number>
+  heisman: SnapshotHeisman[]
+}
+
+/** One name on the save's Heisman shortlist. */
+export interface SnapshotHeisman {
+  rank: number
+  /** Roster row, so the phone can find the player it already has. */
+  index: number
+  first: string
+  last: string
+  position: string
+  overall: number
+  team: string | null
 }
 
 const UNASSIGNED = 255
@@ -173,6 +196,7 @@ export function buildSnapshot(
   extra?: {
     transfers?: SnapshotMove[]; threads?: SnapshotThread[]
     schoolColors?: Record<string, string>; champions?: string[]
+    ranks?: Record<string, number>; heisman?: SnapshotHeisman[]
   },
 ): DynastySnapshot {
   const schools = readTeamNames(payload)
@@ -248,5 +272,7 @@ export function buildSnapshot(
     threads: extra?.threads ?? [],
     schoolColors: extra?.schoolColors ?? {},
     champions: extra?.champions ?? [],
+    ranks: extra?.ranks ?? {},
+    heisman: extra?.heisman ?? [],
   }
 }

@@ -53,6 +53,29 @@ data class DynastySnapshot(
      */
     val schoolColors: Map<String, String> = emptyMap(),
     val champions: List<String> = emptyList(),
+    /**
+     * The game's own ranking, school name to rank, and its Heisman shortlist.
+     *
+     * Both are found on the PC — a rank is a column of the save's team table,
+     * identified by the shape only a ranking has — and travel here rather than
+     * being worked out twice. Empty when the save did not give them up, and the
+     * phone falls back to the same arithmetic the PC would.
+     */
+    val ranks: Map<String, Int> = emptyMap(),
+    val heisman: List<SnapshotHeisman> = emptyList(),
+)
+
+/** One name on the save's own Heisman shortlist. */
+@Serializable
+data class SnapshotHeisman(
+    val rank: Int = 0,
+    /** Roster row, so the phone can find the player it already has. */
+    val index: Int = 0,
+    val first: String = "",
+    val last: String = "",
+    val position: String = "",
+    val overall: Int = 0,
+    val team: String? = null,
 )
 
 /** One transfer, already resolved to school names by the desktop. */

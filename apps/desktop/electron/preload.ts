@@ -105,6 +105,7 @@ const api = {
   readTables: (root: string, files: string[]) => ipcRenderer.invoke('assets:readTables', { root, files }),
   findArt: (root: string) => ipcRenderer.invoke('assets:findArt', root),
   searchArt: (query: string) => ipcRenderer.invoke('assets:searchArt', query),
+  choosePoll: (index: number) => ipcRenderer.invoke('poll:choose', index) as Promise<{ ok: true }>,
   dumpStore: (path: string, name: string, rows?: number) =>
     ipcRenderer.invoke('save:dumpStore', { path, name, rows }),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),

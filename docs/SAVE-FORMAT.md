@@ -969,6 +969,44 @@ for. Until then the method is the one that just worked for team ids: take a
 value the schema names, find it in the payload by its value, and confirm the
 stride.
 
+## Rankings and the Heisman, found by shape
+
+The store directory settles what exists. There is no poll table in it — 88
+stores and not one of them is a ranking — which means a team's rank is one of
+`TeamStore`'s 424 members, and the header does not say which. The same is true
+of the Heisman: `HeismanRankingStore` holds five rows of four members and none
+of them is labelled.
+
+Both were found without a single offset being guessed at, by a property only the
+real thing has.
+
+**A ranking is a permutation.** Over 143 teams, a full ordering holds every
+number from 1 to 143 exactly once; a poll holds 1 to 25 once each with everyone
+else on one shared value. `findTeamRanks` reads every byte offset of a team row
+as 8-bit, 16-bit big-endian and 16-bit little-endian, and keeps the columns that
+match. A column that fails is not a ranking; a column that matches is a ranking
+of something, even if which poll it is has to be settled by looking.
+
+The one trap is the trap this project has already fallen into once: **a counter
+is a perfect permutation too.** A column whose value is its own row number is
+rejected outright, because a rank in team-table order is an index, not a rank.
+`check-save` builds a synthetic `TeamStore` with a shuffled ordering, a poll, a
+counter and a constant, and asserts that the first two are found and the last two
+are not.
+
+**The Heisman's player column is the one that always resolves.** A reference in
+this format is a 2-byte type tag and a 2-byte index. `readHeisman` tries every
+2-byte-aligned offset in the row and keeps the one whose index is a real roster
+row in *every* one of the five rows. One column that works for all five is not a
+coincidence; one that works for three is, which is why the test also checks that
+a roster knowing none of them leaves the column unfound rather than pointing at
+whichever bytes looked plausible.
+
+What is still not decoded is the *case* for each name — the season statistics
+behind them — and which of several ranking columns is the AP and which the
+coaches'. Nothing in the file says, so the app shows the top of each and lets
+the user pick the one matching their game.
+
 ## The store directory
 
 Every table in the save announces itself, and the announcement is enough to

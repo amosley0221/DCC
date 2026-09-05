@@ -10,6 +10,41 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.44.0] - 2026-09-05
+
+### Added
+
+- **The game's own rankings, out of your save.** There is no poll table in the
+  file — 88 tables and not one of them is a ranking — so a team's rank is one of
+  `TeamStore`'s 424 members and nothing says which. DCC finds them by the one
+  shape a ranking has: over 143 programs, every place filled exactly once, or
+  twenty-five ranked with the rest level.
+
+  A plain counter is a perfect ordering by accident, and this project has been
+  fooled by exactly that before, so a column whose value is its own row number
+  is rejected. What survives is a ranking of something.
+
+  Your save may keep more than one, because the sport has more than one poll.
+  Nothing in the file says which is the AP and which is the coaches', so the
+  Save screen shows the top ten of each and League → Rankings lets you pick the
+  one that matches your game. It is remembered, and it travels to the phone.
+
+- **The real Heisman watch.** `HeismanRankingStore` holds exactly the five-name
+  shortlist the game shows. Which of its four members is the player is not
+  written down either, so DCC takes the column that resolves to a real roster
+  row in every single one of the five. Home shows it on the PC and the League
+  screen shows it on the phone, both under the game's own trophy.
+
+  What the save still does not give up is the case for each of them: the season
+  statistics are not decoded, and the panel says so rather than implying a stat
+  line.
+
+### Changed
+
+- **Standings, the bracket and the Top 25 toggle all follow the real ranking**
+  where the save has one, on both apps. Teams it does not rank fall in behind by
+  record, and only that part is DCC's opinion.
+
 ## [0.43.0] - 2026-09-05
 
 ### Fixed

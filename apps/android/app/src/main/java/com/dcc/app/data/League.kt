@@ -106,6 +106,22 @@ object League {
         return table
     }
 
+    /**
+     * The country in the order the save itself keeps.
+     *
+     * A poll ranks twenty-five and leaves everyone else level, so the ranked
+     * teams come first in their own order and the rest fall in behind them by
+     * the same arithmetic that would have ordered all of them. Nothing is
+     * invented: only the order among unranked teams is DCC's opinion.
+     */
+    fun orderByRanks(table: Map<Int, Row>, ranks: Map<String, Int>): List<Row> {
+        val fallback = rankings(table)
+        val place = fallback.withIndex().associate { (i, r) -> r.name to i }
+        return table.values.sortedWith(
+            compareBy({ ranks[it.name] ?: Int.MAX_VALUE }, { place[it.name] ?: 0 }),
+        )
+    }
+
     /** Programs strongest first. A team with no games sinks rather than tying at the top. */
     fun rankings(table: Map<Int, Row>): List<Row> = table.values.sortedWith(
         compareByDescending<Row> { if (it.played > 0) 1 else 0 }

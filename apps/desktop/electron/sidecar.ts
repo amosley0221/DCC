@@ -19,7 +19,7 @@ import type { Ledger } from './transfers'
 import { standing } from './tamper'
 import type { TamperTurn } from './tamper'
 import { TEAM_ID_NAMES } from './teamIds'
-import type { SnapshotMove, SnapshotThread } from './snapshot'
+import type { SnapshotHeisman, SnapshotMove, SnapshotThread } from './snapshot'
 
 export interface TamperThread {
   key: string
@@ -97,6 +97,18 @@ export function rememberPack(file: string, bytes: number) {
 
 export const readPack = () => (packFile && existsSync(packFile.file) ? packFile : null)
 
+/**
+ * The ranking the user picked out of their save, and the Heisman five.
+ *
+ * Held like the titles and the colours: the roster pass is where they come
+ * from, and the snapshot has to carry them to the phone so both apps show the
+ * game's own numbers rather than each computing an opinion.
+ */
+let rankCache: Record<string, number> = {}
+let heismanCache: SnapshotHeisman[] = []
+export const rememberRanks = (r: Record<string, number>) => { rankCache = r }
+export const rememberHeisman = (h: SnapshotHeisman[]) => { heismanCache = h }
+
 const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
 const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
 
@@ -142,6 +154,8 @@ export function snapshotExtras(): {
   threads: SnapshotThread[]
   schoolColors: Record<string, string>
   champions: string[]
+  ranks: Record<string, number>
+  heisman: SnapshotHeisman[]
 } {
   const nameOf = (id: number) => TEAM_ID_NAMES[id] ?? `Team ${id}`
   const transfers: SnapshotMove[] = moves(readLedger()).map((m) => ({
@@ -169,5 +183,7 @@ export function snapshotExtras(): {
     threads,
     schoolColors: schoolColorCache,
     champions: [...champions],
+    ranks: rankCache,
+    heisman: heismanCache,
   }
 }

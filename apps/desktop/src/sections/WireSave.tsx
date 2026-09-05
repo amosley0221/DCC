@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useKit, useSave } from '../saveStore'
+import { useKit, usePoll, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
-import { buildLeague, rankings, visibleGames, winPct } from '../../electron/league'
+import { buildLeague, orderByRanks, rankings, visibleGames, winPct } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
 
 const UNASSIGNED = 255
@@ -118,7 +118,11 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
     () => buildLeague(visibleGames(games, me, holdFrom), teams),
     [games, teams, me, holdFrom],
   )
-  const order = useMemo(() => rankings(table), [table])
+  const poll = usePoll()
+  const order = useMemo(
+    () => (poll.ranks ? orderByRanks(table, poll.ranks) : rankings(table)),
+    [table, poll.ranks],
+  )
   const rankOf = useMemo(() => {
     const m = new Map<string, number>()
     order.forEach((r, i) => m.set(r.name, i + 1))
@@ -173,15 +177,32 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
    * rating, by the positions the award actually goes to, and by whether their
    * team is winning, and the panel says so rather than implying a stat line.
    */
-  const heisman = useMemo(() => (roster?.players ?? [])
-    .filter((p) => p.team !== UNASSIGNED && HEISMAN_WEIGHT[p.position])
-    .map((p) => {
-      const school = nameOf(p.team)
-      const row = school ? table.get(school) : undefined
-      return { p, school, score: p.overall * HEISMAN_WEIGHT[p.position] + (row ? winPct(row) : 0) * 14 }
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5), [roster, table, state.teamNames])
+  const heisman = useMemo(() => {
+    // The save's own five, when it has them. `HeismanRankingStore` holds exactly
+    // the shortlist the game shows, and the player column is found by being the
+    // one that resolves to a real roster row in every single row of it.
+    const byRow = new Map((roster?.players ?? []).map((p) => [p.index, p]))
+    const real = (roster?.heisman ?? [])
+      .filter((h) => h.index >= 0)
+      .map((h) => byRow.get(h.index))
+      .filter((p): p is RosterPlayer => !!p)
+    if (real.length) {
+      return real.map((p) => ({ p, school: nameOf(p.team), real: true }))
+    }
+    return (roster?.players ?? [])
+      .filter((p) => p.team !== UNASSIGNED && HEISMAN_WEIGHT[p.position])
+      .map((p) => {
+        const school = nameOf(p.team)
+        const row = school ? table.get(school) : undefined
+        return {
+          p, school, real: false,
+          score: p.overall * HEISMAN_WEIGHT[p.position] + (row ? winPct(row) : 0) * 14,
+        }
+      })
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, 5)
+      .map(({ p, school, real }) => ({ p, school, real }))
+  }, [roster, table, state.teamNames])
 
   const scouted = (p: RosterPlayer) => state.revealAllRecruits || state.revealedRecruits.includes(p.playerId)
 
@@ -381,9 +402,13 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
               <FeatureList
                 kicker="Heisman watch"
                 headline={heisman.length ? `${heisman[0].p.first} ${heisman[0].p.last}` : 'Nobody yet'}
-                standfirst={'No season statistics are decoded out of the save yet, so this is not yards ' +
-                  'and touchdowns. It is the field by rating, by the positions the award goes to, and by ' +
-                  'whether their team is winning.'}
+                standfirst={heisman[0]?.real
+                  ? 'The save keeps its own five-name shortlist and this is it, in its own order. ' +
+                    'What the file does not give up yet is the case for each of them: the season ' +
+                    'statistics are not decoded.'
+                  : 'No shortlist was found in this save and no season statistics are decoded, so this ' +
+                    'is the field by rating, by the positions the award goes to, and by whether their ' +
+                    'team is winning.'}
                 bg={save.awardArt['trophy:heisman'] ?? save.awardArt['trophy:heismanmemorialtrophy']
                   ?? artOf(heisman[0]?.school)}
                 tint={save.schoolColors[heisman[0]?.school ?? ''] ?? null}

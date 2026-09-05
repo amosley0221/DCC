@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useKit, useSave } from '../saveStore'
+import { useKit, rosterPatch, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
@@ -62,7 +62,7 @@ export default function TeamSave() {
     const res = await window.dcc.roster(path, myTeam)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players, season: res.season, titles: res.titles } })
+      patch({ roster: rosterPatch(res) })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     }
   }

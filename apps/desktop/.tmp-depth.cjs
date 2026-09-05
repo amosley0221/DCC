@@ -78,10 +78,13 @@ __export(saveAnalysis_exports, {
   checkDictionary: () => checkDictionary,
   decodeFrames: () => decodeFrames,
   diffSaves: () => diffSaves,
+  dumpStore: () => dumpStore,
   findDictionary: () => findDictionary,
+  findTeamRanks: () => findTeamRanks,
   readChampions: () => readChampions,
   readCoaches: () => readCoaches,
   readDepthCharts: () => readDepthCharts,
+  readHeisman: () => readHeisman,
   readRoster: () => readRoster,
   readSavePayload: () => readSavePayload,
   readSeasonGames: () => readSeasonGames,
@@ -1335,6 +1338,126 @@ function readSeasonGames(payload, teams) {
   }
   return out.sort((a, b) => a.week - b.week || a.row - b.row);
 }
+function dumpStore(payload, name, limit = 40) {
+  const t = storeTable(payload, name);
+  if (!t) return null;
+  const rowBytes = Math.max(1, Math.min(t.rowBytes, 256));
+  const lines = [];
+  for (let r = 0; r < Math.min(limit, t.rows); r++) {
+    const at = t.data + r * t.rowBytes;
+    if (at + rowBytes > payload.length) break;
+    const raw = payload.subarray(at, at + rowBytes);
+    const u8 = [...raw].join(" ");
+    const u16 = [];
+    for (let i = 0; i + 2 <= raw.length; i += 2) u16.push(raw.readUInt16BE(i));
+    const u32 = [];
+    for (let i = 0; i + 4 <= raw.length; i += 4) u32.push(raw.readUInt32BE(i));
+    lines.push(
+      `row ${r} @0x${at.toString(16)}
+  hex  ${raw.toString("hex").replace(/(.{2})/g, "$1 ").trim()}
+  u8   ${u8}
+  u16  ${u16.join(" ")}
+  u32  ${u32.join(" ")}`
+    );
+  }
+  return {
+    name,
+    rows: t.rows,
+    members: t.memberBits.length,
+    rowBytes: t.rowBytes,
+    memberBits: t.memberBits,
+    lines
+  };
+}
+function findTeamRanks(payload) {
+  const t = storeTable(payload, "TeamStore");
+  if (!t || t.rows < 8 || t.rowBytes < 4) return [];
+  const rows = t.rows;
+  const out = [];
+  const readers = [
+    [1, "be", (at) => payload.readUInt8(at)],
+    [2, "be", (at) => payload.readUInt16BE(at)],
+    [2, "le", (at) => payload.readUInt16LE(at)]
+  ];
+  for (const [width, endian, read] of readers) {
+    for (let a = 0; a + width <= t.rowBytes; a++) {
+      const vals = [];
+      let ok = true;
+      for (let r = 0; r < rows; r++) {
+        const cell = t.data + r * t.rowBytes + a;
+        if (cell + width > payload.length) {
+          ok = false;
+          break;
+        }
+        vals.push(read(cell));
+      }
+      if (!ok) continue;
+      if (vals.every((v, i) => v === i + 1) || vals.every((v, i) => v === i)) continue;
+      const kind = rankKind(vals, rows);
+      if (!kind) continue;
+      const ranks = {};
+      vals.forEach((v, i) => {
+        if (v >= 1 && v <= rows) ranks[i] = v;
+      });
+      out.push({
+        at: a,
+        width,
+        endian,
+        kind,
+        ranks,
+        top: Object.entries(ranks).map(([index, rank]) => ({ index: Number(index), rank })).sort((x, y) => x.rank - y.rank).slice(0, 25)
+      });
+    }
+  }
+  return out;
+}
+function rankKind(vals, rows) {
+  const sorted = [...vals].sort((a, b) => a - b);
+  if (sorted.every((v, i) => v === i + 1)) return "full";
+  const ranked = vals.filter((v) => v >= 1 && v <= 25).sort((a, b) => a - b);
+  if (ranked.length !== 25 || !ranked.every((v, i) => v === i + 1)) return null;
+  const rest = new Set(vals.filter((v) => v < 1 || v > 25));
+  if (rest.size !== 1) return null;
+  if (vals.length !== rows) return null;
+  return "top25";
+}
+function readHeisman(payload, playerRows) {
+  const t = storeTable(payload, "HeismanRankingStore");
+  if (!t || !t.rows || t.rowBytes < 4) return [];
+  const rowAt = (r) => t.data + r * t.rowBytes;
+  let playerAt = -1;
+  for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
+    let all = true;
+    for (let r = 0; r < t.rows; r++) {
+      const at = rowAt(r) + a;
+      if (at + 4 > payload.length) {
+        all = false;
+        break;
+      }
+      if (!playerRows.has(payload.readUInt16BE(at + 2))) {
+        all = false;
+        break;
+      }
+    }
+    if (all) {
+      playerAt = a;
+      break;
+    }
+  }
+  const out = [];
+  for (let r = 0; r < t.rows; r++) {
+    const o = rowAt(r);
+    if (o + t.rowBytes > payload.length) break;
+    const words = [];
+    for (let i = 0; i + 4 <= t.rowBytes; i += 4) words.push(payload.readUInt32BE(o + i));
+    out.push({
+      rank: r + 1,
+      playerIndex: playerAt >= 0 ? payload.readUInt16BE(o + playerAt + 2) : -1,
+      words
+    });
+  }
+  return out;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ARCHETYPES,
@@ -1385,10 +1508,13 @@ function readSeasonGames(payload, teams) {
   checkDictionary,
   decodeFrames,
   diffSaves,
+  dumpStore,
   findDictionary,
+  findTeamRanks,
   readChampions,
   readCoaches,
   readDepthCharts,
+  readHeisman,
   readRoster,
   readSavePayload,
   readSeasonGames,

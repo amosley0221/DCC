@@ -93,5 +93,98 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
   assert.equal(t.memberBits.length, YMEMBERS)
 }
 
+/* ------------------------------------------------ rankings out of TeamStore */
+// The save has no poll table, so a team's rank is one of TeamStore's 424
+// members and nothing says which. It is found by a property only a ranking has,
+// and the test that matters is the one for the trap: a counter is a perfect
+// permutation too, and this project has been fooled by exactly that before.
+{
+  const TEAMS = 40, TROW = 24, TMEMBERS = 6
+  const tname = Buffer.from('TeamStore', 'latin1')
+  const thead = Buffer.concat([
+    Buffer.from('SPBF', 'latin1'), u32(486), u32(1), u32(0), u32(tname.length), tname,
+    u32(0x40), u32(0), u32(TEAMS),
+    Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(TROW / 4), u32(TEAMS), u32(TMEMBERS), u32(0),
+    Buffer.alloc(TMEMBERS * 4),
+  ])
+  const trows = Buffer.alloc(TROW * TEAMS)
+
+  // A shuffled full ordering — every rank once, in no particular team order.
+  const full = Array.from({ length: TEAMS }, (_, i) => i + 1)
+  for (let i = full.length - 1; i > 0; i--) {
+    const j = (i * 7 + 3) % (i + 1)
+    ;[full[i], full[j]] = [full[j], full[i]]
+  }
+  // A poll: ranks 1..25, everyone else unranked on one shared value.
+  const poll = Array.from({ length: TEAMS }, () => 0)
+  const order25 = [5, 1, 9, 3, 12, 2, 20, 7, 25, 4, 18, 6, 11, 8, 22, 10, 15, 13, 24, 14, 19, 16, 23, 17, 21]
+  order25.forEach((rank, i) => { poll[i * 1 + 3] = rank })
+
+  for (let r = 0; r < TEAMS; r++) {
+    const o = r * TROW
+    trows.writeUInt8(full[r], o + 0)          // the ordering
+    trows.writeUInt8(poll[r], o + 1)          // the poll
+    trows.writeUInt8(r + 1, o + 2)            // a counter — the decoy
+    trows.writeUInt8(7, o + 3)                // a constant
+    trows.writeUInt16BE(3000 + r * 13, o + 8) // something else entirely
+  }
+  const tpayload = Buffer.concat([Buffer.alloc(64), thead, trows, Buffer.alloc(64)])
+
+  const found = S.findTeamRanks(tpayload)
+  const kinds = found.map((f) => `${f.kind}@${f.at}`)
+  assert.ok(kinds.includes('full@0'), 'the shuffled ordering is found: ' + kinds.join(' '))
+  assert.ok(kinds.includes('top25@1'), 'the poll is found: ' + kinds.join(' '))
+  assert.ok(!kinds.some((k) => k.endsWith('@2')), 'a counter is not a ranking')
+  assert.ok(!kinds.some((k) => k.endsWith('@3')), 'a constant is not a ranking')
+
+  const ordering = found.find((f) => f.at === 0 && f.kind === 'full')
+  for (let r = 0; r < TEAMS; r++) assert.equal(ordering.ranks[r], full[r])
+  assert.equal(ordering.top[0].rank, 1)
+  assert.equal(ordering.top.length, 25, 'the sample is the top 25 of whatever it found')
+
+  const found25 = found.find((f) => f.kind === 'top25' && f.at === 1)
+  assert.equal(Object.keys(found25.ranks).length, 25, 'only the ranked teams carry a rank')
+  assert.equal(found25.ranks[3], 5, 'and the rank is the one the column held')
+}
+
+/* ---------------------------------------------------------- the Heisman five */
+{
+  // Five rows of four members, and which member is the player is not written
+  // down — so it is the column that resolves to a real roster row in all five.
+  const HROWS = 5, HROW = 16, HMEMBERS = 4
+  const hname = Buffer.from('HeismanRankingStore', 'latin1')
+  const hhead = Buffer.concat([
+    Buffer.from('SPBF', 'latin1'), u32(486), u32(1), u32(0), u32(hname.length), hname,
+    u32(0x40), u32(0), u32(HROWS),
+    Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(HROW / 4), u32(HROWS), u32(HMEMBERS), u32(0),
+    Buffer.alloc(HMEMBERS * 4),
+  ])
+  const hrows = Buffer.alloc(HROW * HROWS)
+  const players = [811, 47, 1290, 305, 96]
+  players.forEach((idx, r) => {
+    const o = r * HROW
+    hrows.writeUInt32BE(9000 - r * 37, o + 0)   // points, or something like it
+    hrows.writeUInt16BE(0x2ac1, o + 4)          // a player reference
+    hrows.writeUInt16BE(idx, o + 6)
+    hrows.writeUInt32BE(r, o + 8)
+  })
+  const hpayload = Buffer.concat([Buffer.alloc(64), hhead, hrows, Buffer.alloc(64)])
+
+  const roster = new Set(players)
+  const watch = S.readHeisman(hpayload, roster)
+  assert.equal(watch.length, 5)
+  assert.deepEqual(watch.map((w) => w.rank), [1, 2, 3, 4, 5])
+  assert.deepEqual(watch.map((w) => w.playerIndex), players,
+    'the player column is the one that resolves in every row')
+  assert.equal(watch[0].words.length, HROW / 4, 'the rest of the row is kept as words')
+
+  // A roster that knows none of them leaves the column unfound rather than
+  // pointing at whichever bytes happened to look plausible.
+  const blind = S.readHeisman(hpayload, new Set([1, 2, 3]))
+  assert.deepEqual(blind.map((w) => w.playerIndex), [-1, -1, -1, -1, -1])
+}
+
 console.log('check-save: game table decodes 2/2 synthetic rows, team order verified,')
-console.log('            champions read per season and unplayed seasons name nobody')
+console.log('            champions read per season and unplayed seasons name nobody,')
+console.log('            rankings found in TeamStore without mistaking a counter for one,')
+console.log('            and the Heisman five resolve to real roster rows')

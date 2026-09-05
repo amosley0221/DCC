@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useKit, useSave } from '../saveStore'
+import { useKit, rosterPatch, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Track } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
@@ -86,7 +86,7 @@ export default function TamperSave() {
     const res = await window.dcc.roster(path, state.teamId)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players, season: res.season, titles: res.titles } })
+      patch({ roster: rosterPatch(res) })
     }
   }
 

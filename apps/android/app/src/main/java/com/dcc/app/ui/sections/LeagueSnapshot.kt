@@ -79,8 +79,17 @@ fun LeagueSnapshotSection(view: SnapshotView) {
         League.visible(view.snapshot.games, userIndex, view.holdFrom, spoilers)
     }
     val table = remember(games) { League.build(games, view.snapshot.teams) }
-    val order = remember(table) { League.rankings(table) }
-    val rankOf = remember(order) { order.withIndex().associate { (i, r) -> r.index to i + 1 } }
+    // The game's own ranking when the PC found one and sent it; DCC's order
+    // otherwise. Same rule as the desktop, from the same data.
+    val saveRanks = view.snapshot.ranks
+    val order = remember(table, saveRanks) {
+        if (saveRanks.isEmpty()) League.rankings(table)
+        else League.orderByRanks(table, saveRanks)
+    }
+    val rankOf = remember(order, saveRanks) {
+        if (saveRanks.isEmpty()) order.withIndex().associate { (i, r) -> r.index to i + 1 }
+        else order.mapNotNull { r -> saveRanks[r.name]?.let { r.index to it } }.toMap()
+    }
     val groups = remember(table) { League.conferences(table) }
     val field = remember(table) { League.projectPlayoff(table) }
 
@@ -165,14 +174,60 @@ fun LeagueSnapshotSection(view: SnapshotView) {
             "RANKINGS" -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 item {
                     DccCard {
-                        MonoLabel("DCC'S OWN ORDER", c.accent, 10)
+                        MonoLabel(
+                            if (saveRanks.isNotEmpty()) "THE SAVE'S OWN RANKING" else "DCC'S OWN ORDER",
+                            c.accent, 10,
+                        )
                         Spacer(Modifier.height(6.dp))
                         MetaText(
-                            "There is no poll in the save — no AP number, no coaches' number — so this " +
-                                "is record first, with scoring margin as the tie-break and a cap on it, " +
-                                "so a 98-0 win over nobody cannot outrank a second win.",
-                            c.ink3, 10, maxLines = 4,
+                            if (saveRanks.isNotEmpty())
+                                "This is the ranking your save keeps, found on the PC and sent with " +
+                                    "the dynasty. Teams it does not rank fall in behind by record."
+                            else
+                                "No ranking was found in this save, so this is record first, with " +
+                                    "scoring margin as the tie-break and a cap on it, so a 98-0 win " +
+                                    "over nobody cannot outrank a second win.",
+                            c.ink3, 10, maxLines = 5,
                         )
+                    }
+                }
+                // The save's own five-name Heisman shortlist, when it keeps one.
+                val watch = view.snapshot.heisman
+                if (watch.isNotEmpty()) {
+                    item {
+                        DccCard {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AwardMark("trophy:heisman", 30.dp)
+                                Spacer(Modifier.width(8.dp))
+                                MonoLabel("HEISMAN WATCH", c.accent, 10)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            watch.forEach { h ->
+                                Row(
+                                    Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    NumText("${h.rank}", c.accent, 13, FontWeight.SemiBold, Modifier.width(22.dp))
+                                    SchoolBadge(mono(h.team), h.team ?: "", false, 24.dp, "logo")
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        RowTitle("${h.first} ${h.last}", c.ink, 15)
+                                        MetaText(
+                                            listOfNotNull(h.position.ifBlank { null }, h.team).joinToString(" · "),
+                                            c.ink4, 10, maxLines = 1,
+                                        )
+                                    }
+                                    NumText("${h.overall}", c.ink, 14, FontWeight.SemiBold)
+                                }
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            MetaText(
+                                "The save's own shortlist, in its own order. What it does not give up " +
+                                    "yet is the case for each of them: the season statistics are not " +
+                                    "decoded.",
+                                c.ink4, 9, maxLines = 3,
+                            )
+                        }
                     }
                 }
                 items(order.take(40), key = { it.index }) { r ->

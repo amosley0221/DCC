@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { useSave } from '../saveStore'
+import { usePoll, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Card, Chip, Empty, Kicker, Meta, SchoolArt, SectionHeader, Tab } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import {
-  buildLeague, conferenceArtKeys, conferences, FIRST_ROUND, margin, played,
-  projectPlayoff, QUARTERFINALS, rankings, visibleGames, winPct,
+  buildLeague, conferenceArtKeys, conferences, FIRST_ROUND, margin, orderByRanks,
+  played, projectPlayoff, QUARTERFINALS, rankings, visibleGames, winPct,
 } from '../../electron/league'
 import type { LeagueRow, PlayoffField } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
@@ -63,7 +63,12 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
     .filter((t) => t.name), [roster, state.teamNames])
 
   const table = useMemo(() => buildLeague(games, teams), [games, teams])
-  const order = useMemo(() => rankings(table), [table])
+  // The save's own ranking when one has been picked out of it, DCC's otherwise.
+  const poll = usePoll()
+  const order = useMemo(
+    () => (poll.ranks ? orderByRanks(table, poll.ranks) : rankings(table)),
+    [table, poll.ranks],
+  )
   const rankOf = useMemo(() => {
     const m = new Map<string, number>()
     order.forEach((r, i) => m.set(r.name, i + 1))
@@ -240,13 +245,32 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
           <Card className="card-pad">
             <div className="card-head">
               <Kicker>The country, best first</Kicker>
-              <Meta size={10}>DCC'S OWN ORDER</Meta>
+              <Meta size={10}>{poll.ranks ? "THE SAVE'S OWN" : "DCC'S OWN ORDER"}</Meta>
             </div>
-            <p className="body-serif" style={{ marginTop: 7 }}>
-              The save carries results, not a poll — there is no AP or coaches' number in the file
-              that DCC has found. This is record first, with scoring margin as the tie-break and a
-              cap on it, so a 70-0 win over nobody cannot outrank a win.
-            </p>
+            {poll.columns.length ? (
+              <>
+                <p className="body-serif" style={{ marginTop: 7 }}>
+                  Your save keeps {poll.columns.length === 1 ? 'a ranking' : `${poll.columns.length} rankings`} of
+                  its own, found by the one shape a ranking has: every place filled exactly once.
+                  Nothing in the file says which is the AP and which is the coaches', so pick the
+                  one that matches your game and it is remembered.
+                </p>
+                <div className="row" style={{ gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
+                  {poll.columns.map((c, i) => (
+                    <Chip key={i} on={poll.choice === i} onClick={() => poll.setChoice(i)}>
+                      {c.kind === 'top25' ? 'TOP 25' : 'FULL'} · {i + 1}
+                    </Chip>
+                  ))}
+                  <Chip on={poll.choice === -1} onClick={() => poll.setChoice(-1)}>DCC'S ORDER</Chip>
+                </div>
+              </>
+            ) : (
+              <p className="body-serif" style={{ marginTop: 7 }}>
+                Nothing in this save reads as a ranking, so this is DCC's: record first, with
+                scoring margin as the tie-break and a cap on it, so a 70-0 win over nobody cannot
+                outrank a win.
+              </p>
+            )}
             <table className="tbl" style={{ marginTop: 10 }}>
               <thead>
                 <tr>

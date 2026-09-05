@@ -1973,3 +1973,171 @@ export function dumpStore(payload: Buffer, name: string, limit = 40): StoreDump 
     rowBytes: t.rowBytes, memberBits: t.memberBits, lines,
   }
 }
+
+/* --------------------------------------------------- rankings and the Heisman */
+
+/**
+ * A column of `TeamStore` that holds a ranking.
+ *
+ * The save has no poll table — the store directory lists 88 tables and none of
+ * them is one. A team's rank is a field on the team, one of `TeamStore`'s 424
+ * members, and the header does not say which.
+ *
+ * So it is found rather than guessed at, by a property only a ranking has: over
+ * 143 teams, a full ordering holds every number from 1 to 143 exactly once, and
+ * a poll holds 1 to 25 once each with everyone else on one shared value. A
+ * column matching that is a ranking of something.
+ *
+ * The one trap the search has to avoid is the one that has caught this project
+ * before: a plain counter is also a perfect permutation. A column whose value
+ * is its own row number is rejected, because a rank in team-table order is not
+ * a rank, it is an index.
+ */
+export interface TeamRankColumn {
+  /** Byte offset within a team row. */
+  at: number
+  width: 1 | 2
+  endian: 'be' | 'le'
+  /** Every team ranked, or a top 25 with the rest level. */
+  kind: 'full' | 'top25'
+  /** Team-table index to rank. */
+  ranks: Record<number, number>
+  /** The first few, best first, so a screen can show what was found. */
+  top: { index: number; rank: number }[]
+}
+
+export function findTeamRanks(payload: Buffer): TeamRankColumn[] {
+  const t = storeTable(payload, 'TeamStore')
+  if (!t || t.rows < 8 || t.rowBytes < 4) return []
+  const rows = t.rows
+  const out: TeamRankColumn[] = []
+
+  const readers: [1 | 2, 'be' | 'le', (at: number) => number][] = [
+    [1, 'be', (at) => payload.readUInt8(at)],
+    [2, 'be', (at) => payload.readUInt16BE(at)],
+    [2, 'le', (at) => payload.readUInt16LE(at)],
+  ]
+
+  for (const [width, endian, read] of readers) {
+    for (let a = 0; a + width <= t.rowBytes; a++) {
+      const vals: number[] = []
+      let ok = true
+      for (let r = 0; r < rows; r++) {
+        const cell = t.data + r * t.rowBytes + a
+        if (cell + width > payload.length) { ok = false; break }
+        vals.push(read(cell))
+      }
+      if (!ok) continue
+
+      // A counter is a perfect permutation and means nothing.
+      if (vals.every((v, i) => v === i + 1) || vals.every((v, i) => v === i)) continue
+
+      const kind = rankKind(vals, rows)
+      if (!kind) continue
+
+      const ranks: Record<number, number> = {}
+      vals.forEach((v, i) => { if (v >= 1 && v <= rows) ranks[i] = v })
+      out.push({
+        at: a, width, endian, kind, ranks,
+        top: Object.entries(ranks)
+          .map(([index, rank]) => ({ index: Number(index), rank }))
+          .sort((x, y) => x.rank - y.rank)
+          .slice(0, 25),
+      })
+    }
+  }
+  return out
+}
+
+/** Whether a column of values is a full ordering, a top 25, or neither. */
+function rankKind(vals: number[], rows: number): 'full' | 'top25' | null {
+  const sorted = [...vals].sort((a, b) => a - b)
+  if (sorted.every((v, i) => v === i + 1)) return 'full'
+
+  // A poll: 1 to 25 once each, everyone else sharing one value.
+  const ranked = vals.filter((v) => v >= 1 && v <= 25).sort((a, b) => a - b)
+  if (ranked.length !== 25 || !ranked.every((v, i) => v === i + 1)) return null
+  const rest = new Set(vals.filter((v) => v < 1 || v > 25))
+  if (rest.size !== 1) return null
+  if (vals.length !== rows) return null
+  return 'top25'
+}
+
+/**
+ * The Heisman watch, out of the save's own five-row table.
+ *
+ * `HeismanRankingStore` holds exactly five rows of four members, which is the
+ * shortlist the game shows. Which member is the player is not written down, so
+ * it is found the same way: the column whose value is a reference resolving to
+ * a real roster row in every one of the five.
+ */
+export interface HeismanEntry {
+  /** 1 is the leader. Row order, which is how the store keeps it. */
+  rank: number
+  /** Roster row, or -1 when the reference did not resolve. */
+  playerIndex: number
+  /** The rest of the row as 32-bit words, for what is not placed yet. */
+  words: number[]
+}
+
+export function readHeisman(payload: Buffer, playerRows: Set<number>): HeismanEntry[] {
+  const t = storeTable(payload, 'HeismanRankingStore')
+  if (!t || !t.rows || t.rowBytes < 4) return []
+
+  const rowAt = (r: number) => t.data + r * t.rowBytes
+
+  // The player column: a 4-byte reference whose index is a real roster row in
+  // every row of the table. One column that works for all five is not a
+  // coincidence; one that works for three is.
+  let playerAt = -1
+  for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
+    let all = true
+    for (let r = 0; r < t.rows; r++) {
+      const at = rowAt(r) + a
+      if (at + 4 > payload.length) { all = false; break }
+      if (!playerRows.has(payload.readUInt16BE(at + 2))) { all = false; break }
+    }
+    if (all) { playerAt = a; break }
+  }
+
+  const out: HeismanEntry[] = []
+  for (let r = 0; r < t.rows; r++) {
+    const o = rowAt(r)
+    if (o + t.rowBytes > payload.length) break
+    const words: number[] = []
+    for (let i = 0; i + 4 <= t.rowBytes; i += 4) words.push(payload.readUInt32BE(o + i))
+    out.push({
+      rank: r + 1,
+      playerIndex: playerAt >= 0 ? payload.readUInt16BE(o + playerAt + 2) : -1,
+      words,
+    })
+  }
+  return out
+}
+
+/**
+ * What the renderer is handed for a ranking column and the Heisman five.
+ *
+ * Named here rather than in the renderer's ambient types so both sides of the
+ * bridge agree by construction: the main process builds these, the store holds
+ * them, and neither can drift from a type written twice.
+ */
+export interface RankColumnView {
+  at: number
+  width: 1 | 2
+  endian: 'be' | 'le'
+  kind: 'full' | 'top25'
+  /** School name to rank. */
+  ranks: Record<string, number>
+}
+
+export interface HeismanView {
+  rank: number
+  index: number
+  first: string | null
+  last: string | null
+  position: string | null
+  overall: number | null
+  team: number | null
+  words: number[]
+}

@@ -316,3 +316,26 @@ export function conferenceArtKeys(conference: string | null): string[] {
   const names = mapped && mapped !== norm ? [mapped, norm] : [norm]
   return names.map((n) => `confchamp:${n}championship`)
 }
+
+/**
+ * The country in the order the save itself keeps, where it has one.
+ *
+ * A poll ranks twenty-five and leaves everyone else level, so the ranked teams
+ * come first in their own order and the rest fall in behind them by the same
+ * arithmetic that would have ordered all of them. Nothing is invented: an
+ * unranked team is unranked, and only its position among other unranked teams
+ * is DCC's opinion.
+ */
+export function orderByRanks(
+  table: Map<string, LeagueRow>,
+  ranks: Record<string, number>,
+): LeagueRow[] {
+  const fallback = rankings(table)
+  const place = new Map(fallback.map((r, i) => [r.name, i]))
+  return [...table.values()].sort((a, b) => {
+    const ra = ranks[a.name] ?? Infinity
+    const rb = ranks[b.name] ?? Infinity
+    if (ra !== rb) return ra - rb
+    return (place.get(a.name) ?? 0) - (place.get(b.name) ?? 0)
+  })
+}

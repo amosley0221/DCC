@@ -1,5 +1,8 @@
 import type { UpdateStatus } from './updates'
-import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame } from '../electron/saveAnalysis'
+import type {
+  SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
+  RankColumnView, HeismanView,
+} from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
@@ -22,7 +25,11 @@ declare global {
         | { ok: true; count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
             schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]
             players: RosterPlayer[]; season: number | null
-            titles: { season: number; champion: string | null; runnerUp: string | null }[] }
+            titles: { season: number; champion: string | null; runnerUp: string | null }[]
+            /** Columns of TeamStore that hold a ranking, found by their own shape. */
+            rankColumns: RankColumnView[]
+            /** The save's own five-name Heisman shortlist. */
+            heisman: HeismanView[] }
         | { ok: false; message: string }
       >
       transfers(): Promise<TransferView>
@@ -78,6 +85,8 @@ declare global {
       pickFaces(): Promise<string | null>
       /** Filenames in the art folder containing a word, for naming schemes DCC has not learned. */
       searchArt(query: string): Promise<{ ok: true; hits: string[]; total: number }>
+      /** Which of the save's rankings the snapshot should carry to the phone. */
+      choosePoll(index: number): Promise<{ ok: true }>
       /** One store's rows, written to a file — the instrument the remaining decodes need. */
       dumpStore(path: string, name: string, rows?: number): Promise<
         { ok: true; file: string; rows: number; rowBytes: number } | { ok: false; message: string }
