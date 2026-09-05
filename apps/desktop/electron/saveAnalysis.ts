@@ -215,17 +215,26 @@ function extractStrings(buf: Buffer, min = 5, cap = 120): { text: string; count:
 }
 
 /**
- * Strings shaped like a Frostbite class name: capitalised, no spaces, possibly
- * an array suffix. The registry names its classes this way, so this is the
- * closest thing the save has to a table of contents.
+ * Strings shaped like a Frostbite class name: CamelCase, no underscores,
+ * optionally an array suffix. The registry names its classes this way, so this
+ * is the closest thing the save has to a table of contents.
+ *
+ * Two capitals is the whole filter, and it is doing more work than it looks.
+ * Without it the list fills with first names — Aaron, Chris — and with
+ * underscores allowed it fills with the save's own asset ids, `AaronsOmar_30391`
+ * and `Air_Force_Army_Game`, tens of thousands of them. Sorted alphabetically
+ * and capped, that meant the list never got past the letter A: DepthChart, the
+ * name someone would actually go looking for, could not appear.
  */
-function extractClassNames(buf: Buffer, cap = 600): { text: string; count: number }[] {
+function extractClassNames(buf: Buffer, cap = 2000): { text: string; count: number }[] {
   const counts = new Map<string, number>()
   let cur: number[] = []
   const flush = () => {
     if (cur.length >= 5 && cur.length <= 48) {
       const s = Buffer.from(cur).toString('latin1')
-      if (/^[A-Z][A-Za-z0-9_]*(\[\])?$/.test(s)) counts.set(s, (counts.get(s) ?? 0) + 1)
+      const shaped = /^[A-Z][A-Za-z0-9]*(\[\])?$/.test(s)
+      const camel = (s.match(/[A-Z]/g) ?? []).length >= 2
+      if (shaped && camel) counts.set(s, (counts.get(s) ?? 0) + 1)
     }
     cur = []
   }

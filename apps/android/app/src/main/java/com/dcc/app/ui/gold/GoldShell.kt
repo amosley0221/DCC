@@ -201,9 +201,16 @@ fun GoldShell(
                         }
                         Spacer(Modifier.height(16.dp))
                         Box(Modifier.weight(1f).fillMaxWidth()) {
+                            // Each tab gets its own half. Both non-queue tabs
+                            // used to fall through to the same call, so
+                            // Appearance and Dynasty file drew the identical
+                            // full page.
                             when (ops) {
                                 "queue" -> QueueSection(vm, state)
-                                else -> SettingsSection(vm, state, dynasty, snapshot, busy, importError)
+                                "dynasty" ->
+                                    SettingsSection(vm, state, dynasty, snapshot, busy, importError, "dynasty")
+                                else ->
+                                    SettingsSection(vm, state, dynasty, snapshot, busy, importError, "appearance")
                             }
                         }
                     }

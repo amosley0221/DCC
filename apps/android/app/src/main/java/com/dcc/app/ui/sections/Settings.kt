@@ -31,11 +31,21 @@ fun SettingsSection(
     snapshot: SnapshotView?,
     busy: String?,
     importError: String?,
+    /**
+     * Which half to render. The rail themes have one Settings screen and take
+     * "all"; Gold Standard splits it across its own tabs, and passing nothing
+     * meant both of those tabs drew the same full page.
+     */
+    part: String = "all",
 ) {
+    val all = part == "all"
+    val showDynasty = all || part == "dynasty"
+    val showAppearance = all || part == "appearance"
     val c = Dcc.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var update by remember { mutableStateOf<Updater.State>(Updater.State.Idle) }
+    var wheel by rememberSaveable { mutableStateOf(false) }
     var relayUrl by remember(state.relayUrl) { mutableStateOf(state.relayUrl) }
     var relayToken by remember(state.relayToken) { mutableStateOf(state.relayToken) }
     var githubRepo by remember(state.githubRepo) { mutableStateOf(state.githubRepo) }
@@ -52,13 +62,15 @@ fun SettingsSection(
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        SectionHeader(
-            title = "Settings",
-            sub = { MetaText("VERSION ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
-        )
+        if (all) {
+            SectionHeader(
+                title = "Settings",
+                sub = { MetaText("VERSION ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
+            )
+        }
 
         // ── snapshot ─────────────────────────────────────────────────────────
-        DccCard {
+        if (showDynasty) DccCard {
             Kicker("Dynasty snapshot")
             Spacer(Modifier.height(9.dp))
             if (snapshot != null) {
@@ -206,10 +218,10 @@ fun SettingsSection(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        if (showDynasty) Spacer(Modifier.height(10.dp))
 
         // ── dynasty ──────────────────────────────────────────────────────────
-        DccCard {
+        if (showDynasty) DccCard {
             Kicker("Dynasty")
             Spacer(Modifier.height(9.dp))
             when (state.dynastySource) {
@@ -244,10 +256,10 @@ fun SettingsSection(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        if (showDynasty) Spacer(Modifier.height(10.dp))
 
         // ── relay ────────────────────────────────────────────────────────────
-        DccCard {
+        if (showDynasty) DccCard {
             Kicker("Relay")
             Spacer(Modifier.height(9.dp))
             BodySerif(
@@ -265,10 +277,10 @@ fun SettingsSection(
             MonoLabel("EDITS QUEUED HERE STILL STAY ON THE PHONE", c.warn, 9)
         }
 
-        Spacer(Modifier.height(10.dp))
+        if (showDynasty) Spacer(Modifier.height(10.dp))
 
         // ── appearance ───────────────────────────────────────────────────────
-        DccCard {
+        if (showAppearance) DccCard {
             Kicker("Appearance")
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -300,17 +312,28 @@ fun SettingsSection(
                 Kicker("Accent")
                 Spacer(Modifier.height(12.dp))
                 AccentSwatches(state.accent) { vm.setAccent(it) }
-                Spacer(Modifier.height(16.dp))
-                // One hex is stored; the light-mode value is derived from it,
-                // which is what makes an arbitrary pick off the wheel safe.
-                AccentWheel(state.accent, onPick = { vm.setAccent(it) })
+                Spacer(Modifier.height(12.dp))
+                // Opened on request, not always on screen. The wheel handles
+                // drags, so while it is open a swipe across it sets a colour
+                // rather than scrolling the page — fine when you asked for it,
+                // a trap when you were only trying to get past it.
+                DccChip(
+                    if (wheel) "Close the colour wheel" else "Any colour…",
+                    wheel, accent = true,
+                ) { wheel = !wheel }
+                if (wheel) {
+                    Spacer(Modifier.height(14.dp))
+                    // One hex is stored; the light-mode value is derived from
+                    // it, which is what makes an arbitrary pick safe.
+                    AccentWheel(state.accent, onPick = { vm.setAccent(it) })
+                }
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        if (showAppearance) Spacer(Modifier.height(10.dp))
 
         // ── updates ──────────────────────────────────────────────────────────
-        DccCard {
+        if (showAppearance) DccCard {
             Kicker("Updates")
             Spacer(Modifier.height(9.dp))
             MetaText(

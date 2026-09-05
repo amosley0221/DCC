@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import com.dcc.app.ui.theme.Dcc
@@ -56,6 +58,7 @@ fun AccentWheel(
     hex: String,
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    diameter: Dp = 200.dp,
 ) {
     val c = Dcc.colors
     val start = remember(hex) { hsvOf(parseHex(hex) ?: c.accent) }
@@ -66,10 +69,13 @@ fun AccentWheel(
     fun emit() = onPick(hexOf(Color.hsv(hue, sat, value)))
 
     Column(modifier) {
+        // A fixed size rather than the width of the screen. Filling the width
+        // made it a tablet-sized disc that took most of a screen, and a
+        // drag-handling surface that large inside a scrolling page is a trap:
+        // every attempt to scroll past it changed the accent instead.
         Box(
             Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
+                .size(diameter)
                 .pointerInput(Unit) {
                     fun pick(p: Offset, s: Size) {
                         val r = min(s.width, s.height) / 2f
@@ -96,7 +102,7 @@ fun AccentWheel(
                     }
                 },
         ) {
-            Canvas(Modifier.fillMaxWidth().aspectRatio(1f)) {
+            Canvas(Modifier.size(diameter)) {
                 val r = min(size.width, size.height) / 2f
                 val centre = Offset(size.width / 2f, size.height / 2f)
                 // Hue around, saturation outward, value as a flat multiply so
@@ -135,7 +141,7 @@ fun AccentWheel(
         // the chosen colour is one swipe.
         Box(
             Modifier
-                .fillMaxWidth()
+                .width(diameter)
                 .height(28.dp)
                 .clip(RoundedCornerShape(Dcc.shapes.button))
                 .pointerInput(Unit) {
@@ -148,7 +154,7 @@ fun AccentWheel(
                     }
                 },
         ) {
-            Canvas(Modifier.fillMaxWidth().height(28.dp)) {
+            Canvas(Modifier.width(diameter).height(28.dp)) {
                 drawRect(
                     Brush.horizontalGradient(
                         listOf(Color.hsv(hue, sat, 0.06f), Color.hsv(hue, sat, 1f)),
