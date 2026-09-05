@@ -145,16 +145,24 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
       <div className="col" style={{ gap: 12, maxWidth: roster && (tab === 'ROSTER' || tab === 'SCHEDULE') ? undefined : 900 }}>
         {roster && naming !== null ? (
           <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
+            <div className="row" style={{ gap: 12, alignItems: 'baseline' }}>
             <Kicker>
-              Which school is team {naming}?
+              {/* Every id has a name now, derived from the recruits' own lists,
+                  so this is a correction rather than a question. It only asks
+                  outright for an id nothing named. */}
+              {nameOf(naming) ? `Rename ${nameOf(naming)}` : `Which school is team ${naming}?`}
               {coachOf.get(naming)?.conference
                 ? ` — ${coachOf.get(naming)!.conference}${coachOf.get(naming)!.division ? ' ' + coachOf.get(naming)!.division : ''}, coached by ${coachOf.get(naming)!.coach ?? 'someone'}`
                 : ''}
             </Kicker>
+            <button className="gs-close" style={{ marginLeft: 'auto' }}
+              onClick={() => { setNaming(null); setSchoolQuery('') }}>Close ✕</button>
+            </div>
             <p className="body-serif" style={{ marginTop: 7 }}>
-              These are the {roster.schools.length} schools your save carries. The save does not
-              link them to rosters anywhere DCC can read, so pick yours once and it sticks. The
-              conference and coach above come from the save and should narrow it down.
+              These are the {roster.schools.length} schools your save carries. Every id already
+              has a name, worked out from the schools the recruits themselves list, so this is
+              only for correcting one — a dynasty that has moved a team around, or a name that
+              came out wrong. The conference and coach above come from the save.
             </p>
             <Input placeholder="search schools" value={schoolQuery} onChange={(e) => setSchoolQuery(e.target.value)} />
             <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
@@ -182,9 +190,13 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
                 ))}
             </div>
             <div className="row" style={{ gap: 8, marginTop: 10 }}>
-              <Btn onClick={() => { if (myTeam === null) dispatch({ type: 'teamId', id: naming }); setNaming(null) }}>
-                Skip — just call it team {naming}
-              </Btn>
+              {nameOf(naming) ? (
+                <Btn onClick={() => { setNaming(null); setSchoolQuery('') }}>Cancel</Btn>
+              ) : (
+                <Btn onClick={() => { if (myTeam === null) dispatch({ type: 'teamId', id: naming }); setNaming(null) }}>
+                  Skip — just call it team {naming}
+                </Btn>
+              )}
             </div>
           </Card>
         ) : roster && !mine ? (
