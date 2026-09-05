@@ -174,6 +174,15 @@ fun SectionHeader(title: String, sub: (@Composable () -> Unit)? = null, right: (
 @Composable
 fun EmptyState(text: String) = MetaText(text, Dcc.colors.ink4, 11, Modifier.padding(vertical = 24.dp))
 
+/** A hairline between two blocks inside a card. */
+@Composable
+fun Rule() = Box(
+    Modifier
+        .fillMaxWidth()
+        .height(1.dp)
+        .background(Dcc.colors.line),
+)
+
 // ── controls ─────────────────────────────────────────────────────────────────
 
 enum class BtnStyle { PRIMARY, SECONDARY, ACCENT, DEAD }

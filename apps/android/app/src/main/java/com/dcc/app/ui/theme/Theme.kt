@@ -14,22 +14,31 @@ import androidx.compose.ui.unit.dp
 import com.dcc.app.R
 
 /**
- * The token set from shared/tokens.json, expressed as Compose types. Both
- * themes ship; Night Wire is the default and the choice is a user setting.
+ * How a theme is assembled. The values live in Tokens.kt, generated from
+ * shared/tokens.json — edit those there, not here.
  *
- * Night Wire is black / white / red. That departs from the original handoff,
- * which specified a warm near-black with cream text and a brick accent — in use
- * that palette read as brown and orange. Field Office keeps its warm identity.
+ * Gold Standard is the default and the only theme with a mode and a
+ * user-chosen accent. It stores one hex: the light-mode accent is the same hue
+ * with its luminance dropped, and every border, rule and wash is mixed from
+ * whichever of the two is in play. That is what makes an arbitrary pick off the
+ * colour wheel safe, and it is the same derivation the desktop does in CSS.
+ *
+ * Night Wire and Field Office are the working themes and name every colour
+ * outright, so nothing about them is derived.
  */
+
+/** What a screen reads. Every field is resolved — no nulls past this point. */
 @Immutable
 data class DccColors(
     val bg0: Color,
     val bar: Color,
     val surface: Color,
+    val surfaceStrong: Color,
     val surfaceLine: Color,
     val line: Color,
     val track: Color,
     val rule: Color,
+    val sheet: Color,
     val ink: Color,
     val ink2: Color,
     val ink3: Color,
@@ -50,77 +59,72 @@ data class DccColors(
     val heatBoxBg: Color,
     val heatFill: Brush,
     val tones: List<Color>,
+    /** The two washes behind the page. Transparent in the working themes. */
+    val haze: Color,
+    val haze2: Color,
 )
 
-private val NightWire = DccColors(
-    bg0 = Color(0xFF000000),
-    bar = Color(0xFF080808),
-    surface = Color(0xFF121212),
-    surfaceLine = Color(0xFF262626),
-    line = Color(0xFF1E1E1E),
-    track = Color(0xFF1E1E1E),
-    rule = Color(0xFFFFFFFF),
-    ink = Color(0xFFFFFFFF),
-    ink2 = Color(0xFFC8C8C8),
-    ink3 = Color(0xFF8E8E8E),
-    ink4 = Color(0xFF5A5A5A),
-    accent = Color(0xFFDC2626),
-    onAccent = Color(0xFFFFFFFF),
-    good = Color(0xFF5FAF6E),
-    warn = Color(0xFFD9A441),
-    btnBg = Color(0xFFFFFFFF),
-    btnInk = Color(0xFF000000),
-    btn2Line = Color(0xFF333333),
-    btn2Ink = Color(0xFF9A9A9A),
-    heroBg = Color(0xFF121212),
-    heroInk = Color(0xFFFFFFFF),
-    heroInk2 = Color(0xFFC8C8C8),
-    effectBg = Color(0xFF141414),
-    effectInk = Color(0xFFD0D0D0),
-    heatBoxBg = Color(0xFF160A0A),
-    heatFill = Brush.horizontalGradient(listOf(Color(0xFFDC2626), Color(0xFFDC2626))),
-    // Neutral greys so avatars read as chrome, not as a second accent colour.
-    tones = listOf(
-        Color(0xFF1C1C1C), Color(0xFF222222), Color(0xFF191919),
-        Color(0xFF252525), Color(0xFF1F1F1F), Color(0xFF2A2A2A),
-    ),
-)
+/** Drops a colour's luminance toward the same hue, for the light ground. */
+fun darken(c: Color, amount: Float = 0.42f): Color =
+    Color(
+        red = c.red * (1f - amount),
+        green = c.green * (1f - amount),
+        blue = c.blue * (1f - amount),
+        alpha = c.alpha,
+    )
 
-private val FieldOffice = DccColors(
-    bg0 = Color(0xFF1B241F),
-    bar = Color(0xFF141B17),
-    surface = Color(0xFF222D26),
-    surfaceLine = Color(0xFF34443B),
-    line = Color(0xFF34443B),
-    track = Color(0xFF141B17),
-    rule = Color(0xFFEFE7D5),
-    ink = Color(0xFFEFE7D5),
-    ink2 = Color(0xFFC9C2AC),
-    ink3 = Color(0xFF8FA294),
-    ink4 = Color(0xFF6D7F72),
-    accent = Color(0xFFC4502B),
-    onAccent = Color(0xFFEFE7D5),
-    good = Color(0xFF7A8F5F),
-    warn = Color(0xFFC9873A),
-    btnBg = Color(0xFF2A2318),
-    btnInk = Color(0xFFEFE7D5),
-    btn2Line = Color(0xFF34443B),
-    btn2Ink = Color(0xFF8FA294),
-    // In this theme the actionable card inverts onto paper.
-    heroBg = Color(0xFFEFE7D5),
-    heroInk = Color(0xFF2A2318),
-    heroInk2 = Color(0xFF4C4436),
-    effectBg = Color(0xFFE3D7BD),
-    effectInk = Color(0xFF4C4436),
-    heatBoxBg = Color(0xFF141B17),
-    heatFill = Brush.horizontalGradient(
-        listOf(Color(0xFF7A8F5F), Color(0xFFC9873A), Color(0xFFC4502B)),
-    ),
-    tones = listOf(
-        Color(0xFF3A4536), Color(0xFF4A3D2E), Color(0xFF37453F),
-        Color(0xFF453231), Color(0xFF3C4030), Color(0xFF31404A),
-    ),
-)
+/** Parses `#RRGGBB`, falling back to the champagne default on anything else. */
+fun accentOf(hex: String): Color {
+    val clean = hex.trim().removePrefix("#")
+    val n = clean.toLongOrNull(16)
+    return if (clean.length == 6 && n != null) Color(0xFF000000 or n) else DccAccents.first().dark
+}
+
+/**
+ * Fills a palette's derived fields from the accent in play.
+ *
+ * A theme that names a border keeps it; only the nulls — which is to say only
+ * Gold Standard — are mixed here, at the same ratios the stylesheet uses.
+ */
+private fun resolve(p: DccPalette, accent: Color, derived: Boolean): DccColors {
+    val line = p.line ?: accent.copy(alpha = if (derived) 0.22f else 1f)
+    val lineStrong = p.btn2Line ?: accent.copy(alpha = 0.50f)
+    return DccColors(
+        bg0 = p.bg0,
+        bar = p.bar,
+        surface = p.surface,
+        surfaceStrong = p.surfaceStrong,
+        surfaceLine = p.surfaceLine ?: line,
+        line = line,
+        track = p.track,
+        rule = p.rule ?: line,
+        sheet = p.sheet,
+        ink = p.ink,
+        ink2 = p.ink2,
+        ink3 = p.ink3,
+        ink4 = p.ink4,
+        accent = accent,
+        onAccent = p.onAccent,
+        good = p.good,
+        warn = p.warn,
+        btnBg = p.btnBg ?: accent,
+        btnInk = p.btnInk,
+        btn2Line = lineStrong,
+        btn2Ink = p.btn2Ink,
+        heroBg = p.heroBg,
+        heroInk = p.heroInk,
+        heroInk2 = p.heroInk2,
+        effectBg = p.effectBg,
+        effectInk = p.effectInk,
+        heatBoxBg = p.heatBoxBg,
+        heatFill = Brush.horizontalGradient(
+            if (derived) listOf(accent, p.ink3) else p.heatStops,
+        ),
+        tones = p.tones,
+        haze = if (derived) accent.copy(alpha = 0.14f) else Color.Transparent,
+        haze2 = if (derived) accent.copy(alpha = 0.08f) else Color.Transparent,
+    )
+}
 
 @Immutable
 data class DccFonts(val serif: FontFamily, val mono: FontFamily, val sans: FontFamily)
@@ -148,14 +152,30 @@ private val CourierPrime = FontFamily(
     Font(R.font.courier_prime_700, FontWeight.SemiBold),
 )
 
+private val BodoniModa = FontFamily(
+    Font(R.font.bodoni_moda_500, FontWeight.Medium),
+    Font(R.font.bodoni_moda_600, FontWeight.SemiBold),
+    Font(R.font.bodoni_moda_700, FontWeight.Bold),
+)
+private val Manrope = FontFamily(
+    Font(R.font.manrope_400, FontWeight.Normal),
+    Font(R.font.manrope_500, FontWeight.Medium),
+    Font(R.font.manrope_600, FontWeight.SemiBold),
+    Font(R.font.manrope_700, FontWeight.Bold),
+)
+
 private val NightFonts = DccFonts(serif = Newsreader, mono = IbmPlexMono, sans = PublicSans)
 private val FieldFonts = DccFonts(serif = ZillaSlab, mono = CourierPrime, sans = PublicSans)
+// Bodoni carries every headline and every number read as data; Manrope carries
+// everything functional. Gold Standard has no monospace register, so the mono
+// slot is Manrope too.
+private val GoldFonts = DccFonts(serif = BodoniModa, mono = Manrope, sans = Manrope)
 
-@Immutable
-data class DccShapes(val button: androidx.compose.ui.unit.Dp, val card: androidx.compose.ui.unit.Dp, val bubble: androidx.compose.ui.unit.Dp)
+private val NightShapes = DccRadii.getValue("night")
+private val FieldShapes = DccRadii.getValue("field")
+private val GoldShapes = DccRadii.getValue("gold")
 
-private val NightShapes = DccShapes(button = 4.dp, card = 6.dp, bubble = 14.dp)
-private val FieldShapes = DccShapes(button = 6.dp, card = 6.dp, bubble = 12.dp)
+private val NightWire = resolve(NightWirePalette, NightWirePalette.accent!!, derived = false)
 
 val LocalDccColors = staticCompositionLocalOf { NightWire }
 val LocalDccFonts = staticCompositionLocalOf { NightFonts }
@@ -171,12 +191,37 @@ object Dcc {
 }
 
 @Composable
-fun DccTheme(theme: String, content: @Composable () -> Unit) {
-    val field = theme == "field"
+fun DccTheme(
+    theme: String,
+    mode: String = "dark",
+    accent: String = "",
+    content: @Composable () -> Unit,
+) {
+    val colors = when (theme) {
+        "field" -> resolve(FieldOfficePalette, FieldOfficePalette.accent!!, derived = false)
+        "night" -> NightWire
+        else -> {
+            val light = mode == "light"
+            val picked = accentOf(accent)
+            resolve(
+                if (light) GoldLightPalette else GoldDarkPalette,
+                if (light) darken(picked) else picked,
+                derived = true,
+            )
+        }
+    }
     CompositionLocalProvider(
-        LocalDccColors provides if (field) FieldOffice else NightWire,
-        LocalDccFonts provides if (field) FieldFonts else NightFonts,
-        LocalDccShapes provides if (field) FieldShapes else NightShapes,
+        LocalDccColors provides colors,
+        LocalDccFonts provides when (theme) {
+            "field" -> FieldFonts
+            "night" -> NightFonts
+            else -> GoldFonts
+        },
+        LocalDccShapes provides when (theme) {
+            "field" -> FieldShapes
+            "night" -> NightShapes
+            else -> GoldShapes
+        },
         content = content,
     )
 }

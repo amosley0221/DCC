@@ -350,6 +350,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ── actions ──────────────────────────────────────────────────────────────
 
     fun setTheme(theme: String) = update { it.copy(theme = theme) }
+    fun setMode(mode: String) = update { it.copy(mode = mode) }
+    fun setAccent(accent: String) = update { it.copy(accent = accent) }
 
     fun setWeek(week: Int) = update { it.copy(week = week.coerceIn(1, 15)) }
 

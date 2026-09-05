@@ -18,6 +18,8 @@ import com.dcc.app.state.AppViewModel
 import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.*
 import com.dcc.app.ui.theme.Dcc
+import com.dcc.app.ui.theme.DccThemeIds
+import com.dcc.app.ui.theme.DccThemeLabels
 import com.dcc.app.update.Updater
 import kotlinx.coroutines.launch
 
@@ -270,11 +272,39 @@ fun SettingsSection(
             Kicker("Appearance")
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DccChip("Night Wire", state.theme == "night", accent = true) { vm.setTheme("night") }
-                DccChip("Field Office", state.theme == "field", accent = true) { vm.setTheme("field") }
+                for (id in DccThemeIds) {
+                    DccChip(DccThemeLabels[id] ?: id, state.theme == id, accent = true) { vm.setTheme(id) }
+                }
             }
             Spacer(Modifier.height(9.dp))
-            MetaText("Night Wire is the default. The choice is saved on this device.", c.ink3, 10, maxLines = 3)
+            MetaText(
+                "Gold Standard is the default and the one built to read as a broadcast. " +
+                    "Night Wire and Field Office are the working themes.",
+                c.ink3, 10, maxLines = 4,
+            )
+
+            if (state.theme == "gold") {
+                Spacer(Modifier.height(16.dp))
+                Rule()
+                Spacer(Modifier.height(14.dp))
+                Kicker("Mode")
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DccChip("Dark", state.mode == "dark", accent = true) { vm.setMode("dark") }
+                    DccChip("Light", state.mode == "light", accent = true) { vm.setMode("light") }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Rule()
+                Spacer(Modifier.height(14.dp))
+                Kicker("Accent")
+                Spacer(Modifier.height(12.dp))
+                AccentSwatches(state.accent) { vm.setAccent(it) }
+                Spacer(Modifier.height(16.dp))
+                // One hex is stored; the light-mode value is derived from it,
+                // which is what makes an arbitrary pick off the wheel safe.
+                AccentWheel(state.accent, onPick = { vm.setAccent(it) })
+            }
         }
 
         Spacer(Modifier.height(10.dp))

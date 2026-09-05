@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
             val importError by vm.importError.collectAsState()
             val loading by vm.loading.collectAsState()
 
-            DccTheme(state.theme) {
+            DccTheme(state.theme, state.mode, state.accent) {
                 val c = Dcc.colors
                 val d = derived
                 val dy = dynasty

@@ -40,6 +40,14 @@ jobs:
           diff -q shared/data/dcc-data.json apps/android/app/src/main/assets/dcc-data.json \
             || { echo "::error::the Android copy of the dataset is stale — run 'node scripts/sync-assets.mjs'"; exit 1; }
 
+      - name: Verify the Android theme is generated from the shared tokens
+        run: |
+          # Android's palette used to be hand-copied from shared/tokens.json and
+          # drifted the moment either side changed. It is generated now, and
+          # this fails the build if the committed file and the generator ever
+          # disagree again.
+          node scripts/generate-theme.mjs --check
+
       - name: Verify versions are in sync
         run: |
           node scripts/sync-version.mjs

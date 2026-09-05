@@ -240,7 +240,10 @@ data class Persisted(
      * has actually been brought in from the PC.
      */
     val dynastySource: String = "none",
-    val theme: String = "night",
+    val theme: String = "gold",
+    /** Gold Standard only: which of its two modes, and the accent it derives from. */
+    val mode: String = "dark",
+    val accent: String = "#D4AF5A",
     val week: Int = 1,
     val heat: Int = 0,
     val gameRunning: Boolean = true,

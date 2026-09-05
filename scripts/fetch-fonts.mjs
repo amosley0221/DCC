@@ -30,8 +30,10 @@ const FAMILIES = [
   // Gold Standard uses one variable file per family rather than a file per
   // weight: the theme leans on weight for its whole hierarchy, and several
   // static cuts would cost more than the axis does.
-  { css: 'Bodoni+Moda:opsz,wght@6..96,500..700', file: 'BodoniModa', variable: true },
-  { css: 'Manrope:wght@400..700', file: 'Manrope', variable: true },
+  // Desktop takes one variable woff2 per family; Android needs static TTFs,
+  // so these carry both a variable flag and the weights Compose loads.
+  { css: 'Bodoni+Moda:opsz,wght@6..96,500..700', file: 'BodoniModa', variable: true, weights: [500, 600, 700] },
+  { css: 'Manrope:wght@400..700', file: 'Manrope', variable: true, weights: [400, 500, 600, 700] },
 ]
 
 /** A TTF/OTF starts with an sfnt version tag; anything else is the wrong format. */
@@ -86,9 +88,7 @@ async function fetchTtf(fam) {
   // The v1 endpoint collapses a variable family to weight 400 when several
   // weights are asked for at once, so each weight is requested on its own.
   const out = []
-  // Android downloads these two through Google Fonts rather than bundling
-  // them, so the desktop woff2 is all that is fetched here.
-  if (fam.variable) return out
+  if (!fam.weights) return out
   for (const w of fam.weights) {
     const css = await (await get(`https://fonts.googleapis.com/css?family=${fam.css.split(':')[0]}:${w}`, TTF_UA)).text()
     const url = /src:\s*url\(([^)]+)\)/.exec(css)?.[1]
