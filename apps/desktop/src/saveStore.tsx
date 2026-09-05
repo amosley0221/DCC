@@ -3,7 +3,7 @@ import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRec
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 
 /**
- * The analysed save, held above the section switch.
+ * The analyzed save, held above the section switch.
  *
  * This used to live inside the Save section, which meant navigating to any
  * other section unmounted it and threw the analysis away — the save had to be
@@ -25,7 +25,7 @@ export interface SaveState {
   dictResult: string | null
   /**
    * True while the remembered save is being re-read at startup — the header
-   * pass and the roster pass both, since a screen with an analysed save and no
+   * pass and the roster pass both, since a screen with an analyzed save and no
    * roster has nothing on it.
    */
   restoring: boolean
@@ -110,21 +110,28 @@ export function useSave(): Ctx {
   return ctx
 }
 
-export function SaveProvider({ remembered, rememberedArt, onPathChange, onArtChange, children }: {
+export function SaveProvider({ remembered, rememberedArt, rememberedTeam, onPathChange, onArtChange, children }: {
   remembered: string | null
   rememberedArt: string | null
+  /** The user's team, so the ledger entry the roster read files knows the week. */
+  rememberedTeam: number | null
   onPathChange: (path: string | null) => void
   onArtChange: (path: string | null) => void
   children: React.ReactNode
 }) {
-  const [save, setSave] = useState<SaveState>(blank)
+  // Start in the restoring state when there is a save to restore, rather than
+  // letting the effect set it a frame later. Otherwise the first paint has no
+  // save and no dynasty, every screen shows its empty state, and the user sees
+  // "no save loaded" flash before their own dynasty replaces it.
+  const [save, setSave] = useState<SaveState>(() =>
+    remembered ? { ...blank, restoring: true, path: remembered } : blank)
   const patch = useCallback((p: Partial<SaveState>) => setSave((s) => ({ ...s, ...p })), [])
   const started = useRef(false)
 
   // Re-open the save the app was last looking at, so a restart or an in-place
   // upgrade lands back where the user left off rather than on an empty panel.
   //
-  // Both passes, not just the first. Analysing the save only gets its header;
+  // Both passes, not just the first. Analyzing the save only gets its header;
   // every screen in the app is built out of the roster pass, so stopping after
   // the analysis left the user on an empty front page with a button to press
   // every single launch.
@@ -142,7 +149,7 @@ export function SaveProvider({ remembered, rememberedArt, onPathChange, onArtCha
         return
       }
       patch({ report: res.report })
-      const r = await window.dcc.roster(remembered)
+      const r = await window.dcc.roster(remembered, rememberedTeam)
       // A roster that fails to read is not worth an error on the front page:
       // the save is open, and The Program still offers the button.
       patch({
@@ -172,7 +179,7 @@ export function SaveProvider({ remembered, rememberedArt, onPathChange, onArtCha
         if (!art.ok) onArtChange(null)
       }
     })()
-  }, [remembered, rememberedArt, patch, onPathChange, onArtChange])
+  }, [remembered, rememberedArt, rememberedTeam, patch, onPathChange, onArtChange])
 
   const value = useMemo(() => ({ save, patch }), [save, patch])
   return <SaveCtx.Provider value={value}>{children}</SaveCtx.Provider>

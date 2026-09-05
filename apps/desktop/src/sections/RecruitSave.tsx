@@ -120,7 +120,7 @@ export default function RecruitSave() {
   const load = async () => {
     if (!save.path) return
     patch({ rosterBusy: true })
-    const res = await window.dcc.roster(save.path)
+    const res = await window.dcc.roster(save.path, state.teamId)
     patch({ rosterBusy: false })
     if (res.ok) {
       patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })

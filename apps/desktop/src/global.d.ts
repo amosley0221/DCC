@@ -4,6 +4,7 @@ import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets
 import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
 import type { RelayState } from '../electron/relay'
+import type { TransferView } from '../electron/preload'
 
 declare global {
   interface Window {
@@ -16,11 +17,15 @@ declare global {
       saveText(name: string, text: string): Promise<string | null>
       pickSave(): Promise<string | null>
       analyzeSave(path: string): Promise<{ ok: true; report: SaveReport } | { ok: false; message: string }>
-      roster(path: string): Promise<
+      roster(path: string, teamId?: number | null): Promise<
         | { ok: true; count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
-            schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]; players: RosterPlayer[] }
+            schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]
+            players: RosterPlayer[]; season: number | null }
         | { ok: false; message: string }
       >
+      transfers(): Promise<TransferView>
+      setTransferYear(year: number | null): Promise<{ ok: true }>
+      forgetTransferSeason(season: number): Promise<{ ok: true }>
       depth(path: string): Promise<
         | { ok: true; slots: { abbr: string; name: string; side: 'offense' | 'defense' | 'special' }[]
             charts: { block: number; slots: number[][] }[] }

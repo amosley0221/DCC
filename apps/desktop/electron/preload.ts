@@ -1,4 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { Move, Path } from './transfers'
+
+/** What the transfer ledger looks like once it has been diffed for the screen. */
+export interface TransferView {
+  latestYear: number | null
+  seasons: { season: number; week: number | null; recordedAt: string; players: number }[]
+  /** Season number to calendar year, once the user has named the latest season. */
+  years: Record<string, number | null>
+  moves: Move[]
+  paths: Path[]
+}
 
 export type UpdateStatus =
   | { state: 'checking' }
@@ -21,7 +32,10 @@ const api = {
     ipcRenderer.invoke('app:saveText', { name, text }) as Promise<string | null>,
   pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
-  roster: (path: string) => ipcRenderer.invoke('save:roster', path),
+  roster: (path: string, teamId?: number | null) => ipcRenderer.invoke('save:roster', path, teamId ?? null),
+  transfers: () => ipcRenderer.invoke('transfers:read') as Promise<TransferView>,
+  setTransferYear: (year: number | null) => ipcRenderer.invoke('transfers:setYear', year),
+  forgetTransferSeason: (season: number) => ipcRenderer.invoke('transfers:forget', season),
   depth: (path: string) => ipcRenderer.invoke('save:depth', path),
   writeDepth: (path: string, edits: unknown[]) => ipcRenderer.invoke('save:writeDepth', path, edits),
   publishSnapshot: (path: string, teamId: number | null, repo: string) =>

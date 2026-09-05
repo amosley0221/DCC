@@ -58,7 +58,7 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
   const load = async () => {
     if (!path) return
     patch({ rosterBusy: true })
-    const res = await window.dcc.roster(path)
+    const res = await window.dcc.roster(path, myTeam)
     patch({ rosterBusy: false })
     if (res.ok) {
       patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })
@@ -138,7 +138,7 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
               .filter(Boolean).join(' · ').toUpperCase() || 'SEASON RESULTS'
           : !roster ? (rosterBusy || save.restoring ? 'READING YOUR SAVE…' : 'ROSTER NOT READ YET')
           : mine ? `${(nameOf(mine.id) ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
-          : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
+          : `${teams.length} PROGRAMS — PICK YOURS`}</Meta>}
         right={view === 'schedule' ? undefined
           : <div className="subtabs">{TABS.map((t) => <Tab key={t} on={tab === t} onClick={() => setTab(t)}>{t}</Tab>)}</div>}
       />
@@ -240,7 +240,7 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
 
         {tab === 'TEAMS' && roster ? (
           <Card className="card-pad">
-            <Kicker>All {teams.length} programmes</Kicker>
+            <Kicker>All {teams.length} programs</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
               Every school is named, along with its conference and head coach. The save does not
               write a school against a roster, but each recruit's top-ten list names schools by

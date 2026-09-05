@@ -120,7 +120,7 @@ fun GoldHome(
             }
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 14.dp)) {
                 Label(
-                    if (last == null) "YOUR PROGRAMME" else "FEATURE · WEEK ${last.week}",
+                    if (last == null) "YOUR PROGRAM" else "FEATURE · WEEK ${last.week}",
                     10.0, c.accent, 2.5,
                 )
                 Spacer(Modifier.height(6.dp))

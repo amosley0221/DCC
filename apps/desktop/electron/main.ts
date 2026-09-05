@@ -7,8 +7,13 @@ import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
-  readDepthCharts, DEPTH_SLOTS,
+  readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
 } from './saveAnalysis'
+import {
+  buildRecord, emptyLedger, fileRecord, moves, paths, yearOf, LEDGER_VERSION,
+} from './transfers'
+import type { Ledger } from './transfers'
+import { TEAM_ID_NAMES } from './teamIds'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
   indexFaces, matchFaces, matchSchools,
@@ -45,6 +50,30 @@ function readSettings(): Record<string, unknown> {
 function writeSettings(next: Record<string, unknown>) {
   mkdirSync(app.getPath('userData'), { recursive: true })
   writeFileSync(settingsFile(), JSON.stringify(next, null, 2))
+}
+
+/**
+ * The transfer ledger, beside settings so it survives upgrades too.
+ *
+ * It is the one thing in DCC that cannot be rebuilt from the current save: a
+ * record of last season's rosters is gone the moment the season turns, so
+ * losing this file loses history the game itself no longer holds.
+ */
+const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
+
+function readLedger(): Ledger {
+  try {
+    const l = JSON.parse(readFileSync(ledgerFile(), 'utf8')) as Ledger
+    if (!l || typeof l !== 'object' || !Array.isArray(l.records)) return emptyLedger()
+    return { version: LEDGER_VERSION, latestYear: l.latestYear ?? null, records: l.records }
+  } catch {
+    return emptyLedger()
+  }
+}
+
+function writeLedger(next: Ledger) {
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  writeFileSync(ledgerFile(), JSON.stringify(next))
 }
 
 /**
@@ -230,12 +259,30 @@ ipcMain.handle('save:depth', (_e, path: string) => {
 
 ipcMain.handle('save:writeDepth', (_e, path: string, edits: DepthEdit[]) => writeDepthEdits(path, edits))
 
-ipcMain.handle('save:roster', (_e, path: string) => {
+ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
   try {
     const payload = readSavePayload(path)
     if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
     const players = readRoster(payload)
     const schools = readTeamNames(payload)
+    const games = readSeasonGames(payload, schools)
+    const season = readSeasonOrdinal(payload)
+
+    // File the roster in the transfer ledger while the save is already open.
+    // Doing it here rather than on demand is the whole point: a season the user
+    // never opened DCC in is a season that can never be diffed, and the moment
+    // to catch it is whenever they read a save.
+    if (season) {
+      try {
+        const week = weekOf(games, teamId ?? null)
+        writeLedger(fileRecord(readLedger(), buildRecord(players, {
+          season, week, unassigned: TEAM_UNASSIGNED,
+        })))
+      } catch {
+        // A ledger that cannot be written must not cost the user their roster.
+      }
+    }
+
     // The renderer only ever shows a page at a time; sending 16,000 full rating
     // sets across the bridge would cost more than reading the save did.
     return {
@@ -245,13 +292,51 @@ ipcMain.handle('save:roster', (_e, path: string) => {
       schools,
       coaches: readCoaches(payload),
       stores: readStores(payload),
-      games: readSeasonGames(payload, schools),
+      games,
+      season,
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
+})
+
+/** The week a save is sitting on: the user's first unplayed game. Null without a team. */
+function weekOf(games: { week: number; played: boolean; postseason: boolean; home: string | null; away: string | null }[], teamId: number | null): number | null {
+  if (teamId === null) return null
+  const name = TEAM_ID_NAMES[teamId]
+  if (!name) return null
+  const mine = games.filter((g) => !g.postseason && (g.home === name || g.away === name))
+  const next = mine.filter((g) => !g.played).map((g) => g.week)
+  if (next.length) return Math.min(...next)
+  return mine.length ? Math.max(...mine.map((g) => g.week)) : null
+}
+
+ipcMain.handle('transfers:read', () => {
+  const ledger = readLedger()
+  const seasons = ledger.records
+    .map((r) => ({ season: r.season, week: r.week, recordedAt: r.recordedAt, players: r.players.length }))
+    .sort((a, b) => a.season - b.season)
+  return {
+    latestYear: ledger.latestYear ?? null,
+    seasons,
+    years: Object.fromEntries(seasons.map((s) => [s.season, yearOf(ledger, s.season)])),
+    moves: moves(ledger),
+    paths: paths(ledger),
+  }
+})
+
+ipcMain.handle('transfers:setYear', (_e, year: number | null) => {
+  const ledger = readLedger()
+  writeLedger({ ...ledger, latestYear: year && Number.isFinite(year) ? Math.round(year) : null })
+  return { ok: true as const }
+})
+
+ipcMain.handle('transfers:forget', (_e, season: number) => {
+  const ledger = readLedger()
+  writeLedger({ ...ledger, records: ledger.records.filter((r) => r.season !== season) })
+  return { ok: true as const }
 })
 
 // The relay needs to know which save is open and which team is the user's, and

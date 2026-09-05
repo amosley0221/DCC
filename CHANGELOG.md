@@ -10,6 +10,31 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.32.0] - 2026-09-05
+
+### Added
+
+- **Transfers, for every school.** A new tab under Portal showing who moved,
+  where from, where to and in which season — your program, who came in, who
+  left, or all 138 schools. A player who has been at two or more schools gets
+  their whole route.
+  Your dynasty file records where players *are*, never where they have been, so
+  DCC keeps its own ledger: it writes down each roster whenever it reads your
+  save, and a transfer is somebody who turns up somewhere else the next season.
+  It fills in from the second season you read, and reading a save once a year is
+  all it asks. Between the two saves already read that is 1,563 moves.
+- **The season number, read out of the save.** Used to stamp each record. There
+  is no calendar year anywhere in the file, so the screen counts seasons and
+  lets you name the current one once if you would rather see 2027.
+
+### Fixed
+
+- **British spelling.** "Your programme", "all 138 programmes", "analysing" and
+  "any colour" are now program, programs, analyzing and color, on both apps.
+- **The empty screen no longer flashes on launch.** Opening the app showed
+  "no save loaded" for a second before your dynasty replaced it, which read as
+  a failure and a recovery. It now says it is opening your save, because it is.
+
 ## [0.31.0] - 2026-09-05
 
 ### Added

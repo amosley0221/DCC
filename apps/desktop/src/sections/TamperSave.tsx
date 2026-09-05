@@ -13,7 +13,7 @@ const ovrColour = (o: number) =>
 /**
  * Editing players on any roster, straight into the save.
  *
- * The game gives you no way to change another programme's players, which is the
+ * The game gives you no way to change another programs' players, which is the
  * point of this screen. It writes the same way the schedule editor does: a
  * timestamped backup first, then a rebuilt save that is refused unless it reads
  * back with exactly the numbers asked for and nothing else moved.
@@ -37,7 +37,7 @@ export default function TamperSave() {
   const load = async () => {
     if (!path) return
     patch({ rosterBusy: true })
-    const res = await window.dcc.roster(path)
+    const res = await window.dcc.roster(path, state.teamId)
     patch({ rosterBusy: false })
     if (res.ok) {
       patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })
@@ -99,7 +99,7 @@ export default function TamperSave() {
           <Card className="card-pad">
             <Kicker>Read the roster first</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>
-              Tampering edits players on other programmes' rosters, which the game itself gives
+              Tampering edits players on other programs' rosters, which the game itself gives
               you no way to do. It needs the save read first.
             </p>
             <Btn variant="primary" onClick={load} disabled={rosterBusy}>

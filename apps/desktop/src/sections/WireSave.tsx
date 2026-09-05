@@ -56,7 +56,7 @@ const ratingTone = (v: number) => (v >= 85 ? 'is-high' : v >= 75 ? 'is-mid' : 'i
 /**
  * Home.
  *
- * Your programme and your board on the left, the feature in the middle, the
+ * Your program and your board on the left, the feature in the middle, the
  * week's results on the right. Opening a score or a board row swaps the middle
  * column rather than navigating away, so the rails stay put and you keep your
  * place — which is the whole reason the layout is three columns.
@@ -81,7 +81,7 @@ export default function WireSave() {
   const last = [...mine].reverse().find((g) => g.played) ?? null
   const next = mine.find((g) => !g.played) ?? null
 
-  /** Every programme's record, so the rail can place you in the country. */
+  /** Every program's record, so the rail can place you in the country. */
   const table = useMemo(() => {
     const t = new Map<string, { w: number; l: number; cw: number; cl: number; pf: number; pa: number }>()
     const get = (n: string) => {
@@ -162,10 +162,10 @@ export default function WireSave() {
 
   return (
     <div className="gs-shell">
-      {/* ── your programme ────────────────────────────────────────────── */}
+      {/* ── your program ────────────────────────────────────────────── */}
       <aside className="gs-rail">
         <div>
-          <Kicker>Your programme</Kicker>
+          <Kicker>Your program</Kicker>
           <h1 className="screen-title" style={{ marginTop: 10 }}>{me ?? 'Pick your team'}</h1>
           <div style={{ marginTop: 8 }}>
             <Meta>

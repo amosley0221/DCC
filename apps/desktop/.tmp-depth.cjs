@@ -84,10 +84,12 @@ __export(saveAnalysis_exports, {
   readRoster: () => readRoster,
   readSavePayload: () => readSavePayload,
   readSeasonGames: () => readSeasonGames,
+  readSeasonOrdinal: () => readSeasonOrdinal,
   readStores: () => readStores,
   readTeamNames: () => readTeamNames,
   sampleFrames: () => sampleFrames,
   seasonGameTable: () => seasonGameTable,
+  storeTable: () => storeTable,
   teamTableOrder: () => teamTableOrder,
   zstdSupported: () => zstdSupported
 });
@@ -1189,11 +1191,39 @@ function teamTableOrder(teams) {
   return [...teams].sort((a, b) => key(a).localeCompare(key(b), "en"));
 }
 function seasonGameTable(payload) {
-  const store = readStores(payload).find((s) => s.name === "SeasonGameStore");
+  const t = storeTable(payload, "SeasonGameStore");
+  return t && { data: t.data, rows: t.rows };
+}
+function storeTable(payload, name) {
+  const store = readStores(payload).find((s) => s.name === name);
   if (!store) return null;
   const bsft = payload.indexOf(Buffer.from("BSFT", "latin1"), store.offset);
-  if (bsft < 0) return null;
-  return { data: bsft + 28 + store.members * 4, rows: store.rows };
+  if (bsft < 0 || bsft + 28 + store.members * 4 > payload.length) return null;
+  const memberBits = [];
+  for (let i = 0; i < store.members; i++) memberBits.push(payload.readUInt32BE(bsft + 28 + i * 4));
+  return {
+    data: bsft + 28 + store.members * 4,
+    rows: store.rows,
+    rowBytes: payload.readUInt32BE(bsft + 12) * 4,
+    memberBits
+  };
+}
+function readSeasonOrdinal(payload) {
+  const t = storeTable(payload, "YearSummaryStore");
+  if (!t || t.rowBytes < 8) return null;
+  let used = 0;
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes;
+    if (o + t.rowBytes > payload.length) break;
+    for (let w = 0; w * 4 < t.rowBytes; w++) {
+      if (w === 1) continue;
+      if (payload.readUInt32BE(o + w * 4) !== 0) {
+        used++;
+        break;
+      }
+    }
+  }
+  return used || null;
 }
 function readSeasonGames(payload, teams) {
   const table = seasonGameTable(payload);
@@ -1302,10 +1332,12 @@ function readSeasonGames(payload, teams) {
   readRoster,
   readSavePayload,
   readSeasonGames,
+  readSeasonOrdinal,
   readStores,
   readTeamNames,
   sampleFrames,
   seasonGameTable,
+  storeTable,
   teamTableOrder,
   zstdSupported
 });

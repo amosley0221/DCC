@@ -104,7 +104,7 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
                   type="color"
                   value={state.accent}
                   onChange={(e) => dispatch({ type: 'accent', accent: e.target.value })}
-                  title="Any colour"
+                  title="Any color"
                 />
                 <Meta size={10}>{state.accent.toUpperCase()}</Meta>
               </div>

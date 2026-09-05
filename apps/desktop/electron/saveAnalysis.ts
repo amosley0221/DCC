@@ -1752,11 +1752,80 @@ export function teamTableOrder(teams: TeamRecord[]): TeamRecord[] {
  * one word per member.
  */
 export function seasonGameTable(payload: Buffer): { data: number; rows: number } | null {
-  const store = readStores(payload).find((s) => s.name === 'SeasonGameStore')
+  const t = storeTable(payload, 'SeasonGameStore')
+  return t && { data: t.data, rows: t.rows }
+}
+
+export interface StoreTable {
+  /** Byte offset of the first row. */
+  data: number
+  rows: number
+  /** Bytes per row, from the store's own header rather than guessed. */
+  rowBytes: number
+  /** One bit offset per member, in the schema's member order. */
+  memberBits: number[]
+}
+
+/**
+ * A store's rows, located and measured from its own header.
+ *
+ * Every store's `BSFT` block turns out to describe its own layout, which is
+ * what the format notes had been looking for the long way round. After the tag
+ * come six words — the third is the row size *in words*, the fourth the row
+ * count and the fifth the member count — and then one word per member, giving
+ * that member's bit offset within the row. `SeasonGameStore` reports 25 words,
+ * which is the 100-byte row that was found by hand, and its member words
+ * include 791, the season week that was found by hand as well.
+ *
+ * Two caveats keep this from being a decoder on its own. The header names no
+ * members, so the offsets only become fields once the schema's member list for
+ * that store is known; and a member's width is not stated, so it still has to
+ * come from the gaps or from reading values. Some stores also report one member
+ * whose offset lies far outside the row — an array member, most likely, whose
+ * word means something else — so a caller must range-check before reading.
+ */
+export function storeTable(payload: Buffer, name: string): StoreTable | null {
+  const store = readStores(payload).find((s) => s.name === name)
   if (!store) return null
   const bsft = payload.indexOf(Buffer.from('BSFT', 'latin1'), store.offset)
-  if (bsft < 0) return null
-  return { data: bsft + 28 + store.members * 4, rows: store.rows }
+  if (bsft < 0 || bsft + 28 + store.members * 4 > payload.length) return null
+  const memberBits: number[] = []
+  for (let i = 0; i < store.members; i++) memberBits.push(payload.readUInt32BE(bsft + 28 + i * 4))
+  return {
+    data: bsft + 28 + store.members * 4,
+    rows: store.rows,
+    rowBytes: payload.readUInt32BE(bsft + 12) * 4,
+    memberBits,
+  }
+}
+
+/**
+ * How many seasons the dynasty has reached, counting the one being played.
+ *
+ * `YearSummaryStore` holds thirty rows and fills them one per season. The rows
+ * it has not reached yet are not blank: each carries its own index plus one in
+ * its second word, which is the free-list chain every store in this save uses.
+ * Ignoring that word and asking which rows carry anything else gives the count
+ * — 3 in a save two offseasons in, and 2 in one taken a season earlier, which
+ * is what identified it.
+ *
+ * It is an ordinal, not a calendar year. Nothing found so far in the save says
+ * "2027", so DCC counts seasons and lets the user name the year if they want to
+ * see one.
+ */
+export function readSeasonOrdinal(payload: Buffer): number | null {
+  const t = storeTable(payload, 'YearSummaryStore')
+  if (!t || t.rowBytes < 8) return null
+  let used = 0
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes
+    if (o + t.rowBytes > payload.length) break
+    for (let w = 0; w * 4 < t.rowBytes; w++) {
+      if (w === 1) continue
+      if (payload.readUInt32BE(o + w * 4) !== 0) { used++; break }
+    }
+  }
+  return used || null
 }
 
 export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGame[] {

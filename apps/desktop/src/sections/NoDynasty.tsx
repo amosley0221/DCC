@@ -84,7 +84,7 @@ export default function NoDynasty({ section, onOpenSettings }: {
           <Kicker color="var(--ink3)">Sample dynasty</Kicker>
           <p className="body-serif" style={{ marginTop: 7 }}>
             Settings can load a sample dynasty to show how these screens are meant to look. It is
-            invented data, not your save, and it is clearly labelled as such wherever it appears.
+            invented data, not your save, and it is clearly labeled as such wherever it appears.
           </p>
           <div className="row" style={{ gap: 8, marginTop: 4 }}>
             <Btn onClick={onOpenSettings}>Open settings</Btn>

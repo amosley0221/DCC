@@ -1063,6 +1063,70 @@ The working method is unchanged: find a store by name in the directory, find a
 field by its value, confirm the stride. It is slower than a rule would be, and
 it is what has actually worked.
 
+### What the `BSFT` header does say
+
+Half of it, at least. After the tag come six words, and the third and fourth
+are the row size **in words** and the row count:
+
+```
+"BSFT"  <total>  <total>  <words per row>  <rows>  <members>  <members+8>
+        then one word per member
+```
+
+`storeTable` reads that, so a store's rows can now be located and measured
+without finding them by hand. It agrees with both stores that *were* found by
+hand — `SeasonGameStore` reports 25 words, which is the 100-byte row, and
+`ScheduleKnownGameStore` reports 4, which is the 16-byte one — and it puts
+`HighSchoolProspectTopSchoolsStore` at 4-byte rows whose first values read
+`74:753`, `108:52`, `74:1000`, the team-and-influence pairs that table was
+found to hold. The first word is `rows x rowBytes + 32 + members x 4` in every
+store checked, which is the table plus this header, and is a useful sanity
+check on a base offset.
+
+The one word per member is **not** a member offset, however close it looks.
+For `SeasonGameStore` the words include 640, 736, 754, 786, 789, 790 and 791,
+which are exactly the verified starts of the home score, wind, away Q4, the
+sim flag, the user flag, overtime and the week. But the quarter scores are
+verified at 708, 715, 722 and 729 and the header says 704, 711, 718 and 725 —
+four short, consistently, and reading the header's four does not sum to the
+final score in a single one of 790 played games, while reading the verified
+four does. So the words are near the offsets without being them, and whatever
+turns one into the other is not known. Anyone picking this up should start
+there: the deltas are 0, 1, 3, 4 and 5 bits, and they are not random.
+
+### The season number
+
+`YearSummaryStore` holds thirty rows and fills them one per season. Rows it
+has not reached are not blank — each holds its own index plus one in its second
+word, which is the free-list chain this save uses everywhere — so the count is
+the rows carrying anything *else*. `readSeasonOrdinal` does that, and reads 3
+in a save two offseasons in and 2 in one taken a season earlier, which is what
+identified it.
+
+It is an ordinal, not a year. No field anywhere in the payload has been found
+that says "2027": the only run of calendar years is a fixed table at
+`0x1c33d4` mapping 2006 to 2045 to something else, present in every save and
+identical between them. DCC therefore counts seasons and lets the user name
+the current one if they want a year on the screen.
+
+### Identity across seasons
+
+Nothing that looks like a player id survives a season.
+
+- `playerId` is not unique inside one save: 11,730 rostered players carry
+  9,524 distinct values. Widening the field to 18 bits gets to 16,392 distinct
+  out of 16,448 and two more bits add one, so 18 is likely its real width —
+  but across two saves a season apart it still matches 1,728 players to
+  somebody else, because the ids are recycled as classes graduate.
+- The record row index is worse, for the same reason: 4,088 rows hold a
+  different player a season later.
+
+**First name, last name, hometown and home state together are unique** — 11,729
+distinct keys for 11,729 rostered players, in every save checked — and they are
+the fields a transfer does not touch. That is the key the transfer ledger uses.
+Matching two saves a season apart on it joins 8,412 players, 1,563 of whom are
+on a different roster, which is a portal class of about eleven per school.
+
 
 ## The season's games
 

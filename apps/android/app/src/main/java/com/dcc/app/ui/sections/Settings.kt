@@ -319,7 +319,7 @@ fun SettingsSection(
                 // rather than scrolling the page — fine when you asked for it,
                 // a trap when you were only trying to get past it.
                 DccChip(
-                    if (wheel) "Close the colour wheel" else "Any colour…",
+                    if (wheel) "Close the color wheel" else "Any color…",
                     wheel, accent = true,
                 ) { wheel = !wheel }
                 if (wheel) {

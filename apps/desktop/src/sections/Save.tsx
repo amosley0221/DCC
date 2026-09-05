@@ -72,7 +72,7 @@ export default function Save() {
 
   const readRoster = async (from: string) => {
     patch({ rosterBusy: true })
-    const res = await window.dcc.roster(from)
+    const res = await window.dcc.roster(from, state.teamId)
     patch({ rosterBusy: false })
     if (res.ok) {
       patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })
@@ -92,7 +92,7 @@ export default function Save() {
     setBusy(false)
     if (!res.ok) { setError(res.message); return }
     setReport(res.report)
-    dispatch({ type: 'log', line: { text: `analysed ${chosen}`, kind: 'info' } })
+    dispatch({ type: 'log', line: { text: `analyzed ${chosen}`, kind: 'info' } })
 
     // Choosing a save is one action, not two. Every screen is built out of the
     // roster pass, so read it here rather than making the user find a second
@@ -414,7 +414,7 @@ export default function Save() {
           </Card>
         ) : null}
 
-        {busy ? <Card className="card-pad"><Meta color="var(--warn)">ANALYSING…</Meta></Card> : null}
+        {busy ? <Card className="card-pad"><Meta color="var(--warn)">ANALYZING…</Meta></Card> : null}
         {restoring ? (
           <Card className="card-pad"><Meta color="var(--warn)">REOPENING THE LAST SAVE…</Meta></Card>
         ) : null}
@@ -574,7 +574,7 @@ export default function Save() {
                   </div>
                   <p className="body-serif" style={{ marginTop: 10, marginBottom: 0 }}>
                     Browse them in the Team section. Five rating pairs sit at known positions but
-                    could be labelled the other way round — within each, the two behave almost
+                    could be labeled the other way round — within each, the two behave almost
                     identically across the league, so nothing in the file separates them:{' '}
                     {roster.unverifiedPairs.map((p) => p.join(' / ')).join(', ')}.
                   </p>

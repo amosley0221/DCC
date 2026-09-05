@@ -121,7 +121,7 @@ export interface Persisted {
    */
   dynastySource: 'none' | 'sample'
   /**
-   * The save file the Save section last analysed, so it reopens on launch.
+   * The save file the Save section last analyzed, so it reopens on launch.
    * Null when none has been chosen, or when the remembered one has gone.
    */
   savePath: string | null

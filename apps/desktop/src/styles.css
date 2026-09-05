@@ -262,7 +262,7 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 
 /* ── Sports furniture ────────────────────────────────────────────────────────
    Lifted from how broadcast and mobile sports apps actually lay out a number:
-   a ring when there is one figure that matters, a labelled bar when there are
+   a ring when there is one figure that matters, a labeled bar when there are
    many to compare, a shield when the number is an identity rather than a
    measurement. Gold reads as a value worth looking at; the accent stays for
    things you press. */
@@ -627,7 +627,7 @@ body[data-theme='gold'] .hero-game .scoreboard-name { font-family: var(--serif);
 body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; border: 1px solid var(--line); }
 
 /* ── Home: rail, feature, rail ───────────────────────────────────────────────
-   The handoff's desktop layout. Your programme and your board on the left, the
+   The handoff's desktop layout. Your program and your board on the left, the
    feature in the middle, the week's results on the right. Opening a score or a
    board row swaps the middle column rather than navigating away, so the rails
    stay put and you keep your place. */

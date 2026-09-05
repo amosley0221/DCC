@@ -16,6 +16,7 @@ import Export from './sections/Export'
 import Devices from './sections/Devices'
 import Settings from './sections/Settings'
 import NoDynasty from './sections/NoDynasty'
+import Transfers from './sections/Transfers'
 import Save from './sections/Save'
 import RecruitSave from './sections/RecruitSave'
 import TeamSave from './sections/TeamSave'
@@ -94,7 +95,7 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
   const held = state.queue.filter((q) => q.state === 'HELD').length
   const lostLease = state.leaseHolder !== THIS_MACHINE
   // Gold Standard is the one meant to read as a sports site, so it does not
-  // show the operator's plumbing — whether a save was analysed, which file is
+  // show the operator's plumbing — whether a save was analyzed, which file is
   // open. The other two themes are the working ones and keep it.
   const ops = state.theme !== 'gold'
 
@@ -198,7 +199,15 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
           ) : section === 'RECRUITING' && save.report ? (
             <RecruitSave />
           ) : section === 'PORTAL' && save.report ? (
-            <TamperSave />
+            <PortalSave />
+          ) : save.restoring ? (
+            // The save is being re-read from the last launch. Without this the
+            // empty state paints first and the dynasty replaces it a second
+            // later, which reads as the app failing and then recovering.
+            <Standby
+              title="Opening your save"
+              body="Reading the roster, the schedule and the board. This is the save the app was last looking at, so it only happens on launch."
+            />
           ) : !d ? (
             <NoDynasty
               section={NAV.find((n) => n.id === section)?.label ?? 'This screen'}
@@ -252,7 +261,7 @@ function Search({ onOpen }: { onOpen: (s: Section) => void }) {
     for (let id = 0; id < TEAM_ID_NAMES.length && out.length < 4; id++) {
       const n = nameOf(id)
       if (n && n.toLowerCase().includes(term)) {
-        out.push({ key: `t${id}`, name: n, sub: 'Programme', kind: 'Team', go: 'PROGRAM' })
+        out.push({ key: `t${id}`, name: n, sub: 'Program', kind: 'Team', go: 'PROGRAM' })
       }
     }
 
@@ -305,6 +314,26 @@ function Search({ onOpen }: { onOpen: (s: Section) => void }) {
   )
 }
 
+/**
+ * The portal screen: who moved, and who you are working on.
+ *
+ * Two halves of one idea, so they share a section rather than each taking a
+ * slot in a six-item nav. Transfers leads because it is the one that is true
+ * whether or not you have done anything.
+ */
+function PortalSave() {
+  const [tab, setTab] = useState<'TRANSFERS' | 'TAMPER'>('TRANSFERS')
+  return (
+    <>
+      <div className="subtabs" style={{ marginBottom: 18 }}>
+        <Tab on={tab === 'TRANSFERS'} onClick={() => setTab('TRANSFERS')}>Transfers</Tab>
+        <Tab on={tab === 'TAMPER'} onClick={() => setTab('TAMPER')}>Tampering</Tab>
+      </div>
+      {tab === 'TRANSFERS' ? <Transfers /> : <TamperSave />}
+    </>
+  )
+}
+
 /** A game DCC is built for but does not read yet. Product copy, not a note. */
 function Standby({ title, body }: { title: string; body: string }) {
   return (
@@ -316,13 +345,14 @@ function Standby({ title, body }: { title: string; body: string }) {
 }
 
 /**
- * Sits between the store and the shell so the analysed save outlives section
+ * Sits between the store and the shell so the analyzed save outlives section
  * switches, and so the path it remembers is written back to settings.
  */
 function SaveGate({ update, version }: { update: UpdateStatus | null; version: string }) {
   const { state, dispatch } = useStore()
   const remembered = useRef(state.savePath).current
   const rememberedArt = useRef(state.artPath).current
+  const rememberedTeam = useRef(state.teamId).current
   const forget = useCallback(() => dispatch({ type: 'savePath', path: null }), [dispatch])
   const forgetArt = useCallback(() => dispatch({ type: 'artPath', path: null }), [dispatch])
 
@@ -330,6 +360,7 @@ function SaveGate({ update, version }: { update: UpdateStatus | null; version: s
     <SaveProvider
       remembered={remembered}
       rememberedArt={rememberedArt}
+      rememberedTeam={rememberedTeam}
       onPathChange={forget}
       onArtChange={forgetArt}
     >

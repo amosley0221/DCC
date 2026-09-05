@@ -340,11 +340,22 @@ var GAME_BITS = {
   overtime: [790, 1]
 };
 function seasonGameTable(payload) {
-  const store = readStores(payload).find((s) => s.name === "SeasonGameStore");
+  const t = storeTable(payload, "SeasonGameStore");
+  return t && { data: t.data, rows: t.rows };
+}
+function storeTable(payload, name) {
+  const store = readStores(payload).find((s) => s.name === name);
   if (!store) return null;
   const bsft = payload.indexOf(Buffer.from("BSFT", "latin1"), store.offset);
-  if (bsft < 0) return null;
-  return { data: bsft + 28 + store.members * 4, rows: store.rows };
+  if (bsft < 0 || bsft + 28 + store.members * 4 > payload.length) return null;
+  const memberBits = [];
+  for (let i = 0; i < store.members; i++) memberBits.push(payload.readUInt32BE(bsft + 28 + i * 4));
+  return {
+    data: bsft + 28 + store.members * 4,
+    rows: store.rows,
+    rowBytes: payload.readUInt32BE(bsft + 12) * 4,
+    memberBits
+  };
 }
 
 // electron/gameEnums.ts
