@@ -8,7 +8,39 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Gold Standard**, a new theme and the default on both apps: warm cream ink
+  on near-black, Bodoni Moda for every headline and every number you read as
+  data, Manrope for everything else.
+- **Dark and light modes**, and an **accent you choose** — four presets plus a
+  full colour wheel, on the desktop and on the phone. One colour is stored;
+  every border, rule and wash is mixed from it, and the light-mode value is
+  that same hue with its luminance dropped.
+- **Search** in the desktop top bar, reaching all 138 teams, all 16,448
+  players and the recruiting pool.
+- A **game switcher** on the wordmark. Madden 27 and FC 27 are listed and
+  marked coming soon; nothing reads their saves yet.
+- **Home** rebuilt as three columns — your programme and board, the feature,
+  the week's scores. Opening a score or a board row swaps the middle column
+  rather than navigating away, so you keep your place.
+
+### Changed
+
+- The nav is editorial: Home, The Program, Recruiting, Portal, League, Legacy.
+  Everything operational — your dynasty file, devices, the queue, the draft
+  export — moves behind a discreet gear, in every theme.
+- Night Wire and Field Office are unchanged and remain selectable as the
+  working themes, where what has been decoded and which file is open still
+  show.
+- Android's palette is generated from the shared tokens rather than hand-copied
+  into Kotlin, so the two apps cannot drift apart again.
+
+### Fixed
+
+- Opening Legacy with a save loaded but no sample dynasty crashed the desktop
+  app, which silently stopped the update prompt from appearing.
+- Light mode's hovers were white washes, invisible on a cream ground.
 
 ## [0.27.0] - 2026-09-05
 
