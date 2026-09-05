@@ -54,4 +54,9 @@ if ! adb shell dumpsys window windows 2>/dev/null | grep -q "$PKG"; then
   fi
 fi
 
+# Take a picture of what it actually drew. "It launched" has passed before
+# while the screen was the wrong one entirely, and a screenshot in the run's
+# artifacts is the only part of this check a person can disagree with.
+adb exec-out screencap -p > launch.png || echo "(could not capture a screenshot)"
+
 echo "==> app launched, drew a window, and is still running after ${SETTLE_SECONDS}s"

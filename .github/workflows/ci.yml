@@ -192,5 +192,7 @@ jobs:
         if: always()
         with:
           name: launch-logcat
-          path: logcat.txt
+          path: |
+            logcat.txt
+            launch.png
           if-no-files-found: ignore
