@@ -1094,6 +1094,24 @@ export const HEIGHT_BIT = 650        // inches, 7 bits, no offset
 export const WEIGHT_BIT = 365        // pounds, 8 bits, plus 160
 export const STARS_BIT = 1241        // 3 bits, plus 1
 export const NIL_BIT = 171           // $K, 9 bits, minus 255
+/**
+ * Not the class year, whatever the enum is called.
+ *
+ * The schema's `ClassYear` enum is HighSchool, JuniorCollege_Sophomore,
+ * JuniorCollege_Junior, and this two-bit field takes those values — so it reads
+ * as where a recruit is coming in from, and for a recruit it is exactly that.
+ * It is not what year a rostered player is in, and two measurements say so.
+ *
+ * It moves. Across one offseason, of 8,412 players on a roster in both saves,
+ * 70.4% of this field advanced by exactly one and the rest held; none went
+ * down. An origin does not do that.
+ *
+ * And it does not partition a roster. Penn State's 85 come out 54 / 13 / 12 /
+ * 6, and no team has fifty-four freshmen.
+ *
+ * So DCC no longer shows it as a class on a roster. Class year is on the
+ * undecoded list until something is found that survives both tests.
+ */
 export const CLASS_YEAR_BIT = 1189   // 2 bits
 export const DEV_TRAIT_BIT = 322     // 2 bits
 export const STATE_BIT = 998         // 6 bits
@@ -1152,10 +1170,8 @@ export const ARCHETYPES: Record<string, (string | null)[]> = {
  * and 76 Pass Blocking, 19–20 average 82 Kicking Power and nothing else.
  */
 export const POSITION_BIT = 1010
-export const POSITIONS = [
-  'QB', 'HB', 'FB', 'WR', 'TE', 'LT', 'LG', 'C', 'RG', 'RT',
-  'LE', 'RE', 'DT', 'LOLB', 'MLB', 'ROLB', 'CB', 'FS', 'SS', 'K', 'P',
-]
+export { POSITIONS } from './positions'
+import { POSITIONS } from './positions'
 
 /**
  * Overall. For every position it tracks the ratings that position is judged on

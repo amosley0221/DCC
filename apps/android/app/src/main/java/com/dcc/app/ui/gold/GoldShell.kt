@@ -44,11 +44,14 @@ import com.dcc.app.ui.components.MetaText
 import com.dcc.app.ui.components.MonoLabel
 import com.dcc.app.ui.sections.CoachSection
 import com.dcc.app.ui.sections.NationalSection
+import com.dcc.app.ui.sections.PortalSnapshotSection
 import com.dcc.app.ui.sections.QueueSection
 import com.dcc.app.ui.sections.RecruitSection
 import com.dcc.app.ui.sections.RecruitSnapshotSection
 import com.dcc.app.ui.sections.SettingsSection
 import com.dcc.app.ui.sections.TamperSection
+import com.dcc.app.ui.sections.TeamSection
+import com.dcc.app.ui.sections.TeamSnapshotSection
 import com.dcc.app.ui.theme.Dcc
 
 /**
@@ -64,6 +67,7 @@ import com.dcc.app.ui.theme.Dcc
 /** The five tabs. M3 allows five; anything else goes behind the gear. */
 private val TABS = listOf(
     GoldTab("home", "Home"),
+    GoldTab("program", "Program"),
     GoldTab("board", "Board"),
     GoldTab("portal", "Portal"),
     GoldTab("league", "League"),
@@ -228,6 +232,14 @@ fun GoldShell(
                                 onOpenBoard = { tab = "board" },
                             ) { ops = "dynasty" }
 
+                            "program" -> if (snapshot != null) {
+                                TeamSnapshotSection(snapshot)
+                            } else if (dynasty != null && derived != null) {
+                                TeamSection(vm, dynasty, state, derived) { callTarget = it }
+                            } else {
+                                Standby("The program", "Your roster, your depth chart and your schedule land here with your save.") { ops = "dynasty" }
+                            }
+
                             "board" -> if (snapshot != null) {
                                 RecruitSnapshotSection(vm, state, snapshot)
                             } else if (dynasty != null && derived != null) {
@@ -236,10 +248,15 @@ fun GoldShell(
                                 Standby("The board", "Your recruiting class lands here once your save reaches this phone.") { ops = "dynasty" }
                             }
 
-                            "portal" -> if (dynasty != null && derived != null) {
+                            // The snapshot wins here: transfers and the
+                            // conversations are both things the desktop keeps
+                            // beside the save, and they travel with it.
+                            "portal" -> if (snapshot != null) {
+                                PortalSnapshotSection(snapshot)
+                            } else if (dynasty != null && derived != null) {
                                 TamperSection(vm, dynasty, state, derived, callTarget) { callTarget = it }
                             } else {
-                                Standby("The portal", "Conversations and offers open here once your save reaches this phone.") { ops = "dynasty" }
+                                Standby("The portal", "Who moved, and who you are working on. Both land here with your save.") { ops = "dynasty" }
                             }
 
                             "league" -> if (snapshot != null || (dynasty != null && derived != null)) {

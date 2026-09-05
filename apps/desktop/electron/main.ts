@@ -9,10 +9,11 @@ import {
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
 } from './saveAnalysis'
+import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
-  buildRecord, emptyLedger, fileRecord, moves, paths, yearOf, LEDGER_VERSION,
-} from './transfers'
-import type { Ledger } from './transfers'
+  readLedger, readThreads, snapshotExtras, writeLedger, writeThreads,
+} from './sidecar'
+import type { TamperThread } from './sidecar'
 import { TEAM_ID_NAMES } from './teamIds'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
@@ -21,7 +22,7 @@ import {
 import { writeStory } from './press'
 import type { PressRequest } from './press'
 import { resistance, standing } from './tamper'
-import type { TamperCoach, TamperTarget, TamperTurn } from './tamper'
+import type { TamperCoach, TamperTarget } from './tamper'
 import { sendText } from './tamperTalk'
 import { buildSnapshot } from './snapshot'
 import { publishSnapshot } from './publish'
@@ -53,30 +54,6 @@ function readSettings(): Record<string, unknown> {
 function writeSettings(next: Record<string, unknown>) {
   mkdirSync(app.getPath('userData'), { recursive: true })
   writeFileSync(settingsFile(), JSON.stringify(next, null, 2))
-}
-
-/**
- * The transfer ledger, beside settings so it survives upgrades too.
- *
- * It is the one thing in DCC that cannot be rebuilt from the current save: a
- * record of last season's rosters is gone the moment the season turns, so
- * losing this file loses history the game itself no longer holds.
- */
-const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
-
-function readLedger(): Ledger {
-  try {
-    const l = JSON.parse(readFileSync(ledgerFile(), 'utf8')) as Ledger
-    if (!l || typeof l !== 'object' || !Array.isArray(l.records)) return emptyLedger()
-    return { version: LEDGER_VERSION, latestYear: l.latestYear ?? null, records: l.records }
-  } catch {
-    return emptyLedger()
-  }
-}
-
-function writeLedger(next: Ledger) {
-  mkdirSync(app.getPath('userData'), { recursive: true })
-  writeFileSync(ledgerFile(), JSON.stringify(next))
 }
 
 /**
@@ -355,7 +332,7 @@ ipcMain.handle('relay:publish', async (_e, { path, teamId, repo }: {
     const payload = readSavePayload(path)
     if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
     const token = String(readSettings().githubToken ?? '')
-    return await publishSnapshot({ repo, token }, buildSnapshot(payload, teamId))
+    return await publishSnapshot({ repo, token }, buildSnapshot(payload, teamId, snapshotExtras()))
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
@@ -386,50 +363,6 @@ ipcMain.handle('press:write', async (_e, req: PressRequest) => {
   const key = String(readSettings().anthropicKey ?? '')
   return writeStory(key, req)
 })
-
-/**
- * Tampering conversations, kept beside settings.
- *
- * A thread is worth more than the save it came from: it is a conversation the
- * user had, and re-reading the save cannot recreate it. It is keyed the way the
- * transfer ledger keys a player, so a thread survives into next season and can
- * be matched against what actually happened to him.
- */
-interface TamperThread {
-  key: string
-  first: string
-  last: string
-  position: string
-  overall: number
-  team: string
-  interest: number
-  resistance: number
-  because: string[]
-  mood: string
-  committed: boolean
-  openedSeason: number | null
-  openedWeek: number | null
-  turns: TamperTurn[]
-}
-
-interface TamperFile { version: number; threads: Record<string, TamperThread> }
-
-const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
-
-function readThreads(): TamperFile {
-  try {
-    const f = JSON.parse(readFileSync(tamperFile(), 'utf8')) as TamperFile
-    if (!f || typeof f !== 'object' || !f.threads) return { version: 1, threads: {} }
-    return { version: 1, threads: f.threads }
-  } catch {
-    return { version: 1, threads: {} }
-  }
-}
-
-function writeThreads(next: TamperFile) {
-  mkdirSync(app.getPath('userData'), { recursive: true })
-  writeFileSync(tamperFile(), JSON.stringify(next, null, 2))
-}
 
 const withStanding = (t: TamperThread) => ({ ...t, standing: standing(t.interest) })
 
@@ -493,7 +426,7 @@ ipcMain.handle('save:snapshot', async (_e, { path, teamId }: { path: string; tea
   try {
     const payload = readSavePayload(path)
     if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
-    const snap = buildSnapshot(payload, teamId)
+    const snap = buildSnapshot(payload, teamId, snapshotExtras())
     const res = await dialog.showSaveDialog(win!, {
       title: 'Save the dynasty snapshot',
       defaultPath: 'dcc-snapshot.json',

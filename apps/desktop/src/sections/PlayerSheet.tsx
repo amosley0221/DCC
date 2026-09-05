@@ -90,7 +90,7 @@ export default function PlayerSheet({ player, teamName, onClose, onSaved }: {
           </div>
           <div style={{ marginTop: 3 }}>
             <Meta size={10}>
-              {[player.position, player.classYear, height(player.heightIn),
+              {[player.position, height(player.heightIn),
                 player.weightLb ? `${player.weightLb} lbs` : null, player.hometown]
                 .filter(Boolean).join(' · ')}
             </Meta>
@@ -120,7 +120,6 @@ export default function PlayerSheet({ player, teamName, onClose, onSaved }: {
             <Kicker>Player profile</Kicker>
             {field('Height', height(player.heightIn))}
             {field('Weight', player.weightLb ? `${player.weightLb} lb` : '—')}
-            {field('Class', player.classYear ?? '—')}
             {field('Archetype', player.archetype ?? '—')}
             {field('Development', player.devTrait ?? '—')}
             {field('Redshirt', player.redshirt ? 'Yes' : 'No')}
@@ -136,9 +135,9 @@ export default function PlayerSheet({ player, teamName, onClose, onSaved }: {
             {field('Ideal pitch', player.idealPitch ?? '—')}
             <div style={{ marginTop: 14 }}>
               <Meta size={9} color="var(--ink4)">
-                NOT DECODED OUT OF THE SAVE YET — JERSEY NUMBER, AGE, PERSONALITY, SCHEME, ROLE,
-                SKILL POINTS, XP, IMPACT PLAYER, SKILL GROUP CAPS, SEASON STATISTICS. THEY ARE NOT
-                SHOWN RATHER THAN SHOWN EMPTY.
+                NOT DECODED OUT OF THE SAVE YET — CLASS YEAR, JERSEY NUMBER, AGE, PERSONALITY,
+                SCHEME, ROLE, SKILL POINTS, XP, IMPACT PLAYER, SKILL GROUP CAPS, SEASON
+                STATISTICS. THEY ARE NOT SHOWN RATHER THAN SHOWN WRONG.
               </Meta>
             </div>
           </div>

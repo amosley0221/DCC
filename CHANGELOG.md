@@ -10,6 +10,39 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.34.0] - 2026-09-05
+
+### Added
+
+- **The Program, and the portal, on the phone.** Android gains a Program tab —
+  your roster, depth and schedule off the snapshot — and Portal now has the
+  same two halves the desktop does. Transfers and the conversations both ride
+  along in the snapshot, because the phone cannot build either: the ledger
+  needs two seasons of saves read on the PC, and a reply needs the API key that
+  lives there. The conversations are read-only on the phone and it says so.
+- **Tampering opens on the whole country.** The screen used to be a search box
+  and nothing else, which is no use when you know you want a corner nobody is
+  playing but not his name. It now lists every player on every other roster,
+  best first, with filters for the unit and for hiding the starters.
+
+### Fixed
+
+- **The roster no longer claims your sophomores went to junior college.** The
+  field DCC was labelling "class" is not one. Across an offseason it advanced
+  by exactly one for 70% of the 8,412 players on a roster in both saves, which
+  an origin does not do, and it puts 54 of Penn State's 85 in a single bucket,
+  which no class does. It is gone from the roster, the player sheet and the
+  cards, and class year has joined the list of fields DCC says it cannot read
+  yet. On a recruit, where it does mean where he is coming in from, it is
+  labelled "from".
+- **Bigger portraits, on a dark ground.** The game's portraits are transparent
+  PNGs, so the tint behind them was a tint on the player — which is what washed
+  every card in the theme's accent. Cards are wider and the faces much larger.
+- **Positions in football order** — QB through P, and the depth chart the same
+  way, with each package's variants beside the position they belong to. The
+  save stores both alphabetically, which is how they were identified and is not
+  how anybody reads them.
+
 ## [0.33.0] - 2026-09-05
 
 ### Changed

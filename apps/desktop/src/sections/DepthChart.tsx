@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Kicker, Meta, PlayerFace } from '../ui'
+import { DEPTH_SLOT_RANK as SLOT_RANK } from '../../electron/positions'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 
 type Slot = { abbr: string; name: string; side: 'offense' | 'defense' | 'special' }
@@ -116,7 +117,12 @@ export default function DepthChart({ team, players }: { team: number; players: R
     setCharts(null)   // re-read, so what is shown is what the save now holds
   }
 
-  const shown = slots.map((s, i) => ({ ...s, i })).filter((s) => s.side === side)
+  // Ordered for reading, not for storage: the slot index `i` is what gets
+  // written back, so it travels with the row rather than being its position.
+  const shown = slots
+    .map((s, i) => ({ ...s, i }))
+    .filter((s) => s.side === side)
+    .sort((a, b) => (SLOT_RANK.get(a.abbr) ?? 99) - (SLOT_RANK.get(b.abbr) ?? 99))
 
   return (
     <div className="col" style={{ gap: 12 }}>

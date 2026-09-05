@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Card, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Track } from '../ui'
+import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Track } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { playerKey } from '../../electron/transfers'
 import { TAMPER_OPENS_WEEK } from '../../electron/tamper'
+import { UNITS } from '../../electron/positions'
 import type { DepthStanding, TamperTarget } from '../../electron/tamper'
 import type { TamperThreadView } from '../../electron/preload'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 
 const UNASSIGNED = 255
+
+
 
 const ord = (n: number) => (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th')
 const standingOf = (d: DepthStanding | null) =>
@@ -37,6 +40,11 @@ export default function TamperSave() {
   /** A player picked from the search who has not been texted yet. */
   const [pending, setPending] = useState<RosterPlayer | null>(null)
   const [query, setQuery] = useState('')
+  const [unit, setUnit] = useState<string | null>(null)
+  /** Hide the starters, who are the hardest calls in the country. */
+  const [benched, setBenched] = useState(false)
+  /** How many of the list to draw; the country is 11,000 players long. */
+  const [limit, setLimit] = useState(60)
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
@@ -178,17 +186,29 @@ export default function TamperSave() {
     }
   }, [myName, records, strength, me])
 
-  /** Everyone on another roster, matching the search. */
+  /**
+   * Everyone on another roster, best first.
+   *
+   * The whole country, not just what a search turns up: you rarely know the
+   * name of the man you want, only that he is a corner nobody is playing. The
+   * search narrows this rather than being the only way in.
+   */
+  const pool = useMemo(
+    () => players
+      .filter((p) => p.team !== UNASSIGNED && p.team !== me)
+      .sort((a, b) => b.overall - a.overall),
+    [players, me],
+  )
+
   const found = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return []
-    return players
-      .filter((p) => p.team !== UNASSIGNED && p.team !== me)
-      .filter((p) => `${p.first} ${p.last}`.toLowerCase().includes(q) || nameOf(p.team).toLowerCase().includes(q))
-      .sort((a, b) => b.overall - a.overall)
-      .slice(0, 40)
+    const inUnit = unit ? new Set(UNITS.find(([u]) => u === unit)?.[1] ?? []) : null
+    return pool.filter((p) =>
+      (!q || `${p.first} ${p.last}`.toLowerCase().includes(q) || nameOf(p.team).toLowerCase().includes(q))
+      && (!inUnit || inUnit.has(p.position))
+      && (!benched || depthOf(p)?.string !== 1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [players, query, me, state.teamNames])
+  }, [pool, query, unit, benched, chartOf, slotNames, state.teamNames])
 
   const open = threads.find((t) => t.key === openKey) ?? null
 
@@ -405,21 +425,32 @@ export default function TamperSave() {
             ) : null}
 
             <Card className="card-pad">
-              <Kicker>Find a player</Kicker>
+              <div className="row" style={{ gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                <Kicker>Everyone else in the country</Kicker>
+                <Meta color="var(--ink4)">
+                  {found.length.toLocaleString()} OF {pool.length.toLocaleString()}, BEST FIRST
+                </Meta>
+              </div>
               <p className="body-serif" style={{ marginTop: 7 }}>
-                Search any roster in the country. What you see beside him is what he would be
-                giving up.
+                Every player on every other roster, strongest first. What you see beside him is
+                what he would be giving up.
               </p>
               <Input
                 placeholder="search by player or school"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => { setQuery(e.target.value); setLimit(60) }}
               />
+              <div className="row" style={{ gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
+                {UNITS.map(([u]) => (
+                  <Chip key={u} on={unit === u} onClick={() => { setUnit(unit === u ? null : u); setLimit(60) }}>{u}</Chip>
+                ))}
+                <Chip on={benched} onClick={() => { setBenched(!benched); setLimit(60) }}>NOT STARTING</Chip>
+              </div>
               {!charts ? (
                 <div style={{ marginTop: 8 }}><Meta color="var(--ink4)">READING THE DEPTH CHARTS…</Meta></div>
               ) : null}
               <div className="col" style={{ gap: 2, marginTop: 10 }}>
-                {found.map((p) => {
+                {found.slice(0, limit).map((p) => {
                   const d = depthOf(p)
                   const key = playerKey(p)
                   const already = threads.some((t) => t.key === key)
@@ -428,7 +459,7 @@ export default function TamperSave() {
                       key={p.index}
                       className="rowbtn"
                       onClick={() => {
-                        setQuery(''); setDraft(''); setNote(null)
+                        setDraft(''); setNote(null)
                         if (already) { setPending(null); setOpenKey(key) }
                         else { setOpenKey(null); setPending(p) }
                       }}
@@ -447,7 +478,14 @@ export default function TamperSave() {
                     </button>
                   )
                 })}
-                {query && !found.length ? <Meta color="var(--ink4)">NOBODY BY THAT NAME.</Meta> : null}
+                {!found.length ? <Meta color="var(--ink4)">NOBODY MATCHES THAT.</Meta> : null}
+                {found.length > limit ? (
+                  <div style={{ marginTop: 8 }}>
+                    <Btn onClick={() => setLimit(limit + 120)}>
+                      Show more — {(found.length - limit).toLocaleString()} left
+                    </Btn>
+                  </div>
+                ) : null}
               </div>
             </Card>
           </>

@@ -20,7 +20,7 @@ import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
 import { teamTableOrder } from './saveAnalysis'
 import { TEAM_ID_NAMES } from './teamIds'
 
-export const SNAPSHOT_VERSION = 2
+export const SNAPSHOT_VERSION = 3
 
 export interface SnapshotTeam {
   /** Row in the save's own team table, which is how games refer to a team. */
@@ -67,6 +67,37 @@ export interface SnapshotRecruit extends SnapshotPlayer {
   idealPitch: string | null
 }
 
+/** One transfer, as the phone reads it: names rather than team ids. */
+export interface SnapshotMove {
+  key: string
+  first: string
+  last: string
+  position: string
+  fromSeason: number
+  toSeason: number
+  from: string
+  to: string
+  overallBefore: number
+  overallAfter: number
+}
+
+/** One tampering conversation, read-only on the phone. */
+export interface SnapshotThread {
+  key: string
+  first: string
+  last: string
+  position: string
+  overall: number
+  team: string
+  interest: number
+  resistance: number
+  because: string[]
+  mood: string
+  committed: boolean
+  standing: string
+  turns: { from: 'coach' | 'player'; text: string; move?: number }[]
+}
+
 export interface DynastySnapshot {
   version: number
   generated: string
@@ -83,6 +114,14 @@ export interface DynastySnapshot {
   games: SeasonGame[]
   players: SnapshotPlayer[]
   recruits: SnapshotRecruit[]
+  /**
+   * Everything the desktop keeps beside the save rather than in it: the
+   * transfer ledger's moves and the tampering threads. The phone cannot build
+   * either — one needs two seasons of saves, the other needs the API key — so
+   * they travel with the snapshot or they do not exist there at all.
+   */
+  transfers: SnapshotMove[]
+  threads: SnapshotThread[]
 }
 
 const UNASSIGNED = 255
@@ -123,7 +162,11 @@ function slim(p: RosterPlayer): SnapshotPlayer {
  * Builds the snapshot. `userTeamId` is the team id the user picked in the
  * desktop app, since the save does not record which roster is theirs.
  */
-export function buildSnapshot(payload: Buffer, userTeamId: number | null): DynastySnapshot {
+export function buildSnapshot(
+  payload: Buffer,
+  userTeamId: number | null,
+  extra?: { transfers?: SnapshotMove[]; threads?: SnapshotThread[] },
+): DynastySnapshot {
   const schools = readTeamNames(payload)
   const order: TeamRecord[] = teamTableOrder(schools)
   const coaches = readCoaches(payload)
@@ -199,5 +242,7 @@ export function buildSnapshot(payload: Buffer, userTeamId: number | null): Dynas
       ratingNames: Object.keys(RATING_BITS), playerCount: players.length,
     },
     teams, games, players: roster, recruits,
+    transfers: extra?.transfers ?? [],
+    threads: extra?.threads ?? [],
   }
 }

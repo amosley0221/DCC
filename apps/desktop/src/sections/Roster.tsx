@@ -1,17 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { Card, Chip, Input, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
+import { POSITION_RANK, UNITS } from '../../electron/positions'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 import PlayerSheet from './PlayerSheet'
 
 const VIEWS = ['LIST', 'GALLERY', 'CARDS'] as const
 type View = (typeof VIEWS)[number]
-
-const UNITS: [string, string[]][] = [
-  ['OFFENSE', ['QB', 'HB', 'FB', 'WR', 'TE', 'LT', 'LG', 'C', 'RG', 'RT']],
-  ['DEFENSE', ['LE', 'RE', 'DT', 'LOLB', 'MLB', 'ROLB', 'CB', 'FS', 'SS']],
-  ['SPECIAL TEAMS', ['K', 'P']],
-]
 
 const ovrColour = (o: number) =>
   o >= 90 ? 'var(--accent)' : o >= 80 ? 'var(--good)' : o >= 70 ? 'var(--ink)' : 'var(--ink3)'
@@ -61,7 +56,6 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
   const [query, setQuery] = useState('')
   const [unit, setUnit] = useState<string | null>(null)
   const [pos, setPos] = useState<string | null>(null)
-  const [year, setYear] = useState<string | null>(null)
   /** The player whose sheet is open, by roster row. */
   const [sheet, setSheet] = useState<number | null>(null)
 
@@ -76,12 +70,6 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
     return m
   }, [players])
 
-  const years = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const p of players) if (p.classYear) m.set(p.classYear, (m.get(p.classYear) ?? 0) + 1)
-    return [...m.entries()].sort((a, b) => b[1] - a[1])
-  }, [players])
-
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
     const inUnit = unit ? new Set(UNITS.find(([u]) => u === unit)?.[1] ?? []) : null
@@ -89,10 +77,9 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
       .filter((p) =>
         (!q || (p.first + ' ' + p.last).toLowerCase().includes(q)) &&
         (!pos || p.position === pos) &&
-        (!year || p.classYear === year) &&
         (!inUnit || inUnit.has(p.position)))
       .sort((a, b) => b.overall - a.overall)
-  }, [players, query, pos, year, unit])
+  }, [players, query, pos, unit])
 
   // Averages by unit, and what the roster costs — the four numbers a coach
   // looks at before any individual player.
@@ -159,12 +146,11 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
           {UNITS.map(([u]) => (
             <Chip key={u} on={unit === u} onClick={() => { setUnit(unit === u ? null : u); setPos(null) }}>{u}</Chip>
           ))}
-          {years.map(([y, n]) => (
-            <Chip key={y} on={year === y} onClick={() => setYear(year === y ? null : y)}>{y} {n}</Chip>
-          ))}
         </div>
         <div className="row" style={{ gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-          {[...counts.entries()].sort((a, b) => b[1] - a[1]).map(([p, n]) => (
+          {[...counts.entries()]
+            .sort((a, b) => (POSITION_RANK.get(a[0]) ?? 99) - (POSITION_RANK.get(b[0]) ?? 99))
+            .map(([p, n]) => (
             <Chip key={p} on={pos === p} onClick={() => setPos(pos === p ? null : p)}>{p} {n}</Chip>
           ))}
         </div>
@@ -176,7 +162,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
             <thead>
               <tr>
                 <th />
-                <th>Name</th><th>Pos</th><th>Yr</th>
+                <th>Name</th><th>Pos</th>
                 <th style={{ textAlign: 'right' }}>Ht</th>
                 <th style={{ textAlign: 'right' }}>Wt</th>
                 <th style={{ textAlign: 'right' }}>Ovr</th>
@@ -200,7 +186,6 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
                     </button>
                   </td>
                   <td><Meta size={9}>{p.position}</Meta></td>
-                  <td><Meta size={9}>{p.classYear ?? '—'}</Meta></td>
                   <td className="num">{height(p.heightIn)}</td>
                   <td className="num">{p.weightLb || '—'}</td>
                   <td className="num" style={{ color: ovrColour(p.overall) }}>{p.overall}</td>
@@ -225,7 +210,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
                   </div>
                   <div style={{ marginTop: 3 }}>
                     <Meta size={10}>
-                      {[p.position, p.classYear, height(p.heightIn), p.weightLb ? `${p.weightLb} lbs` : null,
+                      {[p.position, height(p.heightIn), p.weightLb ? `${p.weightLb} lbs` : null,
                         p.hometown, p.archetype].filter(Boolean).join(' · ')}
                     </Meta>
                   </div>
@@ -243,20 +228,20 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
           ))}
         </div>
       ) : (
-        <div className="gs-tiles" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', marginTop: 0 }}>
+        <div className="gs-tiles" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(232px, 1fr))', marginTop: 0 }}>
           {shown.map((p) => {
             const key = KEY_RATING[p.position]
             return (
               <Card key={p.index} className="card-pad"
                 style={{ padding: 0, overflow: 'hidden', cursor: 'pointer' }}
                 onClick={() => setSheet(p.index)}>
-                <div style={{ position: 'relative', background: 'var(--surfaceStrong)' }}>
+                <div style={{ position: 'relative', background: 'var(--bg0)' }}>
                   {/* The school's own mark behind the face, quietly. */}
                   <span style={{ position: 'absolute', right: 8, bottom: 8, opacity: 0.16 }}>
-                    <SchoolArt size={54} file={logo} />
+                    <SchoolArt size={64} file={logo} />
                   </span>
-                  <div style={{ display: 'grid', placeItems: 'center', padding: '14px 0 8px' }}>
-                    <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={104} />
+                  <div style={{ display: 'grid', placeItems: 'center', padding: '10px 0 6px' }}>
+                    <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={168} />
                   </div>
                   <span style={{ position: 'absolute', top: 8, right: 10 }}>
                     <span className="num" style={{ fontSize: 21, color: ovrColour(p.overall) }}>{p.overall}</span>
@@ -268,7 +253,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
                     <strong style={{ color: 'var(--ink)', fontSize: 14 }}>{p.first} {p.last}</strong>
                   </div>
                   <div style={{ marginTop: 3 }}>
-                    <Meta size={9}>{[p.position, p.classYear, height(p.heightIn)].filter(Boolean).join(' · ')}</Meta>
+                    <Meta size={9}>{[p.position, height(p.heightIn), p.weightLb ? `${p.weightLb} lbs` : null].filter(Boolean).join(' · ')}</Meta>
                   </div>
                   <div className="row" style={{ gap: 10, marginTop: 8, alignItems: 'baseline' }}>
                     {key && p.ratings[key] !== undefined ? (

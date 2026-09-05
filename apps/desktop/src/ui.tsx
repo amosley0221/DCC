@@ -279,6 +279,11 @@ export function SchoolArt(
 /**
  * A player's portrait from the chosen art folder, falling back to initials.
  * Never another player's face: a gap is better than a wrong answer.
+ *
+ * The image itself is drawn on nothing. The game's portraits are transparent
+ * PNGs, so a tint on the box is a tint on the player's face and shoulders —
+ * which is what made every card look washed in the theme's accent. Only the
+ * initials fallback, which needs a shape, gets a ground.
  */
 export function PlayerFace(
   { file, first, last, size = 30, className, round }:
@@ -286,7 +291,7 @@ export function PlayerFace(
 ) {
   const box: React.CSSProperties = {
     width: size, height: size, borderRadius: round ? '50%' : 4, flex: '0 0 auto',
-    background: 'var(--rule)', objectFit: 'cover',
+    objectFit: 'cover',
   }
   // Initials are the fallback rather than a broken image: a face is missing
   // whenever the art folder has not been pointed at, or the player is one the
@@ -294,7 +299,7 @@ export function PlayerFace(
   if (!file) {
     return (
       <span className={className}
-        style={{ ...box, display: 'grid', placeItems: 'center', fontSize: size * 0.36, color: 'var(--ink3)' }}>
+        style={{ ...box, background: 'var(--rule)', display: 'grid', placeItems: 'center', fontSize: size * 0.36, color: 'var(--ink3)' }}>
         {(first[0] ?? '') + (last[0] ?? '')}
       </span>
     )

@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter
  * so a snapshot written by a newer desktop build still opens on an older phone
  * build — it simply shows the parts this version knows about.
  */
-const val SNAPSHOT_VERSION = 2
+const val SNAPSHOT_VERSION = 3
 
 @Serializable
 data class DynastySnapshot(
@@ -28,6 +28,54 @@ data class DynastySnapshot(
     val games: List<SnapshotGame> = emptyList(),
     val players: List<SnapshotPlayer> = emptyList(),
     val recruits: List<SnapshotRecruit> = emptyList(),
+    /**
+     * The two things the desktop keeps beside the save rather than in it. The
+     * phone cannot build either — the ledger needs two seasons of saves and the
+     * conversations need an API key — so they ride along or they do not exist
+     * here. Older snapshots have neither key and open with both empty.
+     */
+    val transfers: List<SnapshotMove> = emptyList(),
+    val threads: List<SnapshotThread> = emptyList(),
+)
+
+/** One transfer, already resolved to school names by the desktop. */
+@Serializable
+data class SnapshotMove(
+    val key: String = "",
+    val first: String = "",
+    val last: String = "",
+    val position: String = "",
+    val fromSeason: Int = 0,
+    val toSeason: Int = 0,
+    val from: String = "",
+    val to: String = "",
+    val overallBefore: Int = 0,
+    val overallAfter: Int = 0,
+)
+
+/** One tampering conversation, read-only here: sending needs the desktop. */
+@Serializable
+data class SnapshotThread(
+    val key: String = "",
+    val first: String = "",
+    val last: String = "",
+    val position: String = "",
+    val overall: Int = 0,
+    val team: String = "",
+    val interest: Int = 0,
+    val resistance: Int = 0,
+    val because: List<String> = emptyList(),
+    val mood: String = "",
+    val committed: Boolean = false,
+    val standing: String = "",
+    val turns: List<SnapshotTurn> = emptyList(),
+)
+
+@Serializable
+data class SnapshotTurn(
+    val from: String = "",
+    val text: String = "",
+    val move: Int = 0,
 )
 
 @Serializable
@@ -151,6 +199,8 @@ data class SnapshotRecruit(
 const val UNASSIGNED_TEAM = 255
 
 val SnapshotPlayer.name: String get() = "$first $last".trim()
+val SnapshotMove.name: String get() = "$first $last".trim()
+val SnapshotThread.name: String get() = "$first $last".trim()
 val SnapshotRecruit.name: String get() = "$first $last".trim()
 
 /** The badge takes a two-letter mark; the save's abbreviation is the closest thing. */

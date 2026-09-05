@@ -16,6 +16,7 @@ import { networkInterfaces } from 'node:os'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { readSavePayload } from './saveAnalysis'
 import { buildSnapshot } from './snapshot'
+import { snapshotExtras } from './sidecar'
 import { writeGameEdits, writePlayerEdits } from './saveWrite'
 import type { GameEdit, PlayerEdit } from './saveWrite'
 
@@ -104,7 +105,7 @@ function handle(ctx: RelayContext, req: IncomingMessage, res: ServerResponse) {
     try {
       const payload = readSavePayload(path)
       if (!payload) { send(500, { ok: false, message: 'the save could not be read' }); return }
-      send(200, buildSnapshot(payload, ctx.teamId()))
+      send(200, buildSnapshot(payload, ctx.teamId(), snapshotExtras()))
     } catch (err) {
       send(500, { ok: false, message: String((err as Error)?.message ?? err) })
     }

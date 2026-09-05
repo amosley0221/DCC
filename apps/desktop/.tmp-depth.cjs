@@ -99,6 +99,72 @@ var import_node_zlib = require("node:zlib");
 var zlib = __toESM(require("node:zlib"), 1);
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
+
+// electron/positions.ts
+var POSITIONS = [
+  "QB",
+  "HB",
+  "FB",
+  "WR",
+  "TE",
+  "LT",
+  "LG",
+  "C",
+  "RG",
+  "RT",
+  "LE",
+  "RE",
+  "DT",
+  "LOLB",
+  "MLB",
+  "ROLB",
+  "CB",
+  "FS",
+  "SS",
+  "K",
+  "P"
+];
+var POSITION_RANK = new Map(POSITIONS.map((p, i) => [p, i]));
+var DEPTH_SLOT_ORDER = [
+  "QB",
+  "HB",
+  "PWHB",
+  "3DRB",
+  "FB",
+  "WR",
+  "SLWR",
+  "GAD",
+  "TE",
+  "LT",
+  "LG",
+  "C",
+  "RG",
+  "RT",
+  "LE",
+  "RE",
+  "DT",
+  "NT",
+  "RLE",
+  "RRE",
+  "RDT",
+  "LOLB",
+  "MLB",
+  "ROLB",
+  "SUBLB",
+  "CB",
+  "SLCB",
+  "FS",
+  "SS",
+  "K",
+  "KOS",
+  "P",
+  "LS",
+  "KR",
+  "PR"
+];
+var DEPTH_SLOT_RANK = new Map(DEPTH_SLOT_ORDER.map((a, i) => [a, i]));
+
+// electron/saveAnalysis.ts
 var zstdDecompressSync2 = zlib.zstdDecompressSync;
 var zstdSupported = typeof zstdDecompressSync2 === "function";
 var NO_ZSTD = "This build cannot read zstd frames. Reinstall the latest DCC \u2014 older builds shipped a runtime without zstd support.";
@@ -819,29 +885,6 @@ var ARCHETYPES = {
   "P": [null, null, null, null, null, "KP Accurate", "KP Power"]
 };
 var POSITION_BIT = 1010;
-var POSITIONS = [
-  "QB",
-  "HB",
-  "FB",
-  "WR",
-  "TE",
-  "LT",
-  "LG",
-  "C",
-  "RG",
-  "RT",
-  "LE",
-  "RE",
-  "DT",
-  "LOLB",
-  "MLB",
-  "ROLB",
-  "CB",
-  "FS",
-  "SS",
-  "K",
-  "P"
-];
 var OVERALL_BIT = 561;
 var TEAM_BIT = 431;
 var TEAM_WIDTH = 8;
