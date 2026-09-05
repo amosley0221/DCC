@@ -10,6 +10,19 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.30.3] - 2026-09-05
+
+### Fixed
+
+- **The school-naming card can be closed.** Clicking a school on the Teams tab
+  opened a card whose only button was "Skip — just call it team 47", which is
+  not a cancel and could quietly make that team yours. It has a Close now, and
+  for a team that already has a name the button is Cancel.
+- It also stopped asking a question that no longer applies. Every team id has
+  had a name for a while, worked out from the schools the recruits themselves
+  list, so the card offers to **rename** the school it already knows.
+
+
 ## [0.30.2] - 2026-09-05
 
 ### Fixed
