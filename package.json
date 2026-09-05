@@ -1,8 +1,8 @@
 {
   "name": "dynasty-command-center",
   "private": true,
-  "version": "0.32.0",
-  "description": "Dynasty Command Center \u2014 companion apps for an EA College Football 27 dynasty.",
+  "version": "0.33.0",
+  "description": "Dynasty Command Center — companion apps for an EA College Football 27 dynasty.",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=20"

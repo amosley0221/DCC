@@ -61,7 +61,7 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
     const res = await window.dcc.roster(path, myTeam)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })
+      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players, season: res.season } })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     }
   }

@@ -28,12 +28,15 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
 
       <div className="col" style={{ gap: 12, maxWidth: 720 }}>
         <Card className="card-pad">
-          <Kicker>Press coverage</Kicker>
+          <Kicker>Writing</Kicker>
           <p className="body-serif" style={{ marginTop: 7 }}>
-            Previews and recaps are written by a model from the facts in your save — the teams,
-            the records, the conditions and the score. It uses your own Anthropic API key, which
-            is kept on this machine with the rest of your settings and sent nowhere but the API.
-            Get one at console.anthropic.com.
+            Two things here are written by a model. Previews and recaps, from the facts in your
+            save — the teams, the records, the conditions and the score. And the players you text
+            under Portal → Tampering, who answer for themselves.
+          </p>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            Both use your own Anthropic API key, which is kept on this machine with the rest of
+            your settings and sent nowhere but the API. Get one at console.anthropic.com.
           </p>
           <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Input
@@ -51,7 +54,9 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
             ) : null}
           </div>
           <Meta size={9}>
-            {state.anthropicKey ? 'A KEY IS SAVED — PRESS BUTTONS APPEAR ON EVERY GAME IN TEAM → SCHEDULE' : 'NO KEY SAVED'}
+            {state.anthropicKey
+              ? 'A KEY IS SAVED — PRESS BUTTONS APPEAR ON EVERY GAME, AND TAMPERING CAN SEND'
+              : 'NO KEY SAVED'}
           </Meta>
         </Card>
 

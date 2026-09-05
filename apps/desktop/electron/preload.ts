@@ -1,7 +1,27 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Move, Path } from './transfers'
+import type { TamperCoach, TamperTarget, TamperTurn } from './tamper'
 
 /** What the transfer ledger looks like once it has been diffed for the screen. */
+/** One tampering conversation as the screen reads it. */
+export interface TamperThreadView {
+  key: string
+  first: string
+  last: string
+  position: string
+  overall: number
+  team: string
+  interest: number
+  resistance: number
+  because: string[]
+  mood: string
+  committed: boolean
+  openedSeason: number | null
+  openedWeek: number | null
+  turns: TamperTurn[]
+  standing: string
+}
+
 export interface TransferView {
   latestYear: number | null
   seasons: { season: number; week: number | null; recordedAt: string; players: number }[]
@@ -36,6 +56,14 @@ const api = {
   transfers: () => ipcRenderer.invoke('transfers:read') as Promise<TransferView>,
   setTransferYear: (year: number | null) => ipcRenderer.invoke('transfers:setYear', year),
   forgetTransferSeason: (season: number) => ipcRenderer.invoke('transfers:forget', season),
+  tamperThreads: () => ipcRenderer.invoke('tamper:threads') as Promise<{ threads: TamperThreadView[] }>,
+  tamperSend: (req: {
+    key: string; target: TamperTarget; coach: TamperCoach
+    message: string; season: number | null; week: number | null
+  }) => ipcRenderer.invoke('tamper:send', req) as Promise<
+    { ok: true; thread: TamperThreadView } | { ok: false; message: string }
+  >,
+  tamperForget: (key: string) => ipcRenderer.invoke('tamper:forget', key) as Promise<{ ok: true }>,
   depth: (path: string) => ipcRenderer.invoke('save:depth', path),
   writeDepth: (path: string, edits: unknown[]) => ipcRenderer.invoke('save:writeDepth', path, edits),
   publishSnapshot: (path: string, teamId: number | null, repo: string) =>

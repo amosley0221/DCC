@@ -20,6 +20,9 @@ import {
 } from './gameAssets'
 import { writeStory } from './press'
 import type { PressRequest } from './press'
+import { resistance, standing } from './tamper'
+import type { TamperCoach, TamperTarget, TamperTurn } from './tamper'
+import { sendText } from './tamperTalk'
 import { buildSnapshot } from './snapshot'
 import { publishSnapshot } from './publish'
 import { relayState, startRelay, stopRelay } from './relay'
@@ -382,6 +385,108 @@ ipcMain.handle('save:writePlayers', (_e, { path, edits, playerCount }: {
 ipcMain.handle('press:write', async (_e, req: PressRequest) => {
   const key = String(readSettings().anthropicKey ?? '')
   return writeStory(key, req)
+})
+
+/**
+ * Tampering conversations, kept beside settings.
+ *
+ * A thread is worth more than the save it came from: it is a conversation the
+ * user had, and re-reading the save cannot recreate it. It is keyed the way the
+ * transfer ledger keys a player, so a thread survives into next season and can
+ * be matched against what actually happened to him.
+ */
+interface TamperThread {
+  key: string
+  first: string
+  last: string
+  position: string
+  overall: number
+  team: string
+  interest: number
+  resistance: number
+  because: string[]
+  mood: string
+  committed: boolean
+  openedSeason: number | null
+  openedWeek: number | null
+  turns: TamperTurn[]
+}
+
+interface TamperFile { version: number; threads: Record<string, TamperThread> }
+
+const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
+
+function readThreads(): TamperFile {
+  try {
+    const f = JSON.parse(readFileSync(tamperFile(), 'utf8')) as TamperFile
+    if (!f || typeof f !== 'object' || !f.threads) return { version: 1, threads: {} }
+    return { version: 1, threads: f.threads }
+  } catch {
+    return { version: 1, threads: {} }
+  }
+}
+
+function writeThreads(next: TamperFile) {
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  writeFileSync(tamperFile(), JSON.stringify(next, null, 2))
+}
+
+const withStanding = (t: TamperThread) => ({ ...t, standing: standing(t.interest) })
+
+ipcMain.handle('tamper:threads', () => ({
+  threads: Object.values(readThreads().threads)
+    .map(withStanding)
+    .sort((a, b) => b.interest - a.interest),
+}))
+
+ipcMain.handle('tamper:send', async (_e, req: {
+  key: string
+  target: TamperTarget
+  coach: TamperCoach
+  message: string
+  season: number | null
+  week: number | null
+}) => {
+  const file = readThreads()
+  const existing = file.threads[req.key]
+  const { score, because } = resistance(req.target, req.coach)
+  const interest = existing?.interest ?? 0
+  const turns = existing?.turns ?? []
+
+  const res = await sendText(
+    String(readSettings().anthropicKey ?? ''),
+    req.target, req.coach, turns, req.message, interest,
+  )
+  if (!res.ok) return res
+
+  const next: TamperThread = {
+    key: req.key,
+    first: req.target.first, last: req.target.last,
+    position: req.target.position, overall: req.target.overall,
+    team: req.target.team,
+    interest: Math.max(0, Math.min(100, interest + res.reply.move)),
+    resistance: score,
+    because,
+    mood: res.reply.mood,
+    committed: existing?.committed || res.reply.committed === true,
+    openedSeason: existing?.openedSeason ?? req.season,
+    openedWeek: existing?.openedWeek ?? req.week,
+    turns: [
+      ...turns,
+      { from: 'coach', text: req.message },
+      { from: 'player', text: res.reply.reply, move: res.reply.move },
+    ],
+  }
+  file.threads[req.key] = next
+  writeThreads(file)
+  return { ok: true as const, thread: withStanding(next) }
+})
+
+ipcMain.handle('tamper:forget', (_e, key: string) => {
+  const file = readThreads()
+  delete file.threads[key]
+  writeThreads(file)
+  return { ok: true as const }
 })
 
 ipcMain.handle('save:snapshot', async (_e, { path, teamId }: { path: string; teamId: number | null }) => {

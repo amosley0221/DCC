@@ -31,7 +31,10 @@ export interface SaveState {
   restoring: boolean
   roster: {
     count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
-    schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]; players: RosterPlayer[]
+    schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]
+    players: RosterPlayer[]
+    /** Seasons elapsed, which stamps the transfer ledger. */
+    season: number | null
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -157,7 +160,7 @@ export function SaveProvider({ remembered, rememberedArt, rememberedTeam, onPath
           ? {
               count: r.count, ratingNames: r.ratingNames, unverifiedPairs: r.unverifiedPairs,
               schools: r.schools, coaches: r.coaches, stores: r.stores, games: r.games,
-              players: r.players,
+              players: r.players, season: r.season,
             }
           : null,
         restoring: false,
@@ -173,7 +176,7 @@ export function SaveProvider({ remembered, rememberedArt, rememberedTeam, onPath
         const art = await indexArt(rememberedArt, {
           count: r.count, ratingNames: r.ratingNames, unverifiedPairs: r.unverifiedPairs,
           schools: r.schools, coaches: r.coaches, stores: r.stores, games: r.games,
-          players: r.players,
+          players: r.players, season: r.season,
         })
         patch({ facesBusy: false, ...(art.ok ? art.patch : {}) })
         if (!art.ok) onArtChange(null)

@@ -167,6 +167,23 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 .tbl tbody tr[aria-selected='true'] td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
+/* A whole row that is a button: a list you pick from, rather than a table with
+   a button in it. Used by tampering and anywhere else a row opens something. */
+.rowbtn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.rowbtn:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.rowbtn:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
 .effect {
   border-left: 2px solid var(--accent); background: var(--effectBg); color: var(--effectInk);
   padding: 9px 12px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.6px;

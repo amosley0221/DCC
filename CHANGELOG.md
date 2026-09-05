@@ -10,6 +10,40 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.33.0] - 2026-09-05
+
+### Changed
+
+- **Tampering is a conversation now, not a rating editor.** What was there
+  edited other teams' players, which is not what it was ever meant to be. It
+  has been rebuilt as the thing you asked for.
+
+  From week 11 you can text a player on any other roster, which the rulebook
+  and the game both say you cannot. He answers for himself — Claude writes him
+  as a nineteen-year-old answering a coach who should not have his number — and
+  how far he moves depends on what he would be giving up.
+
+  That last part is read out of your save, not invented: where he sits on his
+  team's depth chart, how their season is going, how their roster grades
+  against yours, and how good he is for the room he is in. A starter at a
+  ten-win program is close to immovable. A third-stringer at a losing one is
+  waiting for the phone to buzz. The screen shows both the number and the
+  reasons, so you can see what you are up against.
+
+  Sending a text moves him, and how far it can move him is capped by how hard
+  he is — so a hard man cannot be talked round in three messages however good
+  the writing. Say the wrong thing and it costs you. Where you end up is where
+  you stand if he enters the portal, and when the transfer ledger later shows
+  he moved, the thread says where he went.
+
+  Nothing is written into your dynasty file. The portal list and the commit
+  score are not decoded yet, so DCC keeps the conversation and where you stand
+  and is honest about the rest.
+
+### Fixed
+
+- **Settings explains the API key properly**, now that two screens use it.
+
 ## [0.32.0] - 2026-09-05
 
 ### Added

@@ -222,6 +222,33 @@ app.whenReady().then(async () => {
   console.log('GAME SWITCHER: ' + (menuOnTop ?? 'opens above the page'))
   if (menuOnTop) { console.log('SMOKE FAIL: ' + menuOnTop); app.exit(1); return }
 
+  // Portal holds two screens behind subtabs, and the second one is the newer
+  // of the two. It imported a module that reaches `electron`, which is fine in
+  // the main process and fatal in the renderer — the whole app rendered blank.
+  // Clicking through to it is what would have caught that in a second.
+  const portalTabs = await (async () => {
+    const idx = r.nav.indexOf('Portal')
+    if (idx < 0) return 'Portal missing from the nav'
+    await win.webContents.executeJavaScript(`document.querySelectorAll('.gs-nav-item')[${idx}].click()`)
+    await wait(500)
+    const clicked = await win.webContents.executeJavaScript(`(() => {
+      const t = [...document.querySelectorAll('.subtabs .tab')].find(x => /Tampering/i.test(x.textContent))
+      if (t) t.click()
+      return !!t
+    })()`)
+    if (!clicked) return 'Tampering missing from the Portal tabs'
+    await wait(600)
+    const text = await win.webContents.executeJavaScript(
+      `((document.querySelector('.gs-page-in')||{}).innerText||'')`)
+    if (!/TAMPERING/i.test(text)) return 'Tampering rendered nothing: ' + text.slice(0, 120)
+    // Either it is asking for the roster or it is showing the screen; both are
+    // real renders, and which one depends on whether the roster pass has run.
+    if (!/week 11|read the roster/i.test(text)) return 'Tampering rendered neither state: ' + text.slice(0, 160)
+    return null
+  })()
+  console.log('PORTAL TABS: ' + (portalTabs ?? 'transfers and tampering both render'))
+  if (portalTabs) { console.log('SMOKE FAIL: ' + portalTabs); app.exit(1); return }
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))

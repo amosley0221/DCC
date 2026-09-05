@@ -4,7 +4,8 @@ import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets
 import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
 import type { RelayState } from '../electron/relay'
-import type { TransferView } from '../electron/preload'
+import type { TamperThreadView, TransferView } from '../electron/preload'
+import type { TamperCoach, TamperTarget } from '../electron/tamper'
 
 declare global {
   interface Window {
@@ -26,6 +27,12 @@ declare global {
       transfers(): Promise<TransferView>
       setTransferYear(year: number | null): Promise<{ ok: true }>
       forgetTransferSeason(season: number): Promise<{ ok: true }>
+      tamperThreads(): Promise<{ threads: TamperThreadView[] }>
+      tamperSend(req: {
+        key: string; target: TamperTarget; coach: TamperCoach
+        message: string; season: number | null; week: number | null
+      }): Promise<{ ok: true; thread: TamperThreadView } | { ok: false; message: string }>
+      tamperForget(key: string): Promise<{ ok: true }>
       depth(path: string): Promise<
         | { ok: true; slots: { abbr: string; name: string; side: 'offense' | 'defense' | 'special' }[]
             charts: { block: number; slots: number[][] }[] }

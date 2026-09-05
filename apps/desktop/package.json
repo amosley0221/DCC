@@ -1,7 +1,7 @@
 {
   "name": "@dcc/desktop",
   "productName": "Dynasty Command Center",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "private": true,
   "description": "Dynasty Command Center — Windows workspace and save agent.",
   "author": {
@@ -20,7 +20,8 @@
     "check:relay": "esbuild electron/relay.ts --bundle --platform=node --format=cjs --outfile=.tmp-relay.cjs --external:electron --log-level=error && node check-relay.cjs ./.tmp-relay.cjs",
     "check:snapshot": "esbuild electron/snapshot.ts --bundle --platform=node --format=cjs --outfile=.tmp-snapshot.cjs --log-level=error && node check-snapshot.cjs ./.tmp-snapshot.cjs",
     "check:depth": "esbuild electron/saveAnalysis.ts --bundle --platform=node --format=cjs --outfile=.tmp-depth.cjs --log-level=error && esbuild electron/saveWrite.ts --bundle --platform=node --format=cjs --outfile=.tmp-depthw.cjs --log-level=error && node check-depth.cjs ./.tmp-depth.cjs ./.tmp-depthw.cjs",
-    "check:transfers": "esbuild electron/transfers.ts --bundle --platform=node --format=cjs --outfile=.tmp-transfers.cjs --log-level=error && node check-transfers.cjs ./.tmp-transfers.cjs"
+    "check:transfers": "esbuild electron/transfers.ts --bundle --platform=node --format=cjs --outfile=.tmp-transfers.cjs --log-level=error && node check-transfers.cjs ./.tmp-transfers.cjs",
+    "check:tamper": "esbuild electron/tamper.ts --bundle --platform=node --format=cjs --outfile=.tmp-tamper.cjs --external:electron --log-level=error && node check-tamper.cjs ./.tmp-tamper.cjs"
   },
   "dependencies": {
     "electron-updater": "6.3.9"
