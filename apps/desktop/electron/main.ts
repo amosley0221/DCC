@@ -15,8 +15,8 @@ import {
 import { writeStory } from './press'
 import type { PressRequest } from './press'
 import { buildSnapshot } from './snapshot'
-import { writeGameEdits } from './saveWrite'
-import type { GameEdit } from './saveWrite'
+import { writeGameEdits, writePlayerEdits } from './saveWrite'
+import type { GameEdit, PlayerEdit } from './saveWrite'
 
 const isDev = !app.isPackaged
 let win: BrowserWindow | null = null
@@ -224,6 +224,16 @@ ipcMain.handle('save:roster', (_e, path: string) => {
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:writePlayers', (_e, { path, edits, playerCount }: {
+  path: string; edits: PlayerEdit[]; playerCount: number
+}) => {
+  try {
+    return writePlayerEdits(path, edits, playerCount)
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

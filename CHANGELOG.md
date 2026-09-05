@@ -14,10 +14,28 @@ _Nothing yet._
 
 ### Added
 
-- **Export a dynasty snapshot for the phone.** One file holding every team, the
-  whole season's games and results, your roster with ratings, and the recruiting
-  pool. The save can only be read on the machine it lives on, so this is how the
-  data reaches the Android app. Save → Snapshot for the phone.
+- **The phone shows your real dynasty.** Export a snapshot from the desktop
+  (Save → Snapshot for the phone), move the file to your phone, and import it in
+  the Android app's settings. Team shows your roster and your schedule with a box
+  score behind every game, Recruit shows the real pool, and National's standings
+  show the save's own teams, conferences, coaches and records. Without a snapshot
+  the app behaves exactly as before.
+- **Tampering.** Edit any player on any other programme's roster — overall and
+  all 52 placed ratings — and write it to your save. The game gives you no way to
+  do this. Tamper section, once the roster has been read.
+- **Press coverage.** A preview before a game and a recap after it, written from
+  the facts in your save: the teams, their records, the date, kickoff, conditions,
+  the score and the quarter line, and each roster's best players. The model is
+  told to invent nothing. Add your own Anthropic API key in Settings; it stays on
+  your machine.
+
+### Fixed
+
+- **A tampering bug caught before it could reach a save.** The player-record
+  constants name the last bit of a field, not the first, so a writer that read
+  them as start positions would land in the neighbouring rating — and would pass
+  its own verification, because it would read back the same wrong place. Testing
+  against the roster reader caught it. The convention is now pinned by a test.
 
 ### Notes
 

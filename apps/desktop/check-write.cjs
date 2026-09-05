@@ -84,5 +84,41 @@ let moved = 0
 for (let i = 0; i < payload.length; i++) if (payload[i] !== after.payload[i]) moved++
 assert.ok(moved > 0 && moved <= 12, `expected a handful of changed bytes, got ${moved}`)
 
+// ---- player records ----
+// The player-record constants name the LAST bit of a field, not the first.
+// A writer that reads them as start positions lands in the neighbouring field
+// and still passes its own read-back, so this pins the convention down.
+{
+  const OVERALL_BIT = S.OVERALL_BIT, BASE = S.RECORD_BASE, STRIDE = S.RECORD_STRIDE
+  const index = 3
+  const big = Buffer.alloc((BASE + index + 1) * STRIDE + 16)
+  const at = (BASE + index) * STRIDE
+  // Write 77 into [OVERALL_BIT-6, OVERALL_BIT] by hand, the way readRoster reads it.
+  const value = 77
+  for (let k = 0; k < 7; k++) {
+    const b = OVERALL_BIT - 6 + k
+    if ((value >> (6 - k)) & 1) big[at + (b >> 3)] |= 1 << (7 - (b & 7))
+  }
+  const got = W.readPlayerNumbers(big, index)
+  assert.equal(got.overall, value, 'readPlayerNumbers must treat the constant as the field end')
+
+  // A neighbouring rating must be untouched by an overall edit.
+  const neighbour = Object.entries(S.RATING_BITS)
+    .map(([n, b]) => ({ n, b }))
+    .sort((x, y) => Math.abs(x.b - OVERALL_BIT) - Math.abs(y.b - OVERALL_BIT))[0]
+  const edited = W.applyPlayerEdits(big, [{ index, overall: 12 }]).next
+  assert.equal(W.readPlayerNumbers(edited, index).overall, 12)
+  assert.equal(
+    W.readPlayerNumbers(edited, index).ratings[neighbour.n],
+    W.readPlayerNumbers(big, index).ratings[neighbour.n],
+    `editing overall must not disturb ${neighbour.n}`,
+  )
+  // Out-of-range values are refused before anything is written.
+  assert.equal(W.checkPlayerEdits([{ index, overall: 120 }], index + 1).length, 1)
+  assert.equal(W.checkPlayerEdits([{ index: 99999, overall: 50 }], index + 1).length, 1)
+  assert.equal(W.checkPlayerEdits([{ index, ratings: { Nonsense: 50 } }], index + 1).length, 1)
+  assert.equal(W.checkPlayerEdits([{ index, overall: 50, ratings: { Speed: 99 } }], index + 1).length, 0)
+}
+
 fs.rmSync(dir, { recursive: true, force: true })
-console.log(`check-write: container round-trips, edit applied, ${moved} bytes changed, neighbours intact`)
+console.log(`check-write: container round-trips, edit applied, ${moved} bytes changed, neighbours intact, player fields read from the field end`)

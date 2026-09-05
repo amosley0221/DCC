@@ -22,6 +22,8 @@ const api = {
   pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   roster: (path: string) => ipcRenderer.invoke('save:roster', path),
+  writePlayers: (path: string, edits: unknown[], playerCount: number) =>
+    ipcRenderer.invoke('save:writePlayers', { path, edits, playerCount }),
   writePress: (req: unknown) => ipcRenderer.invoke('press:write', req),
   snapshot: (path: string, teamId: number | null) =>
     ipcRenderer.invoke('save:snapshot', { path, teamId }),

@@ -17,7 +17,9 @@
 import { copyFileSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { deflateSync, inflateSync } from 'node:zlib'
-import { GAME_BITS, seasonGameTable } from './saveAnalysis'
+import {
+  GAME_BITS, OVERALL_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE, seasonGameTable,
+} from './saveAnalysis'
 import { WEATHER } from './gameEnums'
 
 /** Where the chunk record keeps the compressed length, and where the stream starts. */
@@ -254,4 +256,167 @@ export function writeGameEdits(path: string, edits: GameEdit[]): WriteResult {
     message: `updated ${changed.length} game${changed.length === 1 ? '' : 's'}`,
     backup, changed,
   }
+}
+
+
+/* ------------------------------------------------------- player tampering */
+
+/**
+ * One player's edited numbers. The index is the player's position in the save's
+ * own record array, which is what `readRoster` reports.
+ */
+export interface PlayerEdit {
+  index: number
+  overall?: number
+  /** Rating name to value, using the names `RATING_BITS` keys. */
+  ratings?: Record<string, number>
+}
+
+/** Ratings and overall are 7-bit fields, so 0 to 99 is the whole usable range. */
+const RATING_MIN = 0
+const RATING_MAX = 99
+
+export function checkPlayerEdits(edits: PlayerEdit[], playerCount: number): EditProblem[] {
+  const out: EditProblem[] = []
+  for (const e of edits) {
+    if (!Number.isInteger(e.index) || e.index < 0 || e.index >= playerCount) {
+      out.push({ row: e.index, field: 'player', message: 'no such player in this save' })
+      continue
+    }
+    const check = (field: string, v: number | undefined) => {
+      if (v === undefined) return
+      if (!Number.isInteger(v) || v < RATING_MIN || v > RATING_MAX) {
+        out.push({ row: e.index, field, message: `must be a whole number from ${RATING_MIN} to ${RATING_MAX}` })
+      }
+    }
+    check('overall', e.overall)
+    for (const [name, v] of Object.entries(e.ratings ?? {})) {
+      if (!(name in RATING_BITS)) { out.push({ row: e.index, field: name, message: 'not a rating DCC can place' }); continue }
+      check(name, v)
+    }
+  }
+  return out
+}
+
+/**
+ * The overall and ratings of one player, read back the way the game will.
+ *
+ * The player-record constants name the *last* bit of a field, not the first —
+ * `readRoster` reads `[end - width + 1, end]` — so a writer that treated them as
+ * start positions would land seven bits into the neighbouring field. It would
+ * also pass its own verification, because it would read back the same wrong
+ * place, which is why this convention is spelled out here rather than assumed.
+ */
+const PLAYER_FIELD_WIDTH = 7
+const startOf = (endBit: number) => endBit - PLAYER_FIELD_WIDTH + 1
+
+export function readPlayerNumbers(payload: Buffer, index: number): { overall: number; ratings: Record<string, number> } | null {
+  const at = (RECORD_BASE + index) * RECORD_STRIDE
+  if (at + RECORD_STRIDE > payload.length) return null
+  const rd = (endBit: number) => {
+    let v = 0
+    for (let b = startOf(endBit); b <= endBit; b++) v = (v << 1) | ((payload[at + (b >> 3)] >> (7 - (b & 7))) & 1)
+    return v
+  }
+  const ratings: Record<string, number> = {}
+  for (const [name, bit] of Object.entries(RATING_BITS)) ratings[name] = rd(bit)
+  return { overall: rd(OVERALL_BIT), ratings }
+}
+
+export function applyPlayerEdits(payload: Buffer, edits: PlayerEdit[]): { next: Buffer; touched: Set<number> } {
+  const next = Buffer.from(payload)
+  const touched = new Set<number>()
+  for (const e of edits) {
+    const at = (RECORD_BASE + e.index) * RECORD_STRIDE
+    const write = (endBit: number, value: number) => {
+      const start = startOf(endBit)
+      putBits(next, at, start, PLAYER_FIELD_WIDTH, value)
+      for (let b = start; b <= endBit; b++) touched.add(at + (b >> 3))
+    }
+    if (e.overall !== undefined) write(OVERALL_BIT, e.overall)
+    for (const [name, v] of Object.entries(e.ratings ?? {})) {
+      const bit = RATING_BITS[name]
+      if (bit !== undefined) write(bit, v)
+    }
+  }
+  return { next, touched }
+}
+
+export interface PlayerWriteResult {
+  ok: boolean
+  message: string
+  backup?: string
+  changed?: { index: number; field: string; before: number; after: number }[]
+}
+
+/**
+ * Writes player edits, with the same refusals the schedule writer uses: nothing
+ * outside the edited fields may move, the rebuilt file must read back
+ * identically, and every field must come back as the value asked for.
+ *
+ * Ratings share a record with fields DCC has not placed, so the "nothing else
+ * moved" check is doing real work here — a wrong bit position would land in a
+ * neighbouring field and be refused rather than written.
+ */
+export function writePlayerEdits(path: string, edits: PlayerEdit[], playerCount: number): PlayerWriteResult {
+  if (!edits.length) return { ok: false, message: 'nothing to change' }
+  const file = readFileSync(path)
+  const c = readContainer(file)
+  if (!c) return { ok: false, message: 'this file is not a save DCC can read' }
+
+  const problems = checkPlayerEdits(edits, playerCount)
+  if (problems.length) return { ok: false, message: problems.map((p) => `${p.field}: ${p.message}`).join('; ') }
+
+  const { next, touched } = applyPlayerEdits(c.payload, edits)
+  if (next.length !== c.payload.length) return { ok: false, message: 'the edit changed the payload size' }
+  for (let i = 0; i < next.length; i++) {
+    if (next[i] !== c.payload[i] && !touched.has(i)) {
+      return { ok: false, message: `refusing to write: byte 0x${i.toString(16)} changed and should not have` }
+    }
+  }
+
+  const rebuilt = packContainer(c, next)
+  if (!rebuilt) return { ok: false, message: 'the edited save does not compress small enough to fit its file' }
+  const check = readContainer(rebuilt)
+  if (!check || !check.payload.equals(next)) {
+    return { ok: false, message: 'the rebuilt save did not read back identically; nothing was written' }
+  }
+
+  const changed: { index: number; field: string; before: number; after: number }[] = []
+  for (const e of edits) {
+    const was = readPlayerNumbers(c.payload, e.index)
+    const now = readPlayerNumbers(check.payload, e.index)
+    if (!was || !now) return { ok: false, message: `could not read player ${e.index} back` }
+    const wanted = new Map<string, number>()
+    if (e.overall !== undefined) wanted.set('overall', e.overall)
+    for (const [n, v] of Object.entries(e.ratings ?? {})) wanted.set(n, v)
+    for (const [field, want] of wanted) {
+      const got = field === 'overall' ? now.overall : now.ratings[field]
+      if (got !== want) return { ok: false, message: `player ${e.index}: ${field} read back as ${got}, not ${want}; nothing was written` }
+      const before = field === 'overall' ? was.overall : was.ratings[field]
+      if (before !== got) changed.push({ index: e.index, field, before, after: got })
+    }
+    // Every field not named must be exactly as it was.
+    if (!wanted.has('overall') && was.overall !== now.overall) {
+      return { ok: false, message: `player ${e.index}: overall changed without being asked to; nothing was written` }
+    }
+    for (const n of Object.keys(was.ratings)) {
+      if (!wanted.has(n) && was.ratings[n] !== now.ratings[n]) {
+        return { ok: false, message: `player ${e.index}: ${n} changed without being asked to; nothing was written` }
+      }
+    }
+  }
+  if (!changed.length) return { ok: false, message: 'the save already holds those values' }
+
+  const backup = backupPath(path)
+  copyFileSync(path, backup)
+  const tmp = `${path}.dccnew`
+  try {
+    writeFileSync(tmp, rebuilt)
+    renameSync(tmp, path)
+  } catch (err) {
+    try { unlinkSync(tmp) } catch { /* nothing to clean up */ }
+    return { ok: false, message: `could not write the save: ${String((err as Error)?.message ?? err)}`, backup }
+  }
+  return { ok: true, message: `updated ${changed.length} value${changed.length === 1 ? '' : 's'}`, backup, changed }
 }
