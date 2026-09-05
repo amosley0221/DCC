@@ -21,7 +21,7 @@ import { currentWeek } from './season'
 import type { WeekGame } from './season'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
-  indexFaces, matchFaces, matchSchools, dominantColor,
+  indexFaces, matchFaces, matchSchools,
 } from './gameAssets'
 import { writeStory } from './press'
 import type { PressRequest } from './press'
@@ -30,7 +30,8 @@ import type { TamperCoach, TamperTarget } from './tamper'
 import { sendText } from './tamperTalk'
 import { buildSnapshot } from './snapshot'
 import { publishArt, publishSnapshot } from './publish'
-import { buildPack } from './artPack'
+import { packEntries } from './artPack'
+import type { PackEntry } from './artPack'
 import { rememberPack } from './sidecar'
 import { relayState, startRelay, stopRelay } from './relay'
 import { writeGameEdits, writePlayerEdits, writeDepthEdits } from './saveWrite'
@@ -463,57 +464,32 @@ ipcMain.handle('assets:pickFaces', async () => {
 })
 
 /**
- * Each school's own colour, read out of its logo.
+ * The art pack, assembled from images the renderer has already resized.
  *
- * The gold mark is skipped on purpose: every school's is the same gold, so a
- * card backed by it would tell you nothing. The flat icon set is preferred
- * because it is the full-colour mark, and the dark variant is a last resort
- * since it is often the white one.
- */
-const COLOR_SOURCES = ['icon', 'logoLight', 'logoDark']
-
-const remember = (c: Record<string, string>) => { rememberSchoolColors(c); return c }
-
-function schoolColors(root: string, art: Record<string, string>): Record<string, string> {
-  const best = new Map<string, { rank: number; file: string }>()
-  for (const [key, file] of Object.entries(art)) {
-    const sep = key.lastIndexOf('|')
-    const rank = COLOR_SOURCES.indexOf(key.slice(sep + 1))
-    if (rank < 0) continue
-    const school = key.slice(0, sep)
-    const cur = best.get(school)
-    if (!cur || rank < cur.rank) best.set(school, { rank, file })
-  }
-  const out: Record<string, string> = {}
-  for (const [school, { file }] of best) {
-    const hex = dominantColor(join(root, file))
-    if (hex) out[school] = hex
-  }
-  return out
-}
-
-/**
- * Builds the art pack the phone draws from, and puts it wherever it is wanted.
+ * Three calls rather than one: the whole country's faces are a hundred
+ * megabytes and neither side wants them in a single message. The renderer opens
+ * the pack, streams batches into it, and closes it.
  *
- * The renderer supplies the asset ids, because it is the one that knows which
- * players are worth carrying — the whole game is sixteen thousand faces and a
- * phone wants the ones in your dynasty.
+ * The renderer does the reading because the game's art is WebP, which Chromium
+ * decodes and a hand-written PNG reader does not. That reader is why the first
+ * pack came out 208 bytes: a manifest, and every file skipped.
  */
-ipcMain.handle('art:pack', async (_e, req: {
-  schoolArt: Record<string, string>
-  assetIds: string[]
-  publish: boolean
-  repo?: string
-}) => {
-  if (!faceRoot) return { ok: false as const, message: 'No art folder is open.' }
+let building: PackEntry[] | null = null
+
+ipcMain.handle('art:packStart', () => { building = []; return { ok: true as const } })
+
+ipcMain.handle('art:packAdd', (_e, entries: { name: string; data: Uint8Array }[]) => {
+  if (!building) return { ok: false as const, message: 'no pack is open' }
+  for (const e of entries) building.push({ name: e.name, data: Buffer.from(e.data) })
+  return { ok: true as const, entries: building.length }
+})
+
+ipcMain.handle('art:packFinish', async (_e, req: { publish: boolean; repo?: string }) => {
+  const entries = building
+  building = null
+  if (!entries) return { ok: false as const, message: 'no pack is open' }
   try {
-    const index = indexFaces(faceRoot)
-    const facePaths: Record<string, string> = {}
-    for (const id of req.assetIds) {
-      const file = index.map[id.toLowerCase()]
-      if (file) facePaths[id] = file
-    }
-    const pack = buildPack({ root: faceRoot, schoolArt: req.schoolArt, facePaths })
+    const pack = packEntries(entries)
     rememberPack(pack.bytes)
 
     const dest = await dialog.showSaveDialog(win!, {
@@ -526,21 +502,25 @@ ipcMain.handle('art:pack', async (_e, req: {
     let published: string | null = null
     if (req.publish && req.repo) {
       const token = String(readSettings().githubToken ?? '')
-      const res = await publishArt({ repo: req.repo, token }, pack.bytes)
-      published = res.message
+      published = (await publishArt({ repo: req.repo, token }, pack.bytes)).message
     }
     return {
       ok: true as const,
       bytes: pack.bytes.length,
       schools: Object.keys(pack.manifest.schools).length,
       players: pack.manifest.players.length,
-      skipped: pack.skipped,
       file: dest.canceled ? null : dest.filePath ?? null,
       published,
     }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
+})
+
+/** The colours the renderer read out of the logos, for the snapshot to carry. */
+ipcMain.handle('art:colors', (_e, colors: Record<string, string>) => {
+  rememberSchoolColors(colors)
+  return { ok: true as const }
 })
 
 ipcMain.handle('assets:indexFaces', (
@@ -559,7 +539,6 @@ ipcMain.handle('assets:indexFaces', (
       sample: index.sample, truncated: index.truncated, dirs: index.dirs,
       match: matchFaces(index, assetIds),
       schoolArt,
-      schoolColors: remember(schoolColors(dir, schoolArt.art)),
       // Only the ids that actually resolved cross to the renderer, which keeps
       // this to the players present rather than the whole folder.
       paths: Object.fromEntries(

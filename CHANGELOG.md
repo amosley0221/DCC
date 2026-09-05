@@ -10,6 +10,31 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.39.0] - 2026-09-05
+
+### Fixed
+
+- **The art pack came out 208 bytes: a manifest and nothing else.** Every file
+  was skipped, because I wrote a PNG reader for it and the game's art is
+  **WebP**. Chromium has been decoding those files all along — it is what draws
+  them on every desktop screen — so the reading and resizing now happen there,
+  on a canvas, and the main process only ever sees images it can put straight
+  into the archive. Whatever format the art is in, if the desktop can show it,
+  it packs.
+
+  Same mistake, same fix, for **team colours**: they were read with the same PNG
+  reader, so every school came back with none and the cards fell back to the
+  theme. They are read off the logo on the canvas now, in the same pass, and go
+  up with the snapshot.
+
+  If a file still will not open, the build says how many and what extension they
+  were — an empty pack should name its own cause rather than leave you counting
+  bytes.
+
+- **The build shows its progress.** Reading twelve thousand faces is not
+  instant, and a button that says "Building…" for two minutes is
+  indistinguishable from one that has hung.
+
 ## [0.38.0] - 2026-09-05
 
 ### Added

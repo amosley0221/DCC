@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSave } from '../saveStore'
+import { buildPack } from '../art'
 import { useStore } from '../store'
 import { Btn, Card, Chip, Input, Kicker, Meta, SectionHeader, Toggle } from '../ui'
 import type { RelayState } from '../../electron/relay'
@@ -16,7 +17,7 @@ import type { RelayState } from '../../electron/relay'
  * limitation of the transport; it is the rule that keeps one writer on the file.
  */
 export default function DevicesSave() {
-  const { save } = useSave()
+  const { save, patch } = useSave()
   const { state, dispatch } = useStore()
   const { path } = save
   const [relay, setRelay] = useState<RelayState | null>(null)
@@ -69,20 +70,42 @@ export default function DevicesSave() {
     return [...ids]
   }
 
-  const buildPack = async () => {
-    setPacking(true); setPackNote(null)
-    const res = await window.dcc.buildArtPack({
-      schoolArt: save.schoolArt,
-      assetIds: assetIds(),
+  const [progress, setProgress] = useState<string | null>(null)
+
+  /**
+   * Reads and resizes every image here, in the renderer, and streams the result
+   * to the main process to be zipped.
+   *
+   * Here because the game's art is WebP: Chromium decodes it, which is how the
+   * desktop has been drawing it all along, and the first version of this pack
+   * decoded PNG in the main process and skipped every single file.
+   */
+  const build = async () => {
+    setPacking(true); setPackNote(null); setProgress(null)
+    const out = await buildPack(
+      save.schoolArt,
+      save.facePaths,
+      assetIds(),
+      {},
+      (p) => setProgress(`${p.done} of ${p.total}${p.label ? ` · ${p.label}` : ''}`),
+    )
+    // The colours come out of the same pass, and the snapshot carries them.
+    if (Object.keys(out.colors).length) {
+      patch({ schoolColors: out.colors })
+      await window.dcc.setSchoolColors(out.colors)
+    }
+    const res = await window.dcc.packFinish({
       publish: !!repo.trim() && !!state.githubToken,
       repo: repo.trim() || undefined,
     })
-    setPacking(false)
+    setPacking(false); setProgress(null)
     if (!res.ok) { setPackNote(res.message); return }
     const mb = (res.bytes / 1024 / 1024).toFixed(1)
     const note = [
       `${mb} MB — ${res.schools} schools, ${res.players.toLocaleString()} faces`,
-      res.skipped ? `${res.skipped} files were not readable images` : null,
+      out.skipped
+        ? `${out.skipped.toLocaleString()} would not open (${out.skippedKinds.map((k) => k.ext).join(', ')})`
+        : null,
       res.file ? `saved to ${res.file}` : null,
       res.published,
     ].filter(Boolean).join(' · ')
@@ -195,9 +218,10 @@ export default function DevicesSave() {
             ))}
           </div>
           <div className="row" style={{ gap: 8, marginTop: 10, alignItems: 'center' }}>
-            <Btn variant="primary" onClick={buildPack} disabled={packing || !save.faces}>
+            <Btn variant="primary" onClick={build} disabled={packing || !save.faces}>
               {packing ? 'Building…' : 'Build the art pack'}
             </Btn>
+            {progress ? <Meta size={9} color="var(--warn)">{progress.toUpperCase()}</Meta> : null}
             {!save.faces ? <Meta size={9} color="var(--warn)">POINT AT YOUR ART FOLDER FIRST</Meta> : null}
           </div>
           {packNote ? <div className="effect" style={{ marginTop: 10 }}>{packNote.toUpperCase()}</div> : null}

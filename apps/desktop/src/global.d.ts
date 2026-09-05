@@ -34,13 +34,14 @@ declare global {
         message: string; season: number | null; week: number | null
       }): Promise<{ ok: true; thread: TamperThreadView } | { ok: false; message: string }>
       tamperForget(key: string): Promise<{ ok: true }>
-      buildArtPack(req: {
-        schoolArt: Record<string, string>; assetIds: string[]; publish: boolean; repo?: string
-      }): Promise<
-        | { ok: true; bytes: number; schools: number; players: number; skipped: number
+      packStart(): Promise<{ ok: true }>
+      packAdd(entries: { name: string; data: Uint8Array }[]): Promise<{ ok: boolean; entries?: number }>
+      packFinish(req: { publish: boolean; repo?: string }): Promise<
+        | { ok: true; bytes: number; schools: number; players: number
             file: string | null; published: string | null }
         | { ok: false; message: string }
       >
+      setSchoolColors(colors: Record<string, string>): Promise<{ ok: true }>
       depth(path: string): Promise<
         | { ok: true; slots: { abbr: string; name: string; side: 'offense' | 'defense' | 'special' }[]
             charts: { block: number; slots: number[][] }[] }
@@ -93,8 +94,6 @@ declare global {
               missing: string[]
               categories: { name: string; files: number }[]
             }
-            /** School name -> the colour read out of its own logo. */
-            schoolColors: Record<string, string>
           }
       >
       findInstall(): Promise<{ found: true; path: string } | { found: false; searched: number; message: string }>

@@ -1,123 +1,92 @@
-// The art pack is written with nothing but zlib — a PNG encoder, a box
-// downscale and a ZIP writer — so all three are checked by reading them back:
-// the PNGs through the app's own decoder, and the ZIP through Node's, which is
-// the same format the phone's java.util.zip opens.
+// The art pack is a ZIP written by hand, so it is checked by reading it back
+// through Node's own unzipper — the same format the phone's java.util.zip
+// opens. The images themselves are resized in the renderer on a canvas, which
+// is why nothing here decodes one: the game's art is WebP, and the version of
+// this that decoded images in the main process skipped every file and shipped a
+// 208-byte pack.
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const os = require('node:os')
-const path = require('node:path')
 const zlib = require('node:zlib')
 const P = require(process.argv[2])
-const G = require(process.argv[3])
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dcc-pack-'))
-
-/* ------------------------------------------------ a source image to work from */
-// Four quadrants of flat colour with a transparent corner, so a downscale has
-// something whose average is known, and so the alpha handling is exercised.
-const W = 64, H = 64
-const src = Buffer.alloc(W * H * 4)
-for (let y = 0; y < H; y++) {
-  for (let x = 0; x < W; x++) {
-    const o = (y * W + x) * 4
-    const right = x >= W / 2, low = y >= H / 2
-    const [r, g, b] = low ? (right ? [0, 0, 255] : [0, 255, 0]) : (right ? [255, 0, 0] : [4, 30, 66])
-    src[o] = r; src[o + 1] = g; src[o + 2] = b
-    src[o + 3] = right && !low ? 0 : 255   // the top-right quadrant is a hole
-  }
-}
-fs.writeFileSync(path.join(dir, 'PennState_OL.png'), P.encodePng(src, W, H))
-
-/* ------------------------------------------------------- the encoder decodes */
+/* ---------------------------------------------------------------- the names */
 {
-  const back = G.decodePng(fs.readFileSync(path.join(dir, 'PennState_OL.png')))
-  assert.ok(back, 'a PNG this app wrote is one this app can read')
-  assert.equal(back.width, W)
-  assert.equal(back.height, H)
-  assert.deepEqual([...back.px.slice(0, 4)], [4, 30, 66, 255], 'top left is the navy, opaque')
-  const tr = ((0 * W) + (W - 1)) * 4
-  assert.equal(back.px[tr + 3], 0, 'the top-right corner is still a hole')
-}
-
-/* ------------------------------------------------------------- the downscale */
-{
-  // Halving a 64x64 of four flat quadrants must leave four flat quadrants.
-  const half = P.box(src, W, H, 32, 32)
-  const at = (x, y) => [...half.slice((y * 32 + x) * 4, (y * 32 + x) * 4 + 4)]
-  assert.deepEqual(at(0, 0), [4, 30, 66, 255], 'flat colour survives a halving unchanged')
-  assert.deepEqual(at(0, 31), [0, 255, 0, 255])
-  assert.deepEqual(at(31, 31), [0, 0, 255, 255])
-  assert.equal(at(31, 0)[3], 0, 'a fully transparent region stays transparent')
-
-  // A quarter-size box straddles the seam, and the average must be the average
-  // — the point of a box filter over nearest neighbour.
-  const tiny = P.box(src, W, H, 2, 2)
-  assert.deepEqual([...tiny.slice(0, 4)], [4, 30, 66, 255])
-  assert.equal(tiny[7], 0, 'the transparent quadrant averages to nothing')
-
-  // An odd size must not read off the end or leave a row blank.
-  const odd = P.box(src, W, H, 7, 13)
-  assert.equal(odd.length, 7 * 13 * 4)
-  assert.ok([...odd].some((v) => v !== 0), 'an odd downscale is not empty')
-}
-
-/* ----------------------------------------------------------------- the pack */
-{
-  fs.writeFileSync(path.join(dir, 'helmet.png'), P.encodePng(src, W, H))
-  fs.writeFileSync(path.join(dir, 'face.png'), P.encodePng(src, W, H))
-  // Something that is not a PNG at all: it must be counted, not crash the build.
-  fs.writeFileSync(path.join(dir, 'broken.dds'), Buffer.from('DDS not a png'))
-
-  const res = P.buildPack({
-    root: dir,
-    schoolArt: {
-      "Penn State|logoLight": 'PennState_OL.png',
-      "Penn State|helmet": 'helmet.png',
-      "Hawai'i|logoLight": 'broken.dds',
-    },
-    facePaths: { 'Generic_0001_P_T0000_D_1_1': 'face.png' },
-    schoolPx: 32,
-    playerPx: 16,
-  })
-
-  assert.equal(res.skipped, 1, 'the file that is not a PNG is reported, not hidden')
-  assert.deepEqual(res.manifest.schools['Penn State'].sort(), ['helmet', 'logo'])
-  assert.ok(!res.manifest.schools["Hawai'i"], 'a school whose art would not read is not claimed')
-  assert.deepEqual(res.manifest.players, ['Generic_0001_P_T0000_D_1_1'])
-
-  // Read the ZIP back the way the phone will: central directory, then entries.
-  const entries = readZip(res.bytes)
-  const names = [...entries.keys()].sort()
-  assert.deepEqual(names, [
-    'manifest.json',
-    'players/Generic_0001_P_T0000_D_1_1.png',
-    'schools/Penn_State__helmet.png',
-    'schools/Penn_State__logo.png',
-  ], 'entry names are the ones the phone looks for')
-
-  const manifest = JSON.parse(entries.get('manifest.json').toString('utf8'))
-  assert.equal(manifest.version, P.PACK_VERSION)
-
-  const logo = G.decodePng(entries.get('schools/Penn_State__logo.png'))
-  assert.equal(logo.width, 32, 'a school mark comes out at the size asked for')
-  assert.deepEqual([...logo.px.slice(0, 4)], [4, 30, 66, 255])
-
-  const face = G.decodePng(entries.get('players/Generic_0001_P_T0000_D_1_1.png'))
-  assert.equal(face.width, 16, 'a face comes out at its own size')
-}
-
-/* ------------------------------------------------------------------- naming */
-{
-  // The phone applies the identical rule to find a file, so awkward names have
-  // to land somewhere predictable.
+  // The phone builds the same name from the school it is drawing, so an awkward
+  // one has to land somewhere predictable on both sides.
   assert.equal(P.safe("Hawai'i"), 'Hawai_i')
   assert.equal(P.safe('App St.'), 'App_St.')
   assert.equal(P.safe('Miami (OH)'), 'Miami_OH_')
   assert.equal(P.safe('Generic_0001_P_T0000_D_1_1'), 'Generic_0001_P_T0000_D_1_1')
+  assert.equal(P.schoolEntryName('Penn State', 'helmet'), 'schools/Penn_State__helmet.png')
+  assert.equal(P.playerEntryName('Generic_0001_P_T0000_D_1_1'),
+    'players/Generic_0001_P_T0000_D_1_1.png')
 }
 
-fs.rmSync(dir, { recursive: true, force: true })
-console.log('check-pack: PNGs round-trip, a box downscale averages, the ZIP reads back')
+/* ------------------------------------------------------- what to carry, once */
+{
+  // icon and logoLight both mean "the logo", and the icon set is the better
+  // mark, so it wins however the two are ordered in the input.
+  const plan = P.schoolPlan({
+    'Penn State|logoLight': 'a.webp',
+    'Penn State|icon': 'b.webp',
+    'Penn State|helmet': 'c.webp',
+    'Penn State|logoGold': 'd.webp',
+    'Penn State|jersey': 'e.webp',
+    'Penn State|logoDark': 'f.webp',
+    "Hawai'i|icon": 'g.webp',
+  })
+  const psu = plan.get('Penn State')
+  assert.deepEqual([...psu.keys()].sort(), ['gold', 'helmet', 'jersey', 'logo'])
+  assert.equal(psu.get('logo'), 'icon', 'the flat icon set is the better mark')
+  assert.ok(![...psu.values()].includes('logoDark'), 'the white-on-dark mark is not carried')
+  assert.deepEqual([...plan.get("Hawai'i").keys()], ['logo'])
+}
+
+/* ---------------------------------------------------------------- the archive */
+{
+  const png = (n) => Buffer.from(`fake png ${n}`.repeat(4), 'utf8')
+  const entries = [
+    { name: P.schoolEntryName('Penn State', 'logo'), data: png(1) },
+    { name: P.schoolEntryName('Penn State', 'helmet'), data: png(2) },
+    { name: P.schoolEntryName("Hawai'i", 'logo'), data: png(3) },
+    { name: P.playerEntryName('Generic_0001_P_T0000_D_1_1'), data: png(4) },
+  ]
+  const built = new Date('2026-09-05T12:00:00.000Z')
+  const res = P.packEntries(entries, built)
+
+  assert.equal(res.manifest.version, P.PACK_VERSION)
+  assert.equal(res.manifest.built, built.toISOString())
+  assert.deepEqual([...res.manifest.schools['Penn_State']].sort(), ['helmet', 'logo'])
+  assert.deepEqual(res.manifest.players, ['Generic_0001_P_T0000_D_1_1'])
+  assert.equal(res.manifest.bytes, entries.reduce((n, e) => n + e.data.length, 0))
+
+  const back = readZip(res.bytes)
+  assert.deepEqual([...back.keys()].sort(), [
+    'manifest.json',
+    'players/Generic_0001_P_T0000_D_1_1.png',
+    'schools/Hawai_i__logo.png',
+    'schools/Penn_State__helmet.png',
+    'schools/Penn_State__logo.png',
+  ], 'entry names are the ones the phone looks for')
+
+  for (const e of entries) {
+    assert.deepEqual(back.get(e.name), e.data, `${e.name} comes back byte for byte`)
+  }
+  const manifest = JSON.parse(back.get('manifest.json').toString('utf8'))
+  assert.deepEqual(manifest, res.manifest, 'the manifest in the archive is the one reported')
+}
+
+/* --------------------------------------------------------------- empty pack */
+{
+  // The failure that shipped: every file skipped, so the archive holds only the
+  // manifest. It must still be a valid archive, and must say it has nothing.
+  const res = P.packEntries([])
+  const back = readZip(res.bytes)
+  assert.deepEqual([...back.keys()], ['manifest.json'])
+  assert.deepEqual(res.manifest.schools, {})
+  assert.deepEqual(res.manifest.players, [])
+}
+
+console.log('check-pack: names round-trip, the plan picks one mark each, the ZIP reads back')
 
 /** Reads a stored-entry ZIP the way any unzipper does: from the end. */
 function readZip(buf) {

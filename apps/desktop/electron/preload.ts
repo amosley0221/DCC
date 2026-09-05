@@ -64,13 +64,17 @@ const api = {
     { ok: true; thread: TamperThreadView } | { ok: false; message: string }
   >,
   tamperForget: (key: string) => ipcRenderer.invoke('tamper:forget', key) as Promise<{ ok: true }>,
-  buildArtPack: (req: {
-    schoolArt: Record<string, string>; assetIds: string[]; publish: boolean; repo?: string
-  }) => ipcRenderer.invoke('art:pack', req) as Promise<
-    | { ok: true; bytes: number; schools: number; players: number; skipped: number
-        file: string | null; published: string | null }
-    | { ok: false; message: string }
-  >,
+  packStart: () => ipcRenderer.invoke('art:packStart') as Promise<{ ok: true }>,
+  packAdd: (entries: { name: string; data: Uint8Array }[]) =>
+    ipcRenderer.invoke('art:packAdd', entries) as Promise<{ ok: boolean; entries?: number }>,
+  packFinish: (req: { publish: boolean; repo?: string }) =>
+    ipcRenderer.invoke('art:packFinish', req) as Promise<
+      | { ok: true; bytes: number; schools: number; players: number
+          file: string | null; published: string | null }
+      | { ok: false; message: string }
+    >,
+  setSchoolColors: (colors: Record<string, string>) =>
+    ipcRenderer.invoke('art:colors', colors) as Promise<{ ok: true }>,
   depth: (path: string) => ipcRenderer.invoke('save:depth', path),
   writeDepth: (path: string, edits: unknown[]) => ipcRenderer.invoke('save:writeDepth', path, edits),
   publishSnapshot: (path: string, teamId: number | null, repo: string) =>

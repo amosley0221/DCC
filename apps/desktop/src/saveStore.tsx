@@ -106,7 +106,6 @@ export async function indexArt(
       },
       facePaths: res.paths,
       schoolArt: res.schoolArt.art,
-      schoolColors: res.schoolColors ?? {},
       schoolArtMissing: res.schoolArt.missing,
     },
   }
