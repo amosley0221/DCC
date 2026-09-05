@@ -10,6 +10,35 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.25.0] - 2026-09-05
+
+### Added
+
+- **The phone can fetch the dynasty over the network, two ways.** Devices on the
+  desktop now offers both. At home, "Start serving" turns this machine into a
+  small server your phone reads directly over your own Wi-Fi — nothing leaves the
+  house, and the six-megabyte snapshot arrives in about half a second. Type the
+  address and code it shows into the Android app's settings.
+- **Away from home, publish the snapshot.** Your PC is not reachable from a phone
+  on mobile data, so the snapshot is compressed and published to a repository you
+  own. Free, private, and nothing running anywhere. Enter the repository as
+  `owner/name` and a GitHub token with Contents write access, then publish
+  whenever you want the phone to catch up.
+- **The Android app fetches by either route**, alongside importing a file, and
+  offers whichever one last worked so a refresh is one tap.
+
+### Notes
+
+- The PC stays the only thing that writes to a save on either route. A save is
+  one file rebuilt whole, so two writers would lose a dynasty.
+- A repository made with GitHub's "new repository" button has no commit and no
+  default branch, and a release needs one, so the first publish writes a README
+  to start it.
+- Android cannot express "allow plain HTTP for private addresses only" — its
+  config matches host names, not address ranges. So cleartext is permitted
+  generally and every internet host the app reaches is named as TLS-only
+  instead, which means nothing it sends outside your network can fall off TLS.
+
 ## [0.24.0] - 2026-09-05
 
 ### Added
