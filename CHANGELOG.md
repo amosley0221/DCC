@@ -10,6 +10,29 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.29.5] - 2026-09-05
+
+### Fixed
+
+- **The phone's Appearance and Dynasty file tabs showed the same thing.** Both
+  drew the whole of Settings, so the tabs were labels over one page. The
+  snapshot, the dynasty and the relay live under Dynasty file now; the theme,
+  the mode, the accent and updates under Appearance.
+- **The colour wheel no longer traps you.** It filled the width of the screen
+  — an enormous disc on a tablet — and it handles drags, so every swipe meant
+  to scroll past it changed the accent instead. It is a fixed size now and
+  opens on request: the four presets stay in view, and **Any colour…** opens
+  the wheel when that is what you came for.
+- **The update prompt stays in its corner.** A shell rule was overriding its
+  fixed position, which dropped it out of the bottom right and pushed it half
+  off the left edge of the window.
+- **The game switcher opens above the page.** It was not see-through — it was
+  behind the page content, along with the search results.
+- The save report's class-name list shipped useless: capped and sorted
+  alphabetically, it filled with the save's own asset ids and never got past
+  the letter A. It lists real class names now.
+
+
 ## [0.29.4] - 2026-09-05
 
 ### Fixed
