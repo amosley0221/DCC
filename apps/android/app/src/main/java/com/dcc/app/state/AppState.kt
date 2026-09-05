@@ -286,6 +286,68 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── the art pack ────────────────────────────────────────────────────────
+
+    private val _art = MutableStateFlow<ArtPack.Manifest?>(null)
+    val art: StateFlow<ArtPack.Manifest?> = _art.asStateFlow()
+
+    /** Loads what is already installed, so the screen can say what it has. */
+    fun loadArt() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val m = ArtPack.manifest(getApplication())
+            withContext(Dispatchers.Main) { _art.value = m }
+        }
+    }
+
+    /**
+     * Brings a pack in, whichever route carried it.
+     *
+     * The same shape as a snapshot import and for the same reason: a pack that
+     * does not unpack leaves the phone with whatever pictures it already had,
+     * and the message says what went wrong rather than the screen going blank.
+     */
+    private fun bringArt(route: String, load: suspend () -> Result<ArtPack.Manifest>) {
+        viewModelScope.launch {
+            _busy.value = "art-$route"
+            _importError.value = null
+            val result = withContext(Dispatchers.IO) { load() }
+            result
+                .onSuccess { _art.value = it }
+                .onFailure { _importError.value = it.message ?: "that art pack could not be read" }
+            _busy.value = null
+        }
+    }
+
+    private fun acceptArt(fetched: SnapshotFetch.Bytes): Result<ArtPack.Manifest> = when (fetched) {
+        is SnapshotFetch.Bytes.Ok -> ArtPack.install(getApplication(), fetched.bytes)
+        is SnapshotFetch.Bytes.Failed -> Result.failure(IllegalArgumentException(fetched.message))
+    }
+
+    fun importArt(uri: Uri) = bringArt("file") {
+        runCatching {
+            val bytes = getApplication<Application>().contentResolver.openInputStream(uri)
+                ?.use { it.readBytes() } ?: error("that file could not be opened")
+            bytes
+        }.mapCatching { ArtPack.install(getApplication(), it).getOrThrow() }
+    }
+
+    fun fetchArtOverWifi() {
+        val s = _state.value
+        bringArt("wifi") { acceptArt(SnapshotFetch.artOverWifi(s.relayUrl, s.relayToken)) }
+    }
+
+    fun fetchArtFromGitHub() {
+        val s = _state.value
+        bringArt("github") { acceptArt(SnapshotFetch.artFromGitHub(s.githubRepo, s.githubToken)) }
+    }
+
+    fun clearArt() {
+        viewModelScope.launch(Dispatchers.IO) {
+            ArtPack.clear(getApplication())
+            withContext(Dispatchers.Main) { _art.value = null }
+        }
+    }
+
     /** Takes the real dynasty back off the phone. The PC still has the file. */
     fun clearSnapshot() {
         _snapshot.value = null

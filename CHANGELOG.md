@@ -10,6 +10,27 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.38.0] - 2026-09-05
+
+### Added
+
+- **Every picture the desktop shows, on the phone.** Logos, helmets, jerseys,
+  the gold mark and player faces — not a subset of those, all of them.
+
+  The game's art folder is gigabytes and the phone has never seen any of it, so
+  the desktop builds an **art pack**: the slice your dynasty actually uses,
+  shrunk to the size a phone draws it at. Every school's four marks always,
+  since 138 of those is a couple of megabytes; faces are the expensive half, so
+  you choose — your roster, your roster and the board, or every roster — and it
+  tells you what it came to.
+
+  Devices → **Build the art pack**. It saves to a file, goes up to GitHub beside
+  the snapshot, and is served over Wi-Fi with it, so it reaches the phone the
+  same three ways the dynasty does. On the phone: Dynasty file → **Pictures**.
+
+  Without a pack the phone looks exactly as it did — initials and monograms —
+  rather than looking broken.
+
 ## [0.37.0] - 2026-09-05
 
 ### Added

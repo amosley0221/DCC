@@ -16,7 +16,7 @@ import { networkInterfaces } from 'node:os'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { readSavePayload } from './saveAnalysis'
 import { buildSnapshot } from './snapshot'
-import { snapshotExtras } from './sidecar'
+import { readPack, snapshotExtras } from './sidecar'
 import { writeGameEdits, writePlayerEdits } from './saveWrite'
 import type { GameEdit, PlayerEdit } from './saveWrite'
 
@@ -95,9 +95,26 @@ function handle(ctx: RelayContext, req: IncomingMessage, res: ServerResponse) {
   if (url.pathname === '/ping') { send(200, { ok: true, save: Boolean(ctx.savePath()), teamId: ctx.teamId() }); return }
   // An endpoint that does not exist is a 404 whether or not a save is open;
   // answering "no save" to a typo would send someone looking in the wrong place.
-  if (url.pathname !== '/snapshot' && url.pathname !== '/edits') {
+  if (url.pathname !== '/snapshot' && url.pathname !== '/edits' && url.pathname !== '/art') {
     send(404, { ok: false, message: 'no such endpoint' }); return
   }
+
+  // The art pack is not read out of the save, so it is answered before the
+  // save check — a phone can be fetching faces while no save is open.
+  if (url.pathname === '/art' && req.method === 'GET') {
+    const pack = readPack()
+    if (!pack) {
+      send(409, { ok: false, message: 'no art pack has been built on the PC yet' }); return
+    }
+    res.writeHead(200, {
+      'content-type': 'application/zip',
+      'content-length': String(pack.length),
+      'cache-control': 'no-store',
+    })
+    res.end(pack)
+    return
+  }
+
   const path = ctx.savePath()
   if (!path) { send(409, { ok: false, message: 'no save is open on the PC' }); return }
 

@@ -19,11 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dcc.app.data.ArtPack
 import com.dcc.app.data.Rules
 import com.dcc.app.data.SaveLabels
 import com.dcc.app.data.SnapshotGame
@@ -120,7 +123,7 @@ fun TeamSnapshotSection(view: SnapshotView) {
                 ) {
                     if (roster.isEmpty()) item { DccCard { EmptyState("the snapshot has no roster for this team") } }
                     items(roster, key = { it.index }) { p ->
-                        PlayerCard(p, color, champion, team?.monogram ?: "") {
+                        PlayerCard(p, color, champion, team?.monogram ?: "", teamName) {
                             openPlayer = p.index
                             tab = "ROSTER"
                         }
@@ -242,7 +245,7 @@ private fun RosterRow(p: SnapshotPlayer, open: Boolean, onToggle: () -> Unit) {
                 if (p.overall >= 90) c.ink else c.ink2, 15, FontWeight.SemiBold,
                 Modifier.width(34.dp),
             )
-            Portrait(p.name, 30.dp)
+            PlayerFace(p.name, p.assetId, 30.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(p.name, c.ink, 15)
@@ -431,17 +434,17 @@ private fun ScoreLine(name: String?, quarters: List<Int>, ot: Int, final: Int, o
 }
 
 /**
- * A player card: his school's own colour, its mark, and what a card has room
- * for.
+ * A player card: his school's colour, its mark, his face and his kit.
  *
  * The colour is read off the school's logo on the PC and travels in the
  * snapshot, because the save carries no team colours and a hand-written table
  * of 138 would be wrong the moment a dynasty renamed one. A champion gets the
- * gold ring, which is the whole reason the game ships a gold mark.
+ * gold mark and a gold edge, which is the whole reason the game ships one.
  *
- * There is no portrait here yet. The phone has no art folder — the faces are
- * gigabytes on the PC — so a card shows initials until the portrait pack is
- * built and carried across.
+ * The face and the jersey come out of the art pack, and the jersey goes over
+ * the portrait rather than under it: the game's portraits carry a generic grey
+ * shirt, and the jersey covers exactly that. Without a pack the card falls back
+ * to initials and reads perfectly well, which is why nothing here waits on one.
  */
 @Composable
 private fun PlayerCard(
@@ -449,10 +452,17 @@ private fun PlayerCard(
     color: Color,
     champion: Boolean,
     monogram: String,
+    school: String?,
     onClick: () -> Unit,
 ) {
     val ink = inkOn(color)
     val gold = Color(0xFFC9A227)
+    val context = LocalContext.current
+    val face = remember(p.assetId) { ArtPack.player(context, p.assetId) }
+    val jersey = remember(school) { ArtPack.school(context, school, "jersey") }
+    val mark = remember(school, champion) {
+        ArtPack.school(context, school, if (champion) "gold" else "logo")
+    }
     Column(
         Modifier
             .fillMaxWidth()
@@ -467,15 +477,27 @@ private fun PlayerCard(
             .clickable { onClick() },
     ) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            // The mark, low and large, the way a crest sits on a shirt.
-            Text(
-                monogram,
-                modifier = Modifier.align(Alignment.Center),
-                style = TextStyle(
-                    fontFamily = Dcc.fonts.serif,
-                    fontSize = 64.sp,
-                    color = (if (champion) gold else ink).copy(alpha = 0.20f),
-                ),
+            // The crest, behind the player the way it sits on a shirt.
+            if (!ArtImage(mark, Modifier.align(Alignment.Center).fillMaxSize(0.72f), alpha = 0.22f)) {
+                Text(
+                    monogram,
+                    modifier = Modifier.align(Alignment.Center),
+                    style = TextStyle(
+                        fontFamily = Dcc.fonts.serif,
+                        fontSize = 64.sp,
+                        color = (if (champion) gold else ink).copy(alpha = 0.20f),
+                    ),
+                )
+            }
+            ArtImage(
+                face,
+                Modifier.align(Alignment.TopCenter).fillMaxWidth(0.92f),
+                contentScale = ContentScale.FillWidth,
+            )
+            ArtImage(
+                jersey,
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth(1.18f),
+                contentScale = ContentScale.FillWidth,
             )
             NumText(
                 p.overall.toString(),

@@ -86,6 +86,10 @@ jobs:
         run: npm run check:tamper
         working-directory: apps/desktop
 
+      - name: Check the art pack
+        run: npm run check:pack
+        working-directory: apps/desktop
+
       - name: Smoke test the built app
         run: |
           # Boots the real Electron app and clicks through every section, which

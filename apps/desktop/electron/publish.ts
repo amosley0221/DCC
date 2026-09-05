@@ -23,6 +23,8 @@ const UPLOADS = 'https://uploads.github.com'
 /** One release, reused forever, holding the current snapshot. */
 export const RELEASE_TAG = 'dynasty-snapshot'
 export const ASSET_NAME = 'dcc-snapshot.json.gz'
+/** The art pack, beside it in the same release. */
+export const ART_ASSET_NAME = 'dcc-art.zip'
 
 export interface PublishTarget {
   /** "owner/name" of a repository the token can write to. Private is fine. */
@@ -113,7 +115,18 @@ async function releaseId(target: PublishTarget): Promise<{ id: number } | { erro
  * Uploads the snapshot, replacing whatever was there. The old asset is deleted
  * first because GitHub refuses a second asset with the same name.
  */
-export async function publishSnapshot(target: PublishTarget, snapshot: unknown): Promise<PublishResult> {
+/**
+ * Replaces one named asset on the snapshot release.
+ *
+ * Both the snapshot and the art pack go up this way, into the same release, so
+ * the phone has one place to look and one token to hold.
+ */
+export async function publishAsset(
+  target: PublishTarget,
+  name: string,
+  contentType: string,
+  body: Buffer,
+): Promise<PublishResult> {
   if (!/^[\w.-]+\/[\w.-]+$/.test(target.repo)) {
     return { ok: false, message: 'The repository should look like owner/name.' }
   }
@@ -128,16 +141,15 @@ export async function publishSnapshot(target: PublishTarget, snapshot: unknown):
   const assets = await gh(target, `${API}/repos/${target.repo}/releases/${rel.id}/assets`)
   if (assets.status === 200) {
     for (const a of await assets.json() as { id: number; name: string }[]) {
-      if (a.name === ASSET_NAME) {
+      if (a.name === name) {
         await gh(target, `${API}/repos/${target.repo}/releases/assets/${a.id}`, { method: 'DELETE' })
       }
     }
   }
 
-  const body = gzipSync(Buffer.from(JSON.stringify(snapshot), 'utf8'))
-  const up = await gh(target, `${UPLOADS}/repos/${target.repo}/releases/${rel.id}/assets?name=${ASSET_NAME}`, {
+  const up = await gh(target, `${UPLOADS}/repos/${target.repo}/releases/${rel.id}/assets?name=${name}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/gzip' },
+    headers: { 'content-type': contentType },
     body,
   })
   if (up.status !== 201) {
@@ -150,4 +162,15 @@ export async function publishSnapshot(target: PublishTarget, snapshot: unknown):
     assetUrl: asset.url,
     bytes: body.length,
   }
+}
+
+export function publishSnapshot(target: PublishTarget, snapshot: unknown): Promise<PublishResult> {
+  return publishAsset(
+    target, ASSET_NAME, 'application/gzip',
+    gzipSync(Buffer.from(JSON.stringify(snapshot), 'utf8')),
+  )
+}
+
+export function publishArt(target: PublishTarget, pack: Buffer): Promise<PublishResult> {
+  return publishAsset(target, ART_ASSET_NAME, 'application/zip', pack)
 }

@@ -64,6 +64,13 @@ const api = {
     { ok: true; thread: TamperThreadView } | { ok: false; message: string }
   >,
   tamperForget: (key: string) => ipcRenderer.invoke('tamper:forget', key) as Promise<{ ok: true }>,
+  buildArtPack: (req: {
+    schoolArt: Record<string, string>; assetIds: string[]; publish: boolean; repo?: string
+  }) => ipcRenderer.invoke('art:pack', req) as Promise<
+    | { ok: true; bytes: number; schools: number; players: number; skipped: number
+        file: string | null; published: string | null }
+    | { ok: false; message: string }
+  >,
   depth: (path: string) => ipcRenderer.invoke('save:depth', path),
   writeDepth: (path: string, edits: unknown[]) => ipcRenderer.invoke('save:writeDepth', path, edits),
   publishSnapshot: (path: string, teamId: number | null, repo: string) =>

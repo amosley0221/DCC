@@ -127,7 +127,7 @@ private fun RecruitRow(
     val c = Dcc.colors
     DccCard(onClick = onToggle) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Portrait(r.name, 30.dp)
+            PlayerFace(r.name, r.assetId, 30.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(r.name, c.ink, 15)

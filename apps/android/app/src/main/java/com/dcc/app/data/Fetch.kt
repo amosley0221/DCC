@@ -33,6 +33,8 @@ object SnapshotFetch {
     /** What the desktop names the release and the asset it publishes. */
     private const val RELEASE_TAG = "dynasty-snapshot"
     private const val ASSET_NAME = "dcc-snapshot.json.gz"
+    /** The art pack, in the same release beside the snapshot. */
+    private const val ART_ASSET_NAME = "dcc-art.zip"
     private const val API = "https://api.github.com"
     private const val API_VERSION = "2022-11-28"
 
@@ -123,7 +125,7 @@ object SnapshotFetch {
     }
 
     /** Finds the one asset in the reusable release that holds the snapshot. */
-    private fun assetUrl(repo: String, token: String): String {
+    private fun assetUrl(repo: String, token: String, asset: String = ASSET_NAME): String {
         val conn = github("$API/repos/$repo/releases/tags/$RELEASE_TAG", token, "application/vnd.github+json")
         val body = try {
             when (val code = conn.responseCode) {
@@ -141,9 +143,9 @@ object SnapshotFetch {
             .orEmpty()
 
         return assets.map { it.jsonObject }
-            .firstOrNull { it["name"]?.jsonPrimitive?.content == ASSET_NAME }
+            .firstOrNull { it["name"]?.jsonPrimitive?.content == asset }
             ?.get("url")?.jsonPrimitive?.content
-            ?: throw Refused("that release has no $ASSET_NAME — publish again from the desktop app")
+            ?: throw Refused("that release has no $asset — publish again from the desktop app")
     }
 
     /**
@@ -176,6 +178,93 @@ object SnapshotFetch {
                     401, 403 -> throw Refused("GitHub refused the download — the token may have expired")
                     404 -> throw Refused("the published snapshot has gone — publish it again from the desktop app")
                     else -> throw Refused("GitHub answered $code downloading the snapshot")
+                }
+            } finally {
+                conn.disconnect()
+            }
+        }
+        throw Refused("GitHub sent the download round in circles")
+    }
+
+    // ── the art pack ────────────────────────────────────────────────────────
+
+    sealed interface Bytes {
+        data class Ok(val bytes: ByteArray) : Bytes
+        data class Failed(val message: String) : Bytes
+    }
+
+    /**
+     * The pictures, over the same two routes as the dynasty.
+     *
+     * A pack is a ZIP of small PNGs rather than a JSON document, so it comes
+     * back as bytes and is not gzipped again — it is already compressed, and
+     * gzipping a ZIP makes it very slightly bigger.
+     */
+    suspend fun artOverWifi(base: String, token: String): Bytes = withContext(Dispatchers.IO) {
+        val root = baseUrl(base)
+            ?: return@withContext Bytes.Failed("that address should look like http://192.168.1.42:7327")
+        if (token.isBlank()) {
+            return@withContext Bytes.Failed("the desktop shows a code beside the address — it goes here")
+        }
+        try {
+            val conn = open("$root/art", "application/zip")
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            try {
+                when (val code = conn.responseCode) {
+                    200 -> Bytes.Ok(conn.inputStream.readBytes())
+                    401 -> Bytes.Failed("the desktop refused that code — it is made fresh each time")
+                    409 -> Bytes.Failed("build the art pack on the desktop first, under Devices")
+                    else -> Bytes.Failed("the desktop answered $code for the art pack")
+                }
+            } finally {
+                conn.disconnect()
+            }
+        } catch (e: IOException) {
+            Bytes.Failed("nothing answered at $root — check the desktop is showing that address")
+        }
+    }
+
+    suspend fun artFromGitHub(repo: String, token: String): Bytes = withContext(Dispatchers.IO) {
+        val target = repo.trim()
+        if (!REPO.matches(target)) {
+            return@withContext Bytes.Failed("name the repository as owner/name, the way the desktop app has it")
+        }
+        if (token.isBlank()) {
+            return@withContext Bytes.Failed("a GitHub token is needed — the same one the desktop publishes with")
+        }
+        try {
+            Bytes.Ok(downloadBytes(assetUrl(target, token, ART_ASSET_NAME), token))
+        } catch (e: Refused) {
+            Bytes.Failed(e.message.orEmpty())
+        } catch (e: IOException) {
+            Bytes.Failed("GitHub could not be reached — this phone looks to be offline")
+        }
+    }
+
+    /** The redirect dance again, this time keeping the bytes as they arrive. */
+    private fun downloadBytes(assetUrl: String, token: String): ByteArray {
+        var target = assetUrl
+        var credentialed = true
+        repeat(MAX_HOPS) {
+            val conn = if (credentialed) {
+                github(target, token, "application/octet-stream", follow = false)
+            } else {
+                open(target, "application/octet-stream", follow = false)
+            }
+            try {
+                val code = conn.responseCode
+                if (code in 300..399) {
+                    val next = conn.getHeaderField("Location")
+                        ?: throw Refused("GitHub redirected the download to nowhere")
+                    target = URL(URL(target), next).toString()
+                    credentialed = false
+                    return@repeat
+                }
+                return when (code) {
+                    200 -> conn.inputStream.readBytes()
+                    401, 403 -> throw Refused("GitHub refused the download — the token may have expired")
+                    404 -> throw Refused("the published art pack has gone — build it again on the desktop")
+                    else -> throw Refused("GitHub answered $code downloading the art pack")
                 }
             } finally {
                 conn.disconnect()

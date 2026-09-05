@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Card, Input, Kicker, Meta, SectionHeader, Toggle } from '../ui'
+import { Btn, Card, Chip, Input, Kicker, Meta, SectionHeader, Toggle } from '../ui'
 import type { RelayState } from '../../electron/relay'
 
 /**
@@ -37,6 +37,58 @@ export default function DevicesSave() {
     const t = setInterval(() => { void window.dcc.relayState().then(setRelay) }, 4000)
     return () => clearInterval(t)
   }, [relay?.running])
+
+  /**
+   * What the phone needs pictures of.
+   *
+   * Every school's marks always — 138 logos, helmets and jerseys is a couple of
+   * megabytes and the phone draws them everywhere. Faces are the expensive
+   * half: the game has sixteen thousand, so the choice is your own roster, that
+   * plus the board, or the whole country, and the size is reported after so the
+   * choice can be made on what it actually costs.
+   */
+  const faceScopes = [
+    ['mine', 'MY ROSTER'],
+    ['board', 'MY ROSTER AND THE BOARD'],
+    ['all', 'EVERY ROSTER'],
+  ] as const
+  const [scope, setScope] = useState<(typeof faceScopes)[number][0]>('mine')
+  const [packing, setPacking] = useState(false)
+  const [packNote, setPackNote] = useState<string | null>(null)
+
+  const assetIds = () => {
+    const players = save.roster?.players ?? []
+    const ids = new Set<string>()
+    for (const p of players) {
+      if (!p.assetId) continue
+      const rostered = p.team !== 255
+      if (scope === 'all' ? rostered : scope === 'board' ? true : p.team === state.teamId) {
+        ids.add(p.assetId)
+      }
+    }
+    return [...ids]
+  }
+
+  const buildPack = async () => {
+    setPacking(true); setPackNote(null)
+    const res = await window.dcc.buildArtPack({
+      schoolArt: save.schoolArt,
+      assetIds: assetIds(),
+      publish: !!repo.trim() && !!state.githubToken,
+      repo: repo.trim() || undefined,
+    })
+    setPacking(false)
+    if (!res.ok) { setPackNote(res.message); return }
+    const mb = (res.bytes / 1024 / 1024).toFixed(1)
+    const note = [
+      `${mb} MB — ${res.schools} schools, ${res.players.toLocaleString()} faces`,
+      res.skipped ? `${res.skipped} files were not readable images` : null,
+      res.file ? `saved to ${res.file}` : null,
+      res.published,
+    ].filter(Boolean).join(' · ')
+    setPackNote(note)
+    dispatch({ type: 'log', line: { text: `art pack built — ${note}`, kind: 'good' } })
+  }
 
   const publish = async () => {
     if (!path) return
@@ -127,6 +179,28 @@ export default function DevicesSave() {
           </Meta>
           {!state.githubToken ? <Meta size={9} color="var(--warn)">SAVE A TOKEN FIRST</Meta> : null}
           {note ? <div className="effect" style={{ marginTop: 10 }}>{note.toUpperCase()}</div> : null}
+        </Card>
+
+        <Card className="card-pad">
+          <Kicker>Pictures for the phone</Kicker>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            The phone has never seen your art folder, and it is far too big to send. This builds
+            the slice your dynasty actually uses — every school's logo, helmet, jersey and gold
+            mark, and the faces you choose — shrunk to the size a phone draws them at. It saves
+            to a file, goes up to GitHub beside the snapshot, and is served over Wi-Fi with it.
+          </p>
+          <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            {faceScopes.map(([id, label]) => (
+              <Chip key={id} on={scope === id} onClick={() => setScope(id)}>{label}</Chip>
+            ))}
+          </div>
+          <div className="row" style={{ gap: 8, marginTop: 10, alignItems: 'center' }}>
+            <Btn variant="primary" onClick={buildPack} disabled={packing || !save.faces}>
+              {packing ? 'Building…' : 'Build the art pack'}
+            </Btn>
+            {!save.faces ? <Meta size={9} color="var(--warn)">POINT AT YOUR ART FOLDER FIRST</Meta> : null}
+          </div>
+          {packNote ? <div className="effect" style={{ marginTop: 10 }}>{packNote.toUpperCase()}</div> : null}
         </Card>
 
         <Card className="card-pad">

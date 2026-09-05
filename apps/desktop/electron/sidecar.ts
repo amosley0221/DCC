@@ -76,6 +76,16 @@ let titleCache: { season: number; champion: string | null; runnerUp: string | nu
 export const rememberTitles = (t: typeof titleCache) => { titleCache = t }
 export const readTitles = () => titleCache
 
+/**
+ * The art pack, last time one was built.
+ *
+ * Kept in memory rather than on disk: it is rebuilt from the art folder in a
+ * second or two, and the relay needs something to hand the phone when it asks.
+ */
+let packCache: Buffer | null = null
+export const rememberPack = (b: Buffer) => { packCache = b }
+export const readPack = () => packCache
+
 const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
 const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
 

@@ -34,6 +34,13 @@ declare global {
         message: string; season: number | null; week: number | null
       }): Promise<{ ok: true; thread: TamperThreadView } | { ok: false; message: string }>
       tamperForget(key: string): Promise<{ ok: true }>
+      buildArtPack(req: {
+        schoolArt: Record<string, string>; assetIds: string[]; publish: boolean; repo?: string
+      }): Promise<
+        | { ok: true; bytes: number; schools: number; players: number; skipped: number
+            file: string | null; published: string | null }
+        | { ok: false; message: string }
+      >
       depth(path: string): Promise<
         | { ok: true; slots: { abbr: string; name: string; side: 'offense' | 'defense' | 'special' }[]
             charts: { block: number; slots: number[][] }[] }

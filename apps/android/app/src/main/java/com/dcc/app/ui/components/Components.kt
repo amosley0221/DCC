@@ -9,9 +9,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.dcc.app.data.ArtPack
+import java.io.File
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -523,5 +534,74 @@ fun EffectCallout(text: String) {
                 letterSpacing = 0.6.sp, lineHeight = 16.sp, color = c.effectInk,
             ),
         )
+    }
+}
+
+/* ── the art pack ──────────────────────────────────────────────────────────── */
+
+/**
+ * An image out of the art pack, or nothing at all.
+ *
+ * Nothing rather than a placeholder: every caller already draws something when
+ * there is no picture — initials for a face, a monogram for a school — and a
+ * broken-image box in its place would be worse than the fallback it replaced.
+ *
+ * The file is decoded off the main thread the first time and cached after, so a
+ * grid of eighty-five cards asking for the same crest decodes it once.
+ */
+@Composable
+fun ArtImage(
+    file: File?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Fit,
+    alpha: Float = 1f,
+): Boolean {
+    if (file == null) return false
+    val bitmap by produceState<ImageBitmap?>(null, file.path) {
+        value = withContext(Dispatchers.IO) { ArtPack.bitmap(file)?.asImageBitmap() }
+    }
+    val bmp = bitmap ?: return false
+    Image(
+        bitmap = bmp,
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = contentScale,
+        alpha = alpha,
+    )
+    return true
+}
+
+/**
+ * A school's mark at a given size, falling back to its two-letter monogram.
+ * `kind` is "logo", "gold", "helmet" or "jersey".
+ */
+@Composable
+fun SchoolMark(school: String?, monogram: String, size: Dp, kind: String = "logo") {
+    val context = LocalContext.current
+    val file = remember(school, kind) { ArtPack.school(context, school, kind) }
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        val drawn = ArtImage(file, Modifier.size(size))
+        if (!drawn) MonoLabel(monogram, Dcc.colors.ink3, (size.value * 0.34f).toInt().coerceAtLeast(7))
+    }
+}
+
+/**
+ * A player's face out of the art pack, falling back to the initials disc.
+ *
+ * The fallback is what the app drew before there was a pack at all, so a phone
+ * that has never been given one looks exactly as it did rather than looking
+ * broken.
+ */
+@Composable
+fun PlayerFace(name: String, assetId: String?, size: Dp) {
+    val context = LocalContext.current
+    val file = remember(assetId) { ArtPack.player(context, assetId) }
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        val drawn = ArtImage(
+            file,
+            Modifier.size(size).clip(CircleShape),
+            contentScale = ContentScale.Crop,
+        )
+        if (!drawn) Portrait(name, size)
     }
 }

@@ -62,6 +62,11 @@ fun SettingsSection(
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) vm.importSnapshot(uri)
     }
+    val artPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) vm.importArt(uri)
+    }
+    val art by vm.art.collectAsState()
+    LaunchedEffect(Unit) { vm.loadArt() }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         if (all) {
@@ -227,6 +232,51 @@ fun SettingsSection(
                 DccButton("Use the sample dynasty instead", Modifier.fillMaxWidth()) { vm.useSampleInstead() }
                 Spacer(Modifier.height(8.dp))
                 DccButton("Remove snapshot", Modifier.fillMaxWidth(), BtnStyle.ACCENT) { vm.clearSnapshot() }
+            }
+        }
+
+        if (showDynasty) Spacer(Modifier.height(10.dp))
+
+        // ── the pictures ─────────────────────────────────────────────────────
+        if (showDynasty) DccCard {
+            Kicker("Pictures")
+            Spacer(Modifier.height(9.dp))
+            val m = art
+            if (m != null) {
+                MonoLabel(
+                    "ART PACK INSTALLED — ${m.schools.size} SCHOOLS, ${m.players.size} FACES",
+                    c.good, 10,
+                )
+                Spacer(Modifier.height(7.dp))
+                MetaText("BUILT ${SaveLabels.generated(m.built)}", c.ink3, 10, maxLines = 2)
+            } else {
+                MetaText("NO PICTURES YET", c.ink3, 10)
+                Spacer(Modifier.height(7.dp))
+                BodySerif(
+                    "Logos, helmets, jerseys and faces all come out of the game's own art, " +
+                        "which lives on the PC and is far too big to send whole. The Windows " +
+                        "app builds the slice your dynasty uses — Devices, then Build the art " +
+                        "pack — and it comes across the same three ways the dynasty does.",
+                )
+            }
+            Spacer(Modifier.height(11.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DccChip("From a file", false) { artPicker.launch(arrayOf("application/zip", "*/*")) }
+                if (state.relayUrl.isNotBlank()) {
+                    DccChip("Over Wi-Fi", false) { vm.fetchArtOverWifi() }
+                }
+                if (state.githubRepo.isNotBlank()) {
+                    DccChip("From GitHub", false) { vm.fetchArtFromGitHub() }
+                }
+            }
+            when (busy) {
+                "art-file" -> { Spacer(Modifier.height(9.dp)); MonoLabel("UNPACKING…", c.warn, 10) }
+                "art-wifi" -> { Spacer(Modifier.height(9.dp)); MonoLabel("ASKING THE DESKTOP…", c.warn, 10) }
+                "art-github" -> { Spacer(Modifier.height(9.dp)); MonoLabel("FETCHING FROM GITHUB…", c.warn, 10) }
+            }
+            if (art != null) {
+                Spacer(Modifier.height(10.dp))
+                DccButton("Remove the pictures", Modifier.fillMaxWidth(), BtnStyle.ACCENT) { vm.clearArt() }
             }
         }
 

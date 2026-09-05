@@ -941,8 +941,9 @@ export function matchSchools(
 export function dominantColor(file: string): string | null {
   let buf: Buffer
   try { buf = readFileSync(file) } catch { return null }
-  const px = decodePng(buf)
-  if (!px) return null
+  const img = decodePng(buf)
+  if (!img) return null
+  const px = img.px
 
   // Coarse buckets, five bits a channel, so near-identical pixels land
   // together. Transparent and near-white pixels are skipped: a logo is mostly
@@ -975,7 +976,7 @@ export function dominantColor(file: string): string | null {
 }
 
 /** Enough of a PNG decoder for the above: 8-bit RGB, RGBA or palette. */
-function decodePng(buf: Buffer): Uint8Array | null {
+export function decodePng(buf: Buffer): { px: Uint8Array; width: number; height: number } | null {
   if (buf.length < 33 || buf.readUInt32BE(0) !== 0x89504e47) return null
   let width = 0, height = 0, depth = 0, colorType = 0, interlace = 0
   const idat: Buffer[] = []
@@ -1045,5 +1046,5 @@ function decodePng(buf: Buffer): Uint8Array | null {
     }
     line.copy(prev)
   }
-  return out
+  return { px: out, width, height }
 }

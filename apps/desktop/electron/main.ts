@@ -29,7 +29,9 @@ import { resistance, standing } from './tamper'
 import type { TamperCoach, TamperTarget } from './tamper'
 import { sendText } from './tamperTalk'
 import { buildSnapshot } from './snapshot'
-import { publishSnapshot } from './publish'
+import { publishArt, publishSnapshot } from './publish'
+import { buildPack } from './artPack'
+import { rememberPack } from './sidecar'
 import { relayState, startRelay, stopRelay } from './relay'
 import { writeGameEdits, writePlayerEdits, writeDepthEdits } from './saveWrite'
 import type { GameEdit, PlayerEdit, DepthEdit } from './saveWrite'
@@ -489,6 +491,57 @@ function schoolColors(root: string, art: Record<string, string>): Record<string,
   }
   return out
 }
+
+/**
+ * Builds the art pack the phone draws from, and puts it wherever it is wanted.
+ *
+ * The renderer supplies the asset ids, because it is the one that knows which
+ * players are worth carrying — the whole game is sixteen thousand faces and a
+ * phone wants the ones in your dynasty.
+ */
+ipcMain.handle('art:pack', async (_e, req: {
+  schoolArt: Record<string, string>
+  assetIds: string[]
+  publish: boolean
+  repo?: string
+}) => {
+  if (!faceRoot) return { ok: false as const, message: 'No art folder is open.' }
+  try {
+    const index = indexFaces(faceRoot)
+    const facePaths: Record<string, string> = {}
+    for (const id of req.assetIds) {
+      const file = index.map[id.toLowerCase()]
+      if (file) facePaths[id] = file
+    }
+    const pack = buildPack({ root: faceRoot, schoolArt: req.schoolArt, facePaths })
+    rememberPack(pack.bytes)
+
+    const dest = await dialog.showSaveDialog(win!, {
+      title: 'Save the art pack',
+      defaultPath: 'dcc-art.zip',
+      filters: [{ name: 'DCC art pack', extensions: ['zip'] }],
+    })
+    if (!dest.canceled && dest.filePath) writeFileSync(dest.filePath, pack.bytes)
+
+    let published: string | null = null
+    if (req.publish && req.repo) {
+      const token = String(readSettings().githubToken ?? '')
+      const res = await publishArt({ repo: req.repo, token }, pack.bytes)
+      published = res.message
+    }
+    return {
+      ok: true as const,
+      bytes: pack.bytes.length,
+      schools: Object.keys(pack.manifest.schools).length,
+      players: pack.manifest.players.length,
+      skipped: pack.skipped,
+      file: dest.canceled ? null : dest.filePath ?? null,
+      published,
+    }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
 
 ipcMain.handle('assets:indexFaces', (
   _e, { dir, assetIds, schools }: {
