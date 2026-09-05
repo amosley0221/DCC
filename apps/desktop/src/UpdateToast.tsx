@@ -4,19 +4,37 @@ import type { UpdateStatus } from './updates'
 
 const RELEASES = 'https://github.com/amosley0221/DCC/releases'
 
-/** GitHub sends release notes as HTML; the toast wants a few plain lines. */
+const decode = (s: string) => s
+  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ')
+
+/**
+ * GitHub sends release notes as HTML, and a 320px panel is not where a release
+ * body is read.
+ *
+ * Only the list items are taken — the section headings became bare words like
+ * "Added" on their own line — and each is reduced to its lead: the notes are
+ * written with the point in bold at the front, so that bold run is the whole
+ * summary. Anything else falls back to its first sentence. The full text is a
+ * click away on Notes, which is what that button is for.
+ */
 function plainNotes(notes: unknown): string[] {
   if (typeof notes !== 'string') return []
-  return notes
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|li|h\d)>/gi, '\n')
-    .replace(/<li>/gi, '· ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 4)
+  const items = notes.match(/<li>[\s\S]*?<\/li>/gi) ?? []
+  const lines = items.map((raw) => {
+    const bold = /<(strong|b)>([\s\S]*?)<\/\1>/i.exec(raw)
+    const text = decode((bold ? bold[2] : raw).replace(/<[^>]+>/g, ' '))
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[.:]$/, '')
+    return text.length > 68 ? `${text.slice(0, 66).trimEnd()}…` : text
+  })
+  // A body with no list at all still deserves a line or two.
+  if (!lines.length) {
+    return decode(notes.replace(/<[^>]+>/g, '\n')).split('\n')
+      .map((l) => l.trim()).filter(Boolean).slice(0, 3)
+  }
+  return lines.filter(Boolean).slice(0, 3)
 }
 
 /**
@@ -71,9 +89,9 @@ export default function UpdateToast({ status }: { status: UpdateStatus | null })
         </button>
       </div>
 
-      <div className="hero-headline" style={{ marginTop: 5 }}>
-        Version {version ?? '—'}
-      </div>
+      {/* Its own size: the hero headline is 36px under Gold Standard, which is
+          right for a page and absurd in a 320px panel. */}
+      <div className="update-toast-version">Version {version ?? '—'}</div>
 
       {status.state === 'downloading' ? (
         <div style={{ marginTop: 11 }}>
@@ -85,7 +103,7 @@ export default function UpdateToast({ status }: { status: UpdateStatus | null })
       ) : notes.length ? (
         <div className="col" style={{ gap: 3, marginTop: 8 }}>
           {notes.map((n, i) => (
-            <span key={i} className="body-serif" style={{ fontSize: 12.5 }}>{n}</span>
+            <span key={i} className="update-toast-note">{n}</span>
           ))}
         </div>
       ) : null}

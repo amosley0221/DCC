@@ -66,7 +66,7 @@ app.whenReady().then(async () => {
   const toastShots = process.env.DCC_SHOTS
   const seen = []
   for (const [label, payload] of [
-    ['available', { state: 'available', version: '9.9.9', notes: '<ul><li>A first change</li><li>A second change</li></ul>' }],
+    ['available', { state: 'available', version: '9.9.9', notes: '<h3>Added</h3>\\n<ul>\\n<li><strong>The depth chart, read out of your save.</strong> Every position in the order the game plays them — offence, defence and special teams — with the starter on the card and the rest a click away. It used to sort by overall and admit it could not read your real ordering.</li>\\n<li><strong>Reorder it and commit.</strong> Open a position, drag or use the arrows, and the changes are held until you press commit.</li>\\n</ul>' }],
     ['downloading', { state: 'downloading', percent: 42 }],
     ['ready', { state: 'ready', version: '9.9.9' }],
   ]) {

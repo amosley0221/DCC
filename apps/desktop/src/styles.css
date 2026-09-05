@@ -194,10 +194,21 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
   width: 320px;
   z-index: 50;
   padding: 14px 16px 15px;
-  background: var(--surface);
+  /* Opaque on purpose. The surface token is a 3% white wash meant to sit on the
+     page; as a panel floating over it, the page read straight through. */
+  background: var(--sheet);
   border: 1px solid var(--accent);
   border-radius: var(--r-card);
   box-shadow: 0 10px 34px color-mix(in srgb, var(--bg0) 72%, transparent);
+}
+.update-toast-version {
+  font-family: var(--serif); font-weight: 600; font-size: 21px; line-height: 1.15;
+  margin: 5px 0 0; color: var(--ink);
+}
+/* Two lines each, then an ellipsis: a summary, not the release body. */
+.update-toast-note {
+  font-family: var(--sans); font-size: 12px; line-height: 1.45; color: var(--ink2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
 /* Labels stop shouting in letterspaced monospace and become quiet small caps. */
