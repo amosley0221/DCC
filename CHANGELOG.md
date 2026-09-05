@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.29.0] - 2026-09-05
+
 ### Changed
 
 - **Gold Standard has its own shell on the phone.** 0.28.0 shipped the theme's
