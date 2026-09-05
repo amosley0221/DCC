@@ -69,7 +69,8 @@ if adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
   grep -o 'text="[^"]*"' ui.xml | sed 's/text="//;s/"$//' | grep -v '^$' | sort -u || true
   missing=""
   for want in DYNASTY Board Legacy; do
-    grep -q "text=\"[^\"]*$want" ui.xml || missing="$missing $want"
+    # The tabs are drawn uppercased, so match without regard to case.
+    grep -qi "text=\"[^\"]*$want" ui.xml || missing="$missing $want"
   done
   if [ -n "$missing" ]; then
     echo "::error::Gold Standard's shell is not on screen. Missing:$missing"
