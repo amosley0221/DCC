@@ -83,6 +83,31 @@ export default function TeamSave() {
 
   const mine = useMemo(() => teams.find((t) => t.id === myTeam) ?? null, [teams, myTeam])
 
+  // The press needs names to write about and a record to set the scene, both
+  // keyed by school name because that is what a game row carries.
+  const pressPlayers = useMemo(() => {
+    const m = new Map<string, { first: string; last: string; position: string; overall: number }[]>()
+    for (const t of teams) {
+      const name = nameOf(t.id); if (!name) continue
+      m.set(name, t.list.slice(0, 6).map((p) => ({ first: p.first, last: p.last, position: p.position, overall: p.overall })))
+    }
+    return m
+  }, [teams, names])
+
+  const pressRecords = useMemo(() => {
+    const m = new Map<string, { wins: number; losses: number }>()
+    for (const g of roster?.games ?? []) {
+      if (!g.played || g.postseason || !g.home || !g.away) continue
+      const homeWon = g.homeScore > g.awayScore
+      for (const [n, won] of [[g.home, homeWon], [g.away, !homeWon]] as [string, boolean][]) {
+        const r = m.get(n) ?? { wins: 0, losses: 0 }
+        if (won) r.wins++; else r.losses++
+        m.set(n, r)
+      }
+    }
+    return m
+  }, [roster])
+
   const pool = useMemo(() => (mine ? mine.list : roster?.players ?? []), [mine, roster])
 
   const shown = useMemo(() => {
@@ -271,6 +296,9 @@ export default function TeamSave() {
             savePath={path}
             onEdited={load}
             log={(text, kind) => dispatch({ type: 'log', line: { text, kind: kind ?? 'good' } })}
+            players={pressPlayers}
+            records={pressRecords}
+            apiKey={state.anthropicKey}
           />
         ) : tab !== 'ROSTER' ? (
           <Card className="card-pad">

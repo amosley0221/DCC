@@ -44,12 +44,13 @@ fun NoDynasty(section: String, state: Persisted, onOpenSettings: () -> Unit) {
         Spacer(Modifier.height(10.dp))
 
         DccCard {
-            Kicker("Not built yet", c.ink3)
+            Kicker("Bring it across by hand", c.ink3)
             Spacer(Modifier.height(8.dp))
             BodySerif(
-                "The relay service and the PC save agent do not exist yet, so there is no way " +
-                    "for real data to arrive. Until they do, Settings can load a sample dynasty " +
-                    "so you can see how the screens work — it is invented data, not your save.",
+                "The relay does not exist yet, but the Windows app can already write your whole " +
+                    "dynasty to a single file. Copy dcc-snapshot.json to this phone and import " +
+                    "it in Settings, and Team and Recruit fill with your real save. Settings can " +
+                    "also load a sample dynasty — invented data, for looking at the screens.",
             )
         }
 

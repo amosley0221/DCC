@@ -12,6 +12,8 @@ import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
   indexFaces, matchFaces, matchSchools,
 } from './gameAssets'
+import { writeStory } from './press'
+import type { PressRequest } from './press'
 import { buildSnapshot } from './snapshot'
 import { writeGameEdits } from './saveWrite'
 import type { GameEdit } from './saveWrite'
@@ -225,6 +227,11 @@ ipcMain.handle('save:roster', (_e, path: string) => {
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
+})
+
+ipcMain.handle('press:write', async (_e, req: PressRequest) => {
+  const key = String(readSettings().anthropicKey ?? '')
+  return writeStory(key, req)
 })
 
 ipcMain.handle('save:snapshot', async (_e, { path, teamId }: { path: string; teamId: number | null }) => {

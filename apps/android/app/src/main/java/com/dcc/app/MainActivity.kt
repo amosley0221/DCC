@@ -34,12 +34,16 @@ class MainActivity : ComponentActivity() {
             val state by vm.state.collectAsState()
             val dynasty by vm.dynasty.collectAsState()
             val derived by vm.derived.collectAsState()
+            val snapshot by vm.snapshot.collectAsState()
+            val importing by vm.importing.collectAsState()
+            val importError by vm.importError.collectAsState()
             val loading by vm.loading.collectAsState()
 
             DccTheme(state.theme) {
                 val c = Dcc.colors
                 val d = derived
                 val dy = dynasty
+                val snap = snapshot
 
                 Box(Modifier.fillMaxSize().background(c.bg0)) {
                     if (loading) {
@@ -112,10 +116,17 @@ class MainActivity : ComponentActivity() {
                                     .fillMaxHeight()
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                             ) {
-                                // Settings is always reachable; every other
-                                // section needs a dynasty to have something to show.
+                                // Settings is always reachable, and the two
+                                // sections the snapshot fills stand on their own
+                                // — the real dynasty outranks the sample and
+                                // does not need it loaded. Everything else still
+                                // needs a dynasty to have something to show.
                                 if (section == "SETTINGS") {
-                                    SettingsSection(vm, state, dy)
+                                    SettingsSection(vm, state, dy, snap, importing, importError)
+                                } else if (section == "TEAM" && snap != null) {
+                                    TeamSnapshotSection(snap)
+                                } else if (section == "RECRUIT" && snap != null) {
+                                    RecruitSnapshotSection(snap)
                                 } else if (dy == null || d == null) {
                                     NoDynasty(section.lowercase().replaceFirstChar { it.uppercase() }, state) {
                                         section = "SETTINGS"
@@ -123,7 +134,7 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     when (section) {
                                         "WIRE" -> WireSection(vm, state, d)
-                                        "NATIONAL" -> NationalSection(dy, d)
+                                        "NATIONAL" -> NationalSection(dy, d, snap)
                                         "RECRUIT" -> RecruitSection(vm, state, d, dy.meta.userTeamId)
                                         "TEAM" -> TeamSection(vm, dy, state, d) { id ->
                                             callTarget = id

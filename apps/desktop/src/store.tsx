@@ -15,6 +15,7 @@ export const blankPersisted = (): Persisted => ({
   savePath: null,
   teamId: null,
   teamNames: {},
+  anthropicKey: '',
   relayUrl: '',
   relayToken: '',
   theme: 'night',
@@ -83,6 +84,7 @@ export type Action =
   | { type: 'savePath'; path: string | null }
   | { type: 'teamId'; id: number | null }
   | { type: 'teamName'; id: number; name: string | null }
+  | { type: 'anthropicKey'; key: string }
 
 let seq = 0
 const nextId = () => `q${Date.now().toString(36)}${(seq++).toString(36)}`
@@ -192,6 +194,8 @@ export function reducer(state: Persisted, action: Action): Persisted {
       return { ...state, savePath: action.path }
     case 'teamId':
       return { ...state, teamId: action.id }
+    case 'anthropicKey':
+      return { ...state, anthropicKey: action.key }
     case 'teamName': {
       const next = { ...state.teamNames }
       if (action.name) next[action.id] = action.name

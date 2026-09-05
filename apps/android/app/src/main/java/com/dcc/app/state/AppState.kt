@@ -1,6 +1,7 @@
 package com.dcc.app.state
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dcc.app.data.*
@@ -68,6 +69,81 @@ class Derived(private val dynasty: Dynasty, private val state: Persisted) {
     fun boardProspects(): List<Prospect> = state.board.mapNotNull { prospectsById[it] }
 }
 
+/**
+ * The imported snapshot with every join and sort the screens need already done.
+ *
+ * A snapshot is five thousand players, eleven thousand recruits and nine
+ * hundred games, so none of this can happen while a list scrolls. It is built
+ * once, on the IO thread that parsed the file, and the screens only read it.
+ */
+class SnapshotView(val snapshot: DynastySnapshot) {
+
+    val meta: SnapshotMeta = snapshot.meta
+
+    /** Best record first, which is the nearest thing the save has to a ranking. */
+    val teams: List<SnapshotTeam> = snapshot.teams
+        .sortedWith(compareByDescending<SnapshotTeam> { it.wins }.thenBy { it.losses }.thenBy { it.name })
+
+    val teamsByIndex: Map<Int, SnapshotTeam> = snapshot.teams.associateBy { it.index }
+
+    // The team table and the team ids players carry are two different
+    // orderings, so a screen holding one has to be able to reach the other.
+    private val indexByTeamId: Map<Int, Int> =
+        snapshot.teams.mapNotNull { t -> t.teamId?.let { it to t.index } }.toMap()
+
+    val userTeam: SnapshotTeam? = meta.userTeamIndex?.let { teamsByIndex[it] }
+        ?: meta.userTeamId?.let { id -> indexByTeamId[id]?.let { teamsByIndex[it] } }
+
+    private val rosters: Map<Int, List<SnapshotPlayer>> = snapshot.players
+        .groupBy { it.team }
+        .mapValues { (_, list) -> list.sortedByDescending { it.overall } }
+
+    private val schedules: Map<Int, List<SnapshotGame>> = buildMap<Int, MutableList<SnapshotGame>> {
+        for (g in snapshot.games) {
+            if (g.homeIndex >= 0) getOrPut(g.homeIndex) { mutableListOf() }.add(g)
+            if (g.awayIndex >= 0 && g.awayIndex != g.homeIndex) {
+                getOrPut(g.awayIndex) { mutableListOf() }.add(g)
+            }
+        }
+    }.mapValues { (_, list) -> list.sortedWith(compareBy({ it.postseason }, { it.week }, { it.row })) }
+
+    private val byWeek: Map<Int, List<SnapshotGame>> = snapshot.games
+        .filterNot { it.postseason }
+        .groupBy { it.week }
+        .mapValues { (_, list) -> list.sortedBy { it.row } }
+
+    val weeks: List<Int> = byWeek.keys.sorted()
+
+    /**
+     * The first week the user has not played. The game simulates the rest of
+     * the country before the user's own game and keeps those scores out of
+     * sight until it is played, so everything from here on is a spoiler.
+     */
+    val holdFrom: Int = meta.currentWeek ?: Int.MAX_VALUE
+
+    /** Strongest first, so filtering never has to re-sort while the user types. */
+    val recruits: List<SnapshotRecruit> = snapshot.recruits
+        .sortedWith(compareByDescending<SnapshotRecruit> { it.stars ?: 0 }.thenByDescending { it.overall })
+
+    val recruitPositions: List<String> = snapshot.recruits.map { it.position }.distinct().sorted()
+
+    fun rosterOf(index: Int): List<SnapshotPlayer> =
+        teamsByIndex[index]?.teamId?.let { rosters[it] }.orEmpty()
+
+    fun scheduleOf(index: Int): List<SnapshotGame> = schedules[index].orEmpty()
+
+    fun gamesIn(week: Int): List<SnapshotGame> = byWeek[week].orEmpty()
+
+    fun isUserGame(g: SnapshotGame): Boolean {
+        val team = userTeam ?: return false
+        return g.homeIndex == team.index || g.awayIndex == team.index
+    }
+
+    /** The spoiler rule, matching the desktop app's schedule exactly. */
+    fun holds(g: SnapshotGame, spoilers: Boolean): Boolean =
+        !spoilers && g.played && !g.postseason && g.week >= holdFrom && !isUserGame(g)
+}
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _dynasty = MutableStateFlow<Dynasty?>(null)
@@ -79,6 +155,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _derived = MutableStateFlow<Derived?>(null)
     val derived: StateFlow<Derived?> = _derived.asStateFlow()
 
+    /** The real dynasty, imported from the desktop app. It outranks the sample. */
+    private val _snapshot = MutableStateFlow<SnapshotView?>(null)
+    val snapshot: StateFlow<SnapshotView?> = _snapshot.asStateFlow()
+
+    private val _importing = MutableStateFlow(false)
+    val importing: StateFlow<Boolean> = _importing.asStateFlow()
+
+    private val _importError = MutableStateFlow<String?>(null)
+    val importError: StateFlow<String?> = _importError.asStateFlow()
+
     private var seq = 0
 
     private val _loading = MutableStateFlow(true)
@@ -88,6 +174,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val saved = withContext(Dispatchers.IO) { Repository.loadState(getApplication()) }
             _state.value = saved
+            // Six megabytes of snapshot is far too much JSON for the main thread.
+            _snapshot.value = withContext(Dispatchers.IO) {
+                Repository.loadSnapshot(getApplication())?.let { SnapshotView(it) }
+            }
             // Nothing is shown until a dynasty has actually been brought in.
             if (saved.dynastySource != "none") {
                 // 3,200 prospects is too much JSON for the main thread.
@@ -115,6 +205,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) { Repository.saveState(getApplication(), next) }
             _loading.value = false
         }
+    }
+
+    /**
+     * Imports a snapshot the user picked with the document picker. A file that
+     * does not parse never reaches disk, so a bad import leaves the phone
+     * showing the snapshot it already had.
+     */
+    fun importSnapshot(uri: Uri) {
+        viewModelScope.launch {
+            _importing.value = true
+            _importError.value = null
+            val result = withContext(Dispatchers.IO) {
+                Repository.importSnapshot(getApplication(), uri).map { SnapshotView(it) }
+            }
+            result
+                .onSuccess { _snapshot.value = it }
+                .onFailure { _importError.value = it.message ?: "that file could not be read" }
+            _importing.value = false
+        }
+    }
+
+    /** Takes the real dynasty back off the phone. The PC still has the file. */
+    fun clearSnapshot() {
+        _snapshot.value = null
+        _importError.value = null
+        viewModelScope.launch(Dispatchers.IO) { Repository.clearSnapshot(getApplication()) }
+    }
+
+    /**
+     * Drops the imported snapshot and loads the bundled demo. The snapshot wins
+     * wherever it is present, so asking for the sample means letting go of it.
+     */
+    fun useSampleInstead() {
+        clearSnapshot()
+        loadSampleDynasty()
     }
 
     /** Drops whatever is loaded and returns the app to its empty state. */

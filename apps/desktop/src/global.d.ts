@@ -2,6 +2,7 @@ import type { UpdateStatus } from './updates'
 import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { GameEdit, WriteResult } from '../electron/saveWrite'
+import type { PressRequest, PressStory } from '../electron/press'
 
 declare global {
   interface Window {
@@ -20,6 +21,9 @@ declare global {
         | { ok: false; message: string }
       >
       writeGames(path: string, edits: GameEdit[]): Promise<WriteResult>
+      writePress(req: PressRequest): Promise<
+        { ok: true; story: PressStory } | { ok: false; message: string }
+      >
       snapshot(path: string, teamId: number | null): Promise<
         | { ok: true; path: string; teams: number; games: number; players: number; recruits: number }
         | { ok: false; message: string }

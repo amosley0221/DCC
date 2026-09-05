@@ -20,6 +20,7 @@ import com.dcc.app.data.Dynasty
 import com.dcc.app.data.Persisted
 import com.dcc.app.state.AppViewModel
 import com.dcc.app.state.Derived
+import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.*
 import com.dcc.app.ui.theme.Dcc
 
@@ -28,14 +29,19 @@ import com.dcc.app.ui.theme.Dcc
 private val NATIONAL_TABS = listOf("TOP STORIES", "SCORES", "LEADERS", "STANDINGS")
 
 @Composable
-fun NationalSection(dynasty: Dynasty, d: Derived) {
+fun NationalSection(dynasty: Dynasty, d: Derived, snapshot: SnapshotView?) {
     val c = Dcc.colors
     var tab by rememberSaveable { mutableStateOf(NATIONAL_TABS[0]) }
 
     Column(Modifier.fillMaxSize()) {
         SectionHeader(
             title = "National",
-            sub = { MetaText("SEASON ${dynasty.meta.season} · ${dynasty.teams.size} PROGRAMS") },
+            sub = {
+                MetaText(
+                    if (snapshot != null) "${snapshot.teams.size} PROGRAMS · FROM YOUR SAVE"
+                    else "SEASON ${dynasty.meta.season} · ${dynasty.teams.size} PROGRAMS",
+                )
+            },
         )
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 12.dp),
@@ -90,17 +96,26 @@ fun NationalSection(dynasty: Dynasty, d: Derived) {
                     }
                 }
 
-                else -> items(dynasty.teams.sortedBy { it.rank }, key = { it.id }) { t ->
-                    DccCard(borderColor = if (t.isUser) c.accent else c.surfaceLine) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            NumText("${t.rank}", if (t.isUser) c.accent else c.ink3, 13, modifier = Modifier.width(30.dp))
-                            SchoolBadge(t.monogram, t.name, t.isUser, 24.dp)
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                RowTitle(t.name, c.ink, 15)
-                                MetaText(t.conference, c.ink3, 9)
+                // Standings come from the snapshot when there is one: these are
+                // the real programs, so the sample's invented ones would only
+                // contradict every other screen.
+                else -> if (snapshot != null) {
+                    items(snapshot.teams, key = { it.index }) { t ->
+                        SnapshotTeamRow(t, t.index == snapshot.userTeam?.index)
+                    }
+                } else {
+                    items(dynasty.teams.sortedBy { it.rank }, key = { it.id }) { t ->
+                        DccCard(borderColor = if (t.isUser) c.accent else c.surfaceLine) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                NumText("${t.rank}", if (t.isUser) c.accent else c.ink3, 13, modifier = Modifier.width(30.dp))
+                                SchoolBadge(t.monogram, t.name, t.isUser, 24.dp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    RowTitle(t.name, c.ink, 15)
+                                    MetaText(t.conference, c.ink3, 9)
+                                }
+                                NumText("${t.wins}–${t.losses}", c.ink2, 12)
                             }
-                            NumText("${t.wins}–${t.losses}", c.ink2, 12)
                         }
                     }
                 }

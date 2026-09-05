@@ -17,13 +17,17 @@ const CONDITIONS = [0, 2, 1, 4, 5, 6, 7, 8, 9]
  * own game and keeps those scores out of sight until it is played, so showing
  * them here would spoil the week.
  */
-export default function Schedule({ games, team, art, savePath, onEdited, log }: {
+export default function Schedule({ games, team, art, savePath, onEdited, log, players, records, apiKey }: {
   games: SeasonGame[]
   team: string | null
   art: Record<string, string>
   savePath: string | null
   onEdited: () => void
   log: (text: string, kind?: 'good' | 'bad') => void
+  /** Best players per school name, for the press to name. */
+  players: Map<string, { first: string; last: string; position: string; overall: number }[]>
+  records: Map<string, { wins: number; losses: number }>
+  apiKey: string
 }) {
   const [open, setOpen] = useState<number | null>(null)
   const [spoilers, setSpoilers] = useState(false)
@@ -60,7 +64,8 @@ export default function Schedule({ games, team, art, savePath, onEdited, log }: 
           {mine.filter((g) => !g.postseason).map((g) => (
             <GameRow key={g.row} g={g} team={team} icon={icon} open={open === g.row}
               onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={false}
-              savePath={savePath} onEdited={onEdited} log={log} />
+              savePath={savePath} onEdited={onEdited} log={log}
+              players={players} records={records} apiKey={apiKey} />
           ))}
         </Card>
       ) : null}
@@ -81,18 +86,22 @@ export default function Schedule({ games, team, art, savePath, onEdited, log }: 
         {league.map((g) => (
           <GameRow key={g.row} g={g} team={team} icon={icon} open={open === g.row}
             onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={hidden(g)}
-            savePath={savePath} onEdited={onEdited} log={log} />
+            savePath={savePath} onEdited={onEdited} log={log}
+            players={players} records={records} apiKey={apiKey} />
         ))}
       </Card>
     </>
   )
 }
 
-function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, log }: {
+function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, log, players, records, apiKey }: {
   g: SeasonGame; team: string | null; icon: (n: string | null) => string | undefined
   open: boolean; onToggle: () => void; hidden: boolean
   savePath: string | null; onEdited: () => void
   log: (text: string, kind?: 'good' | 'bad') => void
+  players: Map<string, { first: string; last: string; position: string; overall: number }[]>
+  records: Map<string, { wins: number; losses: number }>
+  apiKey: string
 }) {
   const mineHome = team !== null && g.home === team
   const mineAway = team !== null && g.away === team
@@ -130,14 +139,21 @@ function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, lo
           {g.userPlayed ? <Meta size={9} color="var(--accent)">YOU PLAYED</Meta> : null}
         </div>
       </button>
-      {open && !hidden ? <BoxScore g={g} savePath={savePath} onEdited={onEdited} log={log} /> : null}
+      {open && !hidden ? (
+        <BoxScore g={g} savePath={savePath} onEdited={onEdited} log={log}
+          players={players} records={records} apiKey={apiKey} team={team} />
+      ) : null}
     </div>
   )
 }
 
-function BoxScore({ g, savePath, onEdited, log }: {
+function BoxScore({ g, savePath, onEdited, log, players, records, apiKey, team }: {
   g: SeasonGame; savePath: string | null; onEdited: () => void
   log: (text: string, kind?: 'good' | 'bad') => void
+  players: Map<string, { first: string; last: string; position: string; overall: number }[]>
+  records: Map<string, { wins: number; losses: number }>
+  apiKey: string
+  team: string | null
 }) {
   const [editing, setEditing] = useState(false)
   const kickoff = kickoffLabel(g.kickoff)
@@ -173,6 +189,7 @@ function BoxScore({ g, savePath, onEdited, log }: {
           <Meta size={9}>Team and player statistics are only kept by the game for the current week; DCC shows what the save still holds.</Meta>
         </div>
       ) : null}
+      <Press g={g} players={players} records={records} apiKey={apiKey} team={team} log={log} />
       {savePath && !g.played ? (
         editing
           ? <Conditions g={g} savePath={savePath} onDone={() => { setEditing(false); onEdited() }}
@@ -253,6 +270,65 @@ function Conditions({ g, savePath, onDone, onCancel, log }: {
         </Btn>
         <Btn size="sm" onClick={onCancel}>Cancel</Btn>
       </div>
+    </div>
+  )
+}
+
+
+/**
+ * Press coverage for one game — a preview before it, a recap after.
+ *
+ * The model is given the decoded facts and told to use nothing else, so a story
+ * cannot invent a score or a player. It is generated on demand rather than
+ * ahead of time: it costs the user's own API credit, and most games will never
+ * be asked about.
+ */
+function Press({ g, players, records, apiKey, team, log }: {
+  g: SeasonGame
+  players: Map<string, { first: string; last: string; position: string; overall: number }[]>
+  records: Map<string, { wins: number; losses: number }>
+  apiKey: string
+  team: string | null
+  log: (text: string, kind?: 'good' | 'bad') => void
+}) {
+  const [story, setStory] = useState<{ headline: string; standfirst: string; body: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const write = async () => {
+    setBusy(true); setError(null)
+    const res = await window.dcc.writePress({
+      game: g,
+      kind: g.played ? 'recap' : 'preview',
+      homeRecord: g.home ? records.get(g.home) : undefined,
+      awayRecord: g.away ? records.get(g.away) : undefined,
+      homePlayers: g.home ? players.get(g.home) : undefined,
+      awayPlayers: g.away ? players.get(g.away) : undefined,
+      userTeam: team,
+    })
+    setBusy(false)
+    if (res.ok) { setStory(res.story); log(`wrote a ${g.played ? 'recap' : 'preview'} for ${g.away} at ${g.home}`) }
+    else { setError(res.message); log(res.message, 'bad') }
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      {story ? (
+        <div style={{ borderLeft: '2px solid var(--accent)', paddingLeft: 10 }}>
+          <Meta size={9}>{g.played ? 'RECAP' : 'PREVIEW'}</Meta>
+          <h3 style={{ margin: '4px 0 2px', color: 'var(--ink)', fontSize: 17 }}>{story.headline}</h3>
+          <p className="body-serif" style={{ margin: '0 0 6px', color: 'var(--ink2)' }}>{story.standfirst}</p>
+          {story.body.split(/\n+/).map((para, i) => (
+            <p key={i} className="body-serif" style={{ margin: '0 0 6px' }}>{para}</p>
+          ))}
+          <Btn size="sm" onClick={write} disabled={busy}>{busy ? 'Writing…' : 'Write another'}</Btn>
+        </div>
+      ) : (
+        <Btn size="sm" onClick={write} disabled={busy || !apiKey}>
+          {busy ? 'Writing…' : !apiKey ? 'Add an API key in Settings to write press' : g.played ? 'Write a recap' : 'Write a preview'}
+        </Btn>
+      )}
+      {error ? <Meta size={9} color="var(--warn)">{error}</Meta> : null}
     </div>
   )
 }

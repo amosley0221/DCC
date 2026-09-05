@@ -1,5 +1,8 @@
 package com.dcc.app.ui.sections
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,14 +13,23 @@ import androidx.compose.ui.unit.dp
 import com.dcc.app.BuildConfig
 import com.dcc.app.data.Dynasty
 import com.dcc.app.data.Persisted
+import com.dcc.app.data.SaveLabels
 import com.dcc.app.state.AppViewModel
+import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.*
 import com.dcc.app.ui.theme.Dcc
 import com.dcc.app.update.Updater
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty?) {
+fun SettingsSection(
+    vm: AppViewModel,
+    state: Persisted,
+    dynasty: Dynasty?,
+    snapshot: SnapshotView?,
+    importing: Boolean,
+    importError: String?,
+) {
     val c = Dcc.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -25,11 +37,74 @@ fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty?) {
     var relayUrl by remember(state.relayUrl) { mutableStateOf(state.relayUrl) }
     var relayToken by remember(state.relayToken) { mutableStateOf(state.relayToken) }
 
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) vm.importSnapshot(uri)
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         SectionHeader(
             title = "Settings",
             sub = { MetaText("VERSION ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
         )
+
+        // ── snapshot ─────────────────────────────────────────────────────────
+        DccCard {
+            Kicker("Dynasty snapshot")
+            Spacer(Modifier.height(9.dp))
+            if (snapshot != null) {
+                val s = snapshot.snapshot
+                MonoLabel(
+                    "SNAPSHOT LOADED — ${(snapshot.userTeam?.name ?: "NO TEAM PICKED").uppercase()}",
+                    c.good, 10,
+                )
+                Spacer(Modifier.height(7.dp))
+                MetaText("EXPORTED ${SaveLabels.generated(s.generated)}", c.ink3, 10)
+                Spacer(Modifier.height(5.dp))
+                MetaText(
+                    "${s.teams.size} teams · ${s.games.size} games · " +
+                        "${s.players.size} players · ${s.recruits.size} recruits",
+                    c.ink3, 10, maxLines = 3,
+                )
+            } else {
+                MetaText("NO SNAPSHOT IMPORTED", c.ink3, 10)
+                Spacer(Modifier.height(7.dp))
+                BodySerif(
+                    "The Windows app writes dcc-snapshot.json out of your real save. Copy that " +
+                        "file to this phone and import it here — Team and Recruit then show your " +
+                        "dynasty instead of the sample.",
+                )
+            }
+
+            if (importing) {
+                Spacer(Modifier.height(9.dp))
+                MonoLabel("READING THE FILE…", c.warn, 10)
+            }
+            importError?.let {
+                Spacer(Modifier.height(9.dp))
+                MonoLabel(it.uppercase(), c.accent, 10)
+            }
+
+            Spacer(Modifier.height(11.dp))
+            DccButton(
+                if (snapshot != null) "Import another snapshot" else "Import snapshot",
+                Modifier.fillMaxWidth(),
+                BtnStyle.PRIMARY,
+                enabled = !importing,
+            ) {
+                // Providers disagree about what a .json file is — some report
+                // application/json, some octet-stream — and a filtered picker
+                // that guesses wrong hides the file completely.
+                picker.launch(arrayOf("*/*"))
+            }
+            if (snapshot != null) {
+                Spacer(Modifier.height(8.dp))
+                DccButton("Use the sample dynasty instead", Modifier.fillMaxWidth()) { vm.useSampleInstead() }
+                Spacer(Modifier.height(8.dp))
+                DccButton("Remove snapshot", Modifier.fillMaxWidth(), BtnStyle.ACCENT) { vm.clearSnapshot() }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
 
         // ── dynasty ──────────────────────────────────────────────────────────
         DccCard {
@@ -38,6 +113,10 @@ fun SettingsSection(vm: AppViewModel, state: Persisted, dynasty: Dynasty?) {
             when (state.dynastySource) {
                 "sample" -> {
                     MonoLabel("SAMPLE DYNASTY LOADED — INVENTED DATA, NOT YOUR SAVE", c.warn, 10)
+                    if (snapshot != null) {
+                        Spacer(Modifier.height(5.dp))
+                        MetaText("YOUR SNAPSHOT IS SHOWN INSTEAD WHEREVER IT HAS THE DATA", c.ink4, 9)
+                    }
                     Spacer(Modifier.height(7.dp))
                     dynasty?.let {
                         MetaText(

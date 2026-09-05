@@ -12,6 +12,7 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
   const [checking, setChecking] = useState(false)
   const [relayUrl, setRelayUrl] = useState(state.relayUrl)
   const [relayToken, setRelayToken] = useState(state.relayToken)
+  const [key, setKey] = useState(state.anthropicKey)
 
   useEffect(() => { void window.dcc.info().then((i) => setInfo({ userData: i.userData, isDev: i.isDev })) }, [])
 
@@ -26,6 +27,34 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
       <SectionHeader title="Settings" sub={<Meta>VERSION {version}</Meta>} />
 
       <div className="col" style={{ gap: 12, maxWidth: 720 }}>
+        <Card className="card-pad">
+          <Kicker>Press coverage</Kicker>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            Previews and recaps are written by a model from the facts in your save — the teams,
+            the records, the conditions and the score. It uses your own Anthropic API key, which
+            is kept on this machine with the rest of your settings and sent nowhere but the API.
+            Get one at console.anthropic.com.
+          </p>
+          <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Input
+              type="password"
+              style={{ minWidth: 300 }}
+              placeholder="sk-ant-…"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+            />
+            <Btn variant="primary" onClick={() => dispatch({ type: 'anthropicKey', key: key.trim() })}>
+              Save the key
+            </Btn>
+            {state.anthropicKey ? (
+              <Btn onClick={() => { setKey(''); dispatch({ type: 'anthropicKey', key: '' }) }}>Forget it</Btn>
+            ) : null}
+          </div>
+          <Meta size={9}>
+            {state.anthropicKey ? 'A KEY IS SAVED — PRESS BUTTONS APPEAR ON EVERY GAME IN TEAM → SCHEDULE' : 'NO KEY SAVED'}
+          </Meta>
+        </Card>
+
         <Card className="card-pad">
           <Kicker>Appearance</Kicker>
           <div className="row" style={{ gap: 8, marginTop: 10 }}>

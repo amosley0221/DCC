@@ -136,6 +136,11 @@ export interface Persisted {
    * The save groups rosters but never names them, so these are chosen.
    */
   teamNames: Record<number, string>
+  /**
+   * The user's own Anthropic API key, used only to write press coverage. It is
+   * kept with the rest of the settings on this machine and sent nowhere else.
+   */
+  anthropicKey: string
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string
