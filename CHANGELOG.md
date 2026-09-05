@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.29.2] - 2026-09-05
+
 ### Changed
 
 - **The desktop reads your save on launch.** It already re-opened the file you
