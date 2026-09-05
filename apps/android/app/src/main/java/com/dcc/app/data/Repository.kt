@@ -16,6 +16,13 @@ object Repository {
         ignoreUnknownKeys = true
         encodeDefaults = true
         explicitNulls = false
+        // A snapshot is written by a desktop build that may be newer or older
+        // than this one, so decoding has to bend rather than break. Unknown keys
+        // are already ignored; this handles the other direction, where a field
+        // arrives as an explicit null. Without it a single null on a
+        // non-nullable field with a default refuses the entire file, which is a
+        // brutal outcome for a nine-megabyte document that is otherwise fine.
+        coerceInputValues = true
     }
 
     private const val STATE_FILE = "dcc-state.json"
