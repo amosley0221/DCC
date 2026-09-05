@@ -10,6 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.21.3] - 2026-09-05
+
+### Fixed
+
+- **"Throw Under Pressure" was showing every player's height.** The rating was
+  mapped from one player's card to bit 650, and bit 650 is Height, verified on
+  all 16,448 players — that player's throw-under-pressure happened to equal his
+  height in inches. The rating is removed rather than guessed at; DCC now shows
+  52 ratings and says which one it cannot place.
+
+
 ## [0.21.2] - 2026-09-04
 
 ### Added

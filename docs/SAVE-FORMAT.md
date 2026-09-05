@@ -1014,3 +1014,51 @@ through some table not yet identified.
 Two things would finish this: the layout rule, which would settle every store
 at once; or one game's known score, which would anchor `SeasonGame` the way a
 recruit's ten influences anchored the interest table.
+
+## The layout rule: what was tried
+
+The goal was a rule that maps a type's members to their bit offsets, so that
+every store could be read from the schema alone. It was not found. What was
+established, so nobody repeats it:
+
+**Anchors.** 58 fields of the player record with a verified end bit and a
+schema width — 47 ratings plus Position, TeamIndex, Height, Weight, PlayerType,
+OverallRating, TraitDevelopment, ProspectStarRating, HomePipeline,
+RecruitingDealbreaker and IdealRecruitingPitch. The schema's widths agree with
+the searched ones in every case, which is a strong check on both.
+
+**One correction.** A type's own attribute list already includes everything it
+inherits — `Player` lists 288 members, 120 of them also in `FootballPlayer` —
+so flattening base classes on top counts them twice. Every layout test before
+that was found was run on 409 members instead of 271.
+
+**Rules tested, on the corrected list, by pairwise order over 1,653 anchor
+pairs.** A correct rule scores 100%; random scores 50%.
+
+| Rule | Agreement |
+| --- | --- |
+| schema index (which is alphabetical for `Player`) | 61.3% |
+| name, byte order or lower-cased | 61.3% |
+| base class first, then derived; or the reverse | 59.6% / 61.3% |
+| width descending, then name | 43.6% |
+| FNV-1, FNV-1a, djb2, sdbm, Java, CRC32, MurmurHash3, Adler — as-is, lower-cased, with and without the `Rating` suffix | 40–57% |
+
+So the order is neither a sort of the member list by any of these, nor a hash
+of the name.
+
+**What the positions do show.** Ratings sit in runs of 7-bit fields separated
+by gaps that are very often exactly 4 bits, with the same 4-bit gap recurring
+before `PassBlockPower`, `BreakTackle`, `ManCoverage`, `KickReturn`, `JukeMove`,
+`Injury`, `RunBlockFinesse` and `PowerMoves`. Within a run the names are
+locally alphabetical more often than chance — `PowerMoves, Press, Pursuit,
+Release` — but not reliably. That reads as fields grouped into sub-structures,
+each with its own internal order, rather than one sorted list.
+
+**What it caught.** `ThrowUnderPressure` at bit 650 and `Height` at bit 650
+cannot both be true. Height is verified on all 16,448 players; the rating was
+mapped from one player's card, and that player's throw-under-pressure equalled
+his height in inches. DCC now lists 52 ratings and names the 53rd as unplaced.
+
+The working method is unchanged: find a store by name in the directory, find a
+field by its value, confirm the stride. It is slower than a rule would be, and
+it is what has actually worked.

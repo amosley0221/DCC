@@ -1143,7 +1143,7 @@ export const RATING_BITS: Record<string, number> = {
   'Catch in Traffic': 671, 'Spectacular Catch': 657, 'Short Route Running': 895,
   'Medium Route Running': 625, 'Deep Route Running': 294, Release: 959, Jumping: 721,
   'Throwing Power': 888, 'Short Throw Accuracy': 799, 'Medium Throw Accuracy': 785,
-  'Deep Throw Accuracy': 778, 'Throw on the Run': 810, 'Throw Under Pressure': 650,
+  'Deep Throw Accuracy': 778, 'Throw on the Run': 810,
   'Break Sack': 600, 'Play Action': 497, 'Pass Blocking': 543, 'Pass Block Power': 522,
   'Pass Block Finesse': 568, 'Run Blocking': 920, 'Run Block Power': 913,
   'Run Block Finesse': 906, 'Lead Block': 703, 'Impact Blocking': 753,
@@ -1162,6 +1162,14 @@ export const RATING_BITS: Record<string, number> = {
  * the five were the other way round from the correlation guess.
  */
 export const RATING_PAIRS_UNVERIFIED: [string, string][] = []
+
+/**
+ * Ratings the game has that DCC cannot place. Throw Under Pressure was mapped
+ * to bit 650 from one player's rating card; bit 650 is Height, verified on all
+ * 16,448 players, and that player's throw-under-pressure happened to equal his
+ * height in inches. Listed rather than guessed.
+ */
+export const RATINGS_UNPLACED = ['Throw Under Pressure']
 
 export interface RosterPlayer {
   index: number
