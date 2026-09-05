@@ -131,8 +131,11 @@ export default function WireSave() {
       <div className="gs-soon">
         <h1 className="screen-title" style={{ marginBottom: 14 }}>{me ?? 'Your dynasty'}</h1>
         <p className="gs-soon-body">
-          Open The Program and read the roster. The whole front page comes out of that one pass —
-          the schedule, the scores, the squad and the recruiting board.
+          {save.restoring
+            ? 'Reading your save. The whole front page comes out of that one pass — ' +
+              'the schedule, the scores, the squad and the recruiting board.'
+            : 'Open The Program and read the roster. The whole front page comes out of that one ' +
+              'pass — the schedule, the scores, the squad and the recruiting board.'}
         </p>
       </div>
     )

@@ -69,6 +69,16 @@ export default function Save() {
     else setError(res.message)
   }
 
+  const readRoster = async (from: string) => {
+    patch({ rosterBusy: true })
+    const res = await window.dcc.roster(from)
+    patch({ rosterBusy: false })
+    if (res.ok) {
+      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })
+      dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
+    } else setError(res.message)
+  }
+
   const pick = async () => {
     const chosen = await window.dcc.pickSave()
     if (!chosen) return
@@ -82,6 +92,11 @@ export default function Save() {
     if (!res.ok) { setError(res.message); return }
     setReport(res.report)
     dispatch({ type: 'log', line: { text: `analysed ${chosen}`, kind: 'info' } })
+
+    // Choosing a save is one action, not two. Every screen is built out of the
+    // roster pass, so read it here rather than making the user find a second
+    // button before anything appears.
+    void readRoster(chosen)
 
     // Find the dictionary without making the user hunt for it.
     const have = await window.dcc.dictionaryState()
@@ -100,13 +115,7 @@ export default function Save() {
 
   const loadRoster = async () => {
     if (!path) return
-    patch({ rosterBusy: true })
-    const res = await window.dcc.roster(path)
-    patch({ rosterBusy: false })
-    if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })
-      dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
-    } else setError(res.message)
+    await readRoster(path)
   }
 
   const scanInstall = async (dir: string) => {

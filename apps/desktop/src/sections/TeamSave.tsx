@@ -134,7 +134,7 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
         sub={<Meta>{view === 'schedule'
           ? [mine ? coachOf.get(mine.id)?.conference : null, mine ? coachOf.get(mine.id)?.division : null]
               .filter(Boolean).join(' · ').toUpperCase() || 'SEASON RESULTS'
-          : !roster ? 'ROSTER NOT READ YET'
+          : !roster ? (rosterBusy || save.restoring ? 'READING YOUR SAVE…' : 'ROSTER NOT READ YET')
           : mine ? `${(nameOf(mine.id) ?? `TEAM ${mine.id}`).toUpperCase()} — ${mine.list.length} PLAYERS`
           : `${teams.length} PROGRAMMES — PICK YOURS`}</Meta>}
         right={view === 'schedule' ? undefined
@@ -320,8 +320,11 @@ export default function TeamSave({ view }: { view?: 'schedule' } = {}) {
               Names, hometowns, positions, overalls, redshirt status and all 53 ratings, read
               straight out of your save.
             </p>
-            <Btn variant="primary" onClick={load} disabled={rosterBusy}>
-              {rosterBusy ? 'Reading…' : 'Read the roster'}
+            {/* It reads itself on launch now, so the button is the fallback
+                rather than the way in: a save that moved, or a read that
+                failed. */}
+            <Btn variant="primary" onClick={load} disabled={rosterBusy || save.restoring}>
+              {rosterBusy || save.restoring ? 'Reading…' : 'Read the roster'}
             </Btn>
           </Card>
         ) : (

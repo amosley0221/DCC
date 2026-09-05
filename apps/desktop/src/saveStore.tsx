@@ -23,7 +23,11 @@ export interface SaveState {
   scanning: boolean
   dict: { present: boolean; bytes?: number; id?: string } | null
   dictResult: string | null
-  /** True while the remembered save is being re-read at startup. */
+  /**
+   * True while the remembered save is being re-read at startup — the header
+   * pass and the roster pass both, since a screen with an analysed save and no
+   * roster has nothing on it.
+   */
   restoring: boolean
   roster: {
     count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
@@ -82,18 +86,38 @@ export function SaveProvider({ remembered, onPathChange, children }: {
 
   // Re-open the save the app was last looking at, so a restart or an in-place
   // upgrade lands back where the user left off rather than on an empty panel.
+  //
+  // Both passes, not just the first. Analysing the save only gets its header;
+  // every screen in the app is built out of the roster pass, so stopping after
+  // the analysis left the user on an empty front page with a button to press
+  // every single launch.
   useEffect(() => {
     if (started.current || !remembered) return
     started.current = true
     ;(async () => {
       patch({ restoring: true, path: remembered })
       const res = await window.dcc.analyzeSave(remembered)
-      if (res.ok) patch({ report: res.report, restoring: false })
-      else {
+      if (!res.ok) {
         // The file moved or was deleted — forget it rather than nagging.
         patch({ path: null, restoring: false })
         onPathChange(null)
+        patch({ dict: await window.dcc.dictionaryState() })
+        return
       }
+      patch({ report: res.report })
+      const r = await window.dcc.roster(remembered)
+      // A roster that fails to read is not worth an error on the front page:
+      // the save is open, and The Program still offers the button.
+      patch({
+        roster: r.ok
+          ? {
+              count: r.count, ratingNames: r.ratingNames, unverifiedPairs: r.unverifiedPairs,
+              schools: r.schools, coaches: r.coaches, stores: r.stores, games: r.games,
+              players: r.players,
+            }
+          : null,
+        restoring: false,
+      })
       patch({ dict: await window.dcc.dictionaryState() })
     })()
   }, [remembered, patch, onPathChange])
