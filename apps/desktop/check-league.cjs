@@ -123,4 +123,67 @@ const table = L.buildLeague(games, teams)
   assert.deepEqual([psu5.wins, psu5.losses], [3, 0], 'your own record is never held from you')
 }
 
-console.log('check-league: records, bowls, a school\'s season, the order, the standings and the spoiler line')
+/* -------------------------------------------------------------- the playoff */
+{
+  // Twelve teams out of four conferences, so the auto-bid rule has something to
+  // bite on: the five best conference leaders are in on their titles, the rest
+  // of the field is the best of everyone else, and all twelve seed by rank.
+  const conf = (name, n) => Array.from({ length: n }, (_, i) => ({
+    name: `${name}${i + 1}`, conference: name, division: null,
+  }))
+  const teams = [...conf('A', 6), ...conf('B', 6), ...conf('C', 6), ...conf('D', 6),
+                 ...conf('E', 3), ...conf('F', 3)]
+  // Each school's record is set by playing a fixed number of wins against a
+  // punching bag in its own conference, so the ordering is known up front.
+  const games = []
+  let row = 0
+  const beat = (w, l, week) => games.push({
+    week, home: w, away: l, homeScore: 30, awayScore: 10, played: true, postseason: false, row: row++,
+  })
+  // A1 best in A, B1 best in B, and so on; the second team in each conference is
+  // strong nationally but never a leader.
+  const wins = {
+    A1: 9, A2: 8, B1: 8, B2: 7, C1: 7, C2: 6, D1: 6, D2: 5, E1: 5, E2: 4, F1: 4, F2: 3,
+  }
+  for (const [team, n] of Object.entries(wins)) {
+    const bag = team[0] + '6'
+    for (let i = 0; i < n; i++) beat(team, bag === team ? team[0] + '5' : bag, i + 1)
+  }
+  const table = L.buildLeague(games, teams)
+  const field = L.projectPlayoff(table)
+
+  assert.equal(field.teams.length, 12)
+  assert.equal(field.projected, true, 'it never claims to be a played bracket')
+  assert.deepEqual(field.teams.map((t) => t.seed), [1,2,3,4,5,6,7,8,9,10,11,12])
+  assert.ok(field.teams.slice(0, 4).every((t) => t.bye), 'the top four sit out the first round')
+  assert.ok(field.teams.slice(4).every((t) => !t.bye), 'nobody else does')
+
+  // Exactly five are in on a conference title.
+  assert.equal(field.teams.filter((t) => t.champion).length, 5)
+  const champs = field.teams.filter((t) => t.champion).map((t) => t.row.name)
+  assert.deepEqual(champs.sort(), ['A1', 'B1', 'C1', 'D1', 'E1'],
+    'the five best leaders, not all six')
+
+  // F1 leads its conference but is the sixth-best leader, so it is in on merit
+  // or not at all — here it is in, but as an at-large.
+  const f1 = field.teams.find((t) => t.row.name === 'F1')
+  if (f1) assert.equal(f1.champion, false, 'the sixth leader has no automatic bid')
+
+  // Seeding follows the ranking, not how a team got in.
+  const order = L.rankings(table).map((r) => r.name)
+  const seeded = field.teams.map((t) => t.row.name)
+  assert.deepEqual(seeded, order.filter((n) => seeded.includes(n)),
+    'the twelve are seeded in ranking order')
+
+  assert.equal(field.leaders.get('A'), 'A1')
+  assert.equal(field.leaders.size, 6, 'one leader per conference')
+
+  // The bracket shape is the twelve-team one, and every seed appears once.
+  const inFirst = L.FIRST_ROUND.flat()
+  assert.deepEqual([...inFirst].sort((a, b) => a - b), [5, 6, 7, 8, 9, 10, 11, 12])
+  assert.deepEqual(L.QUARTERFINALS.map((q) => q.seed).sort((a, b) => a - b), [1, 2, 3, 4])
+  const fed = L.QUARTERFINALS.flatMap((q) => q.from).sort((a, b) => a - b)
+  assert.deepEqual(fed, inFirst.sort((a, b) => a - b), 'every first-round game feeds a quarterfinal')
+}
+
+console.log('check-league: records, bowls, a school\'s season, the order, the standings, the spoiler line and the playoff field')

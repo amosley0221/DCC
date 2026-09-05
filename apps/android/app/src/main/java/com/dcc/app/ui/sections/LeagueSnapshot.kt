@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.dcc.app.data.League
 import com.dcc.app.data.SnapshotGame
 import com.dcc.app.state.SnapshotView
+import com.dcc.app.ui.components.AwardMark
 import com.dcc.app.ui.components.DccCard
 import com.dcc.app.ui.components.DccChip
 import com.dcc.app.ui.components.EmptyState
@@ -39,7 +40,11 @@ import com.dcc.app.ui.components.SectionHeader
 import com.dcc.app.ui.gold.GoldScoreRow
 import com.dcc.app.ui.theme.Dcc
 
-private val LEAGUE_TABS = listOf("STANDINGS", "RANKINGS", "SCORES", "STATS", "SCHEDULES")
+private val LEAGUE_TABS =
+    listOf("STANDINGS", "RANKINGS", "SCORES", "PLAYOFF", "STATS", "SCHEDULES")
+
+/** The conference picker's "every conference" option. Not a conference name. */
+private const val ALL_CONFERENCES = "\u0000all"
 
 private fun mono(name: String?) = (name ?: "?").take(2).uppercase()
 
@@ -64,6 +69,7 @@ fun LeagueSnapshotSection(view: SnapshotView) {
     var tab by rememberSaveable { mutableStateOf(LEAGUE_TABS[0]) }
     var spoilers by rememberSaveable { mutableStateOf(false) }
     var pick by rememberSaveable { mutableStateOf(view.userTeam?.index ?: -1) }
+    var confPick by rememberSaveable { mutableStateOf<String?>(null) }
     var week by rememberSaveable {
         mutableStateOf(view.weeks.lastOrNull { w -> w < view.holdFrom } ?: view.weeks.lastOrNull() ?: 0)
     }
@@ -76,6 +82,24 @@ fun LeagueSnapshotSection(view: SnapshotView) {
     val order = remember(table) { League.rankings(table) }
     val rankOf = remember(order) { order.withIndex().associate { (i, r) -> r.index to i + 1 } }
     val groups = remember(table) { League.conferences(table) }
+    val field = remember(table) { League.projectPlayoff(table) }
+
+    // The screen opens on your own conference, because that is the table you
+    // came for. Eleven of them is a list you pick from rather than one you
+    // search — on a phone that list is a row of chips.
+    val myConference = view.userTeam?.conference?.ifBlank { null }
+    val shownConf = confPick ?: myConference ?: groups.firstOrNull()?.first ?: ALL_CONFERENCES
+    val confRow: @Composable () -> Unit = {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            groups.forEach { (name, _) ->
+                DccChip(name, shownConf == name) { confPick = name }
+            }
+            DccChip("ALL ${table.size}", shownConf == ALL_CONFERENCES) { confPick = ALL_CONFERENCES }
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         SectionHeader(
@@ -110,11 +134,20 @@ fun LeagueSnapshotSection(view: SnapshotView) {
         }
 
         when (tab) {
-            "STANDINGS" -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            "STANDINGS" -> Column(Modifier.fillMaxSize()) {
+              confRow()
+              LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (groups.isEmpty()) item { DccCard { EmptyState("the snapshot carries no conferences") } }
-                items(groups, key = { it.first }) { (conference, rows) ->
+                items(
+                    groups.filter { shownConf == ALL_CONFERENCES || it.first == shownConf },
+                    key = { it.first },
+                ) { (conference, rows) ->
                     DccCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            League.conferenceArtKeys(conference).firstOrNull()?.let {
+                                AwardMark(it, 24.dp)
+                                Spacer(Modifier.width(8.dp))
+                            }
                             MonoLabel(conference.uppercase(), c.accent, 10)
                             Spacer(Modifier.weight(1f))
                             MetaText("${rows.size} TEAMS", c.ink4, 9)
@@ -126,6 +159,7 @@ fun LeagueSnapshotSection(view: SnapshotView) {
                     }
                 }
                 item { Spacer(Modifier.height(24.dp)) }
+              }
             }
 
             "RANKINGS" -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -148,13 +182,13 @@ fun LeagueSnapshotSection(view: SnapshotView) {
                                 "${rankOf[r.index]}", if ((rankOf[r.index] ?: 99) <= 25) c.accent else c.ink3,
                                 13, FontWeight.SemiBold, Modifier.width(26.dp),
                             )
-                            SchoolBadge(mono(r.name), r.name, r.index == userIndex, 22.dp, "logo")
+                            SchoolBadge(mono(r.name), r.name, r.index == userIndex, 28.dp, "logo")
                             Spacer(Modifier.width(9.dp))
                             Column(Modifier.weight(1f)) {
-                                RowTitle(r.name, if (r.index == userIndex) c.accent else c.ink, 14)
-                                MetaText(r.conference ?: "", c.ink4, 9, maxLines = 1)
+                                RowTitle(r.name, if (r.index == userIndex) c.accent else c.ink, 16)
+                                MetaText(r.conference ?: "", c.ink4, 10, maxLines = 1)
                             }
-                            NumText("${r.wins}-${r.losses}", c.ink, 13, FontWeight.SemiBold)
+                            NumText("${r.wins}-${r.losses}", c.ink, 15, FontWeight.SemiBold)
                             Spacer(Modifier.width(10.dp))
                             NumText(
                                 if (r.played > 0) signed(r.margin) else "—",
@@ -187,7 +221,9 @@ fun LeagueSnapshotSection(view: SnapshotView) {
                 }
             }
 
-            "STATS" -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            "STATS" -> Column(Modifier.fillMaxSize()) {
+              confRow()
+              LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 item {
                     DccCard {
                         MonoLabel("TEAM SCORING", c.accent, 10)
@@ -200,13 +236,16 @@ fun LeagueSnapshotSection(view: SnapshotView) {
                         )
                     }
                 }
-                items(order, key = { it.index }) { r ->
+                items(
+                    order.filter { shownConf == ALL_CONFERENCES || it.conference == shownConf },
+                    key = { it.index },
+                ) { r ->
                     DccCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            SchoolBadge(mono(r.name), r.name, r.index == userIndex, 22.dp, "logo")
+                            SchoolBadge(mono(r.name), r.name, r.index == userIndex, 28.dp, "logo")
                             Spacer(Modifier.width(9.dp))
                             Column(Modifier.weight(1f)) {
-                                RowTitle(r.name, if (r.index == userIndex) c.accent else c.ink, 14)
+                                RowTitle(r.name, if (r.index == userIndex) c.accent else c.ink, 16)
                                 MetaText("${r.played} GAMES · ${r.wins}-${r.losses}", c.ink4, 9, maxLines = 1)
                             }
                             Column(horizontalAlignment = Alignment.End) {
@@ -223,14 +262,18 @@ fun LeagueSnapshotSection(view: SnapshotView) {
                     }
                 }
                 item { Spacer(Modifier.height(24.dp)) }
+              }
             }
 
+            "PLAYOFF" -> Playoff(field, view, userIndex) { pick = it }
+
             else -> Column(Modifier.fillMaxSize()) {
+                confRow()
                 val picked = table[pick]
                 if (picked != null) {
                     DccCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            SchoolBadge(mono(picked.name), picked.name, pick == userIndex, 30.dp, "helmet")
+                            SchoolBadge(mono(picked.name), picked.name, pick == userIndex, 38.dp, "helmet")
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 RowTitle(picked.name, c.ink, 16)
@@ -255,13 +298,16 @@ fun LeagueSnapshotSection(view: SnapshotView) {
                         items(season, key = { it.row }) { g -> SeasonRow(g, pick, view, spoilers) }
                         item { Spacer(Modifier.height(14.dp)) }
                     }
-                    item { MonoLabel("EVERY SCHOOL", c.ink3, 10) }
-                    items(order, key = { "pick-" + it.index }) { r ->
+                    item { MonoLabel(if (shownConf == ALL_CONFERENCES) "EVERY SCHOOL" else shownConf.uppercase(), c.ink3, 10) }
+                    items(
+                        order.filter { shownConf == ALL_CONFERENCES || it.conference == shownConf },
+                        key = { "pick-" + it.index },
+                    ) { r ->
                         Row(
                             Modifier.fillMaxWidth().clickable { pick = r.index },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            SchoolBadge(mono(r.name), r.name, r.index == userIndex, 20.dp, "logo")
+                            SchoolBadge(mono(r.name), r.name, r.index == userIndex, 26.dp, "logo")
                             Spacer(Modifier.width(9.dp))
                             RowTitle(
                                 r.name,
@@ -290,12 +336,12 @@ private fun StandingRow(r: League.Row, rank: Int?, isUser: Boolean) {
             if (rank != null && rank <= 25) "$rank" else "",
             c.ink4, 10, FontWeight.Normal, Modifier.width(20.dp),
         )
-        SchoolBadge(mono(r.name), r.name, isUser, 20.dp, "logo")
+        SchoolBadge(mono(r.name), r.name, isUser, 26.dp, "logo")
         Spacer(Modifier.width(8.dp))
-        RowTitle(r.name, if (isUser) c.accent else c.ink, 13, Modifier.weight(1f))
-        NumText("${r.confWins}-${r.confLosses}", c.ink, 12, FontWeight.SemiBold)
+        RowTitle(r.name, if (isUser) c.accent else c.ink, 15, Modifier.weight(1f))
+        NumText("${r.confWins}-${r.confLosses}", c.ink, 14, FontWeight.SemiBold)
         Spacer(Modifier.width(10.dp))
-        NumText("${r.wins}-${r.losses}", c.ink3, 12)
+        NumText("${r.wins}-${r.losses}", c.ink3, 14)
     }
 }
 
@@ -315,9 +361,9 @@ private fun SeasonRow(g: SnapshotGame, index: Int, view: SnapshotView, spoilers:
     ) {
         NumText("${g.week}", c.ink4, 11, FontWeight.Normal, Modifier.width(24.dp))
         MetaText(if (home) "VS" else "AT", c.ink4, 9, Modifier.width(22.dp))
-        SchoolBadge(mono(other), other ?: "", false, 20.dp, "logo")
+        SchoolBadge(mono(other), other ?: "", false, 26.dp, "logo")
         Spacer(Modifier.width(8.dp))
-        RowTitle(other ?: "TBD", c.ink, 13, Modifier.weight(1f))
+        RowTitle(other ?: "TBD", c.ink, 15, Modifier.weight(1f))
         when {
             !g.played -> MetaText("—", c.ink4, 10)
             held -> MetaText("HELD", c.ink4, 9)
@@ -326,6 +372,161 @@ private fun SeasonRow(g: SnapshotGame, index: Int, view: SnapshotView, spoilers:
                 Spacer(Modifier.width(8.dp))
                 NumText("$us-$them", c.ink3, 12)
             }
+        }
+    }
+}
+
+/**
+ * The playoff, and the rest of bowl season.
+ *
+ * Before December there is no bracket in the save, so this is DCC's projection —
+ * the five highest-ranked conference leaders on their titles, the best seven of
+ * everyone else, and all twelve seeded by the ranking. It is labelled a
+ * projection wherever it appears, because no conference title game has been
+ * played and nothing in the file says who will win one.
+ *
+ * December's games appear as they are played. What DCC cannot do yet is name
+ * them: the save marks a row as postseason but the bowl's own name is not
+ * decoded, so there is no Rose Bowl crest to draw beside one.
+ */
+@Composable
+private fun Playoff(
+    field: League.PlayoffField,
+    view: SnapshotView,
+    userIndex: Int?,
+    onPick: (Int) -> Unit,
+) {
+    val c = Dcc.colors
+    val bySeed = field.teams.associateBy { it.seed }
+    val bowls = view.snapshot.games.filter { it.postseason }.sortedBy { it.week }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            DccCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AwardMark("playoff:nationalchampionship", 26.dp)
+                    Spacer(Modifier.width(8.dp))
+                    MonoLabel("THE PLAYOFF — PROJECTED", c.accent, 10)
+                }
+                Spacer(Modifier.height(6.dp))
+                MetaText(
+                    "The five highest-ranked conference leaders are in on their titles, the next " +
+                        "seven places go to the best of everyone else, and all twelve are seeded by " +
+                        "the ranking. Seeds one to four sit out the first round. This stays a " +
+                        "projection until December: a leader is not yet a champion, and the save " +
+                        "carries no bracket of its own.",
+                    c.ink3, 10, maxLines = 8,
+                )
+            }
+        }
+
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 6.dp)) {
+                AwardMark("playoff:round1", 22.dp)
+                Spacer(Modifier.width(8.dp))
+                MonoLabel("FIRST ROUND", c.ink3, 10)
+            }
+        }
+        items(League.FIRST_ROUND, key = { "fr-" + it.first }) { (high, low) ->
+            DccCard {
+                BracketSlot(bySeed[high], high, userIndex, onPick)
+                Spacer(Modifier.height(6.dp))
+                BracketSlot(bySeed[low], low, userIndex, onPick)
+            }
+        }
+
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 6.dp)) {
+                AwardMark("playoff:qtrfinal", 22.dp)
+                Spacer(Modifier.width(8.dp))
+                MonoLabel("QUARTERFINALS", c.ink3, 10)
+            }
+        }
+        items(League.QUARTERFINALS, key = { "qf-" + it.first }) { (seed, from) ->
+            DccCard {
+                BracketSlot(bySeed[seed], seed, userIndex, onPick)
+                Spacer(Modifier.height(6.dp))
+                MetaText("WINNER OF ${from.first} V ${from.second}", c.ink4, 10, maxLines = 1)
+            }
+        }
+
+        item {
+            DccCard {
+                MonoLabel("SEMIFINALS AND THE TITLE", c.ink3, 10)
+                Spacer(Modifier.height(6.dp))
+                MetaText(
+                    "1/8/9 against 4/5/12, then 3/6/11 against 2/7/10, and the winners for the " +
+                        "national championship.",
+                    c.ink3, 10, maxLines = 3,
+                )
+            }
+        }
+
+        item { MonoLabel("CONFERENCE LEADERS", c.ink3, 10, Modifier.padding(top = 6.dp)) }
+        items(field.leaders.entries.toList(), key = { "cl-" + it.key }) { (conference, team) ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                SchoolBadge(mono(team), team, false, 26.dp, "logo")
+                Spacer(Modifier.width(9.dp))
+                RowTitle(team, c.ink, 15, Modifier.weight(1f))
+                MetaText(conference.uppercase(), c.ink4, 10, maxLines = 1)
+            }
+        }
+
+        item { MonoLabel("BOWL SEASON", c.ink3, 10, Modifier.padding(top = 6.dp)) }
+        if (bowls.isEmpty()) {
+            item {
+                DccCard {
+                    MetaText(
+                        "Nothing yet — December's rows fill in as you play the postseason. DCC can " +
+                            "see that a game is a bowl but not which bowl, so there is no crest to " +
+                            "put beside one.",
+                        c.ink3, 10, maxLines = 4,
+                    )
+                }
+            }
+        } else {
+            items(bowls, key = { "bowl-" + it.row }) { g ->
+                GoldScoreRow(
+                    away = g.away ?: "", awayScore = g.awayScore,
+                    home = g.home ?: "", homeScore = g.homeScore,
+                )
+            }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** One team in the bracket, or an empty slot where the field is short. */
+@Composable
+private fun BracketSlot(
+    team: League.PlayoffTeam?,
+    seed: Int,
+    userIndex: Int?,
+    onPick: (Int) -> Unit,
+) {
+    val c = Dcc.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (team != null) Modifier.clickable { onPick(team.row.index) } else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NumText("$seed", c.ink4, 12, FontWeight.Normal, Modifier.width(22.dp))
+        SchoolBadge(mono(team?.row?.name), team?.row?.name ?: "", team?.row?.index == userIndex, 26.dp, "logo")
+        Spacer(Modifier.width(9.dp))
+        RowTitle(
+            team?.row?.name ?: "TBD",
+            if (team?.row?.index == userIndex) c.accent else c.ink, 15,
+            Modifier.weight(1f),
+        )
+        if (team != null) {
+            if (team.champion) {
+                MetaText("CH", c.accent, 9, maxLines = 1)
+                Spacer(Modifier.width(6.dp))
+            }
+            NumText("${team.row.wins}-${team.row.losses}", c.ink3, 13)
         }
     }
 }

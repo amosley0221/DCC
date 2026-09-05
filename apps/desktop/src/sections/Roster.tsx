@@ -224,7 +224,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
               {shown.map((p) => (
                 <tr key={p.index}>
                   <td style={{ width: 34 }}>
-                    <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={26} />
+                    <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={34} />
                   </td>
                   <td className="name">
                     <button onClick={() => setSheet(p.index)}

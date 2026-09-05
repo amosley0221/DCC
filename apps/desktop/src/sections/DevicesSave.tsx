@@ -110,6 +110,7 @@ export default function DevicesSave() {
       save.schoolArt,
       save.facePaths,
       assetIds(),
+      save.awardArt,
       {},
       (p) => setProgress(`${p.done} of ${p.total}${p.label ? ` · ${p.label}` : ''}`),
     )

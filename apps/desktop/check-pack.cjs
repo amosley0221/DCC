@@ -19,6 +19,10 @@ const P = require(process.argv[2])
   assert.equal(P.schoolEntryName('Penn State', 'helmet'), 'schools/Penn_State__helmet.png')
   assert.equal(P.playerEntryName('Generic_0001_P_T0000_D_1_1'),
     'players/Generic_0001_P_T0000_D_1_1.png')
+  // A colon is not a filename on Windows, so the kind and the name are joined
+  // the same way a school and its mark are.
+  assert.equal(P.awardEntryName('trophy:heisman'), 'awards/trophy__heisman.png')
+  assert.equal(P.awardEntryName('bowl:rosebowltrophy'), 'awards/bowl__rosebowltrophy.png')
 }
 
 /* ------------------------------------------------------- what to carry, once */
@@ -49,6 +53,8 @@ const P = require(process.argv[2])
     { name: P.schoolEntryName('Penn State', 'helmet'), data: png(2) },
     { name: P.schoolEntryName("Hawai'i", 'logo'), data: png(3) },
     { name: P.playerEntryName('Generic_0001_P_T0000_D_1_1'), data: png(4) },
+    { name: P.awardEntryName('trophy:heisman'), data: png(5) },
+    { name: P.awardEntryName('playoff:round1'), data: png(6) },
   ]
   const built = new Date('2026-09-05T12:00:00.000Z')
   const res = P.packEntries(entries, built)
@@ -57,10 +63,14 @@ const P = require(process.argv[2])
   assert.equal(res.manifest.built, built.toISOString())
   assert.deepEqual([...res.manifest.schools['Penn_State']].sort(), ['helmet', 'logo'])
   assert.deepEqual(res.manifest.players, ['Generic_0001_P_T0000_D_1_1'])
+  assert.deepEqual([...res.manifest.awards].sort(), ['playoff:round1', 'trophy:heisman'],
+    'the award keys come back out of the entry names')
   assert.equal(res.manifest.bytes, entries.reduce((n, e) => n + e.data.length, 0))
 
   const back = readZip(res.bytes)
   assert.deepEqual([...back.keys()].sort(), [
+    'awards/playoff__round1.png',
+    'awards/trophy__heisman.png',
     'manifest.json',
     'players/Generic_0001_P_T0000_D_1_1.png',
     'schools/Hawai_i__logo.png',
@@ -84,6 +94,7 @@ const P = require(process.argv[2])
   assert.deepEqual([...back.keys()], ['manifest.json'])
   assert.deepEqual(res.manifest.schools, {})
   assert.deepEqual(res.manifest.players, [])
+  assert.deepEqual(res.manifest.awards, [])
 }
 
 console.log('check-pack: names round-trip, the plan picks one mark each, the ZIP reads back')

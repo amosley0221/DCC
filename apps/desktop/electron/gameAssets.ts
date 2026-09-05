@@ -863,6 +863,42 @@ const SCHOOL_ALIASES: Record<string, string> = {
 
 const normSchool = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 
+/**
+ * The art that is not a school: trophies, bowl crests, playoff marks and
+ * conference championships.
+ *
+ * These are named for themselves rather than for a team — `trophies_Heisman`,
+ * `bowl_RoseBowl`, `bowl_RoseBowlTrophy`, `playoff_Qtr_Final`,
+ * `confchamp__BIG10Championship` — so there is nothing in the save to match
+ * them against. They are keyed by kind and by their own name, stripped to
+ * letters and digits, and a screen asks for the one it wants.
+ *
+ * Four prefixes, taken from the folders they sit in. Note the double underscore
+ * on the conference marks: that is how the game writes them, not a typo.
+ */
+const NAMED_ART: [string, RegExp][] = [
+  ['trophy', /^trophies_(.+)$/i],
+  ['bowl', /^bowl_(.+)$/i],
+  ['playoff', /^playoff_(.+)$/i],
+  ['confchamp', /^confchamp_+(.+)$/i],
+]
+
+export const artKey = (kind: string, name: string) =>
+  `${kind}:${name.toLowerCase().replace(/[^a-z0-9]/g, '')}`
+
+export function matchAwards(index: FaceIndex): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [id, file] of Object.entries(index.map)) {
+    for (const [kind, re] of NAMED_ART) {
+      const m = id.match(re)
+      if (!m) continue
+      out[artKey(kind, m[1])] = file
+      break
+    }
+  }
+  return out
+}
+
 export interface SchoolArt {
   /** category -> path relative to the art root. */
   art: Record<string, string>

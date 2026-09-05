@@ -289,7 +289,7 @@ private fun ScoreCard(g: SnapshotGame, mine: Boolean, awayRank: Int?, homeRank: 
     val homeWon = g.homeScore > g.awayScore
     Column(
         Modifier
-            .width(112.dp)
+            .width(150.dp)
             .clip(RoundedCornerShape(Dcc.shapes.button))
             .border(1.dp, if (mine) c.accent else c.line, RoundedCornerShape(Dcc.shapes.button))
             .background(if (mine) c.surfaceStrong else c.surface)
@@ -313,15 +313,15 @@ private fun ScoreCard(g: SnapshotGame, mine: Boolean, awayRank: Int?, homeRank: 
 private fun ScoreLine(team: String, score: Int, dim: Boolean, rank: Int? = null) {
     val c = Dcc.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
-        SchoolBadge(team.take(2).uppercase(), team, false, 17.dp, "helmet")
+        SchoolBadge(team.take(2).uppercase(), team, false, 24.dp, "helmet")
         Spacer(Modifier.width(6.dp))
         if (rank != null && rank <= 25) {
             Label("$rank", 9.0, c.ink3, 0.5)
             Spacer(Modifier.width(4.dp))
         }
-        Ui(team, 11.0, if (dim) c.ink3 else c.ink, FontWeight.SemiBold, Modifier.weight(1f), maxLines = 1)
+        Ui(team, 13.0, if (dim) c.ink3 else c.ink, FontWeight.SemiBold, Modifier.weight(1f), maxLines = 1)
         Spacer(Modifier.width(6.dp))
-        GoldNum("$score", 15, if (dim) c.ink3 else c.ink)
+        GoldNum("$score", 19, if (dim) c.ink3 else c.ink)
     }
 }
 

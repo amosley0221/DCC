@@ -133,6 +133,111 @@ object League {
             }
             .sortedBy { it.first }
 
+    /* ────────────────────────────────────────────────────────── the playoff */
+
+    const val PLAYOFF_SIZE = 12
+
+    /** Conference champions that qualify on their title alone. */
+    const val PLAYOFF_AUTO_BIDS = 5
+
+    data class PlayoffTeam(
+        val seed: Int,
+        val row: Row,
+        /** In on a conference title rather than on the strength of the résumé. */
+        val champion: Boolean,
+        /** Seeds one to four sit out the first round. */
+        val bye: Boolean,
+    )
+
+    data class PlayoffField(
+        val teams: List<PlayoffTeam>,
+        /** Conference name to the program leading it. */
+        val leaders: Map<String, String>,
+        /** True while this is a projection rather than a bracket the save played. */
+        val projected: Boolean = true,
+    )
+
+    /**
+     * The twelve-team field, projected from the table — the same rule the PC
+     * uses, so the two apps show the same bracket.
+     *
+     * The five highest-ranked conference champions are in on their titles, the
+     * remaining seven places go to the best of everyone left, and all twelve are
+     * then seeded strictly by the ranking. Seeds one to four sit out the first
+     * round.
+     *
+     * "Champion" is the program leading its conference: no title game has been
+     * played in November, and the save cannot be asked who will win one. Every
+     * screen showing this says it is a projection.
+     */
+    fun projectPlayoff(table: Map<Int, Row>): PlayoffField {
+        val order = rankings(table)
+        val leaders = LinkedHashMap<String, String>()
+        for ((conference, rows) in conferences(table)) {
+            rows.firstOrNull()?.let { leaders[conference] = it.name }
+        }
+        val isLeader = leaders.values.toSet()
+
+        val chosen = mutableListOf<Pair<Row, Boolean>>()
+        val taken = mutableSetOf<String>()
+        for (r in order) {
+            if (chosen.size >= PLAYOFF_AUTO_BIDS) break
+            if (r.name !in isLeader) continue
+            chosen += r to true
+            taken += r.name
+        }
+        for (r in order) {
+            if (chosen.size >= PLAYOFF_SIZE) break
+            if (r.name in taken) continue
+            chosen += r to false
+            taken += r.name
+        }
+
+        // Seeded by the ranking, not by how they got in: a champion ranked
+        // eleventh is the eleventh seed.
+        val rank = order.withIndex().associate { (i, r) -> r.name to i }
+        val seeded = chosen.sortedBy { rank[it.first.name] ?: 999 }
+
+        return PlayoffField(
+            teams = seeded.mapIndexed { i, (row, champion) ->
+                PlayoffTeam(i + 1, row, champion, i < 4)
+            },
+            leaders = leaders,
+        )
+    }
+
+    /** First-round pairings, higher seed first. Seeds one to four are not here. */
+    val FIRST_ROUND: List<Pair<Int, Int>> = listOf(5 to 12, 6 to 11, 7 to 10, 8 to 9)
+
+    /** Quarterfinals: a bye seed against the winner of one first-round game. */
+    val QUARTERFINALS: List<Pair<Int, Pair<Int, Int>>> =
+        listOf(1 to (8 to 9), 4 to (5 to 12), 3 to (6 to 11), 2 to (7 to 10))
+
+    /**
+     * The art keys for a conference's championship mark, best first.
+     *
+     * The art names a conference the way a broadcast graphic does — BIG10,
+     * PAC12, CUSA — while the save names it the way a table does: "Big Ten",
+     * "Pac-12", "Conference USA". The PC maps them the same way.
+     */
+    private val CONFERENCE_ART = mapOf(
+        "bigten" to "big10", "big10" to "big10", "b1g" to "big10",
+        "big12" to "big12", "bigxii" to "big12",
+        "pac12" to "pac12", "pacific12" to "pac12",
+        "american" to "american", "americanathletic" to "american", "aac" to "aac",
+        "conferenceusa" to "cusa", "cusa" to "cusa",
+        "mountainwest" to "mountainwest", "mwc" to "mountainwest",
+        "sunbelt" to "sunbelt",
+    )
+
+    fun conferenceArtKeys(conference: String?): List<String> {
+        if (conference.isNullOrBlank()) return emptyList()
+        val norm = conference.lowercase().filter { it.isLetterOrDigit() }
+        val mapped = CONFERENCE_ART[norm]
+        val names = if (mapped != null && mapped != norm) listOf(mapped, norm) else listOf(norm)
+        return names.map { "confchamp:${it}championship" }
+    }
+
     private fun confPct(r: Row): Double {
         val n = r.confWins + r.confLosses
         return if (n == 0) -1.0 else r.confWins.toDouble() / n

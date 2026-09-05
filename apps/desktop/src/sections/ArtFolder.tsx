@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { indexArt, useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Btn, Card, Kicker, Meta } from '../ui'
+import { Btn, Card, Chip, Input, Kicker, Meta } from '../ui'
 
 /**
  * Where the game's extracted art is, and whether it matched.
@@ -18,6 +18,8 @@ export default function ArtFolder() {
   const { state, dispatch } = useStore()
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  const [look, setLook] = useState('')
+  const [found, setFound] = useState<{ hits: string[]; total: number } | null>(null)
 
   const pick = async () => {
     if (!save.roster) { setNote('Read your save first — the art is matched against your players.'); return }
@@ -34,6 +36,11 @@ export default function ArtFolder() {
       ` and ${art.schools} schools`
     setNote(msg)
     dispatch({ type: 'log', line: { text: msg, kind: art.matched ? 'good' : 'bad' } })
+  }
+
+  const search = async (q: string) => {
+    const res = await window.dcc.searchArt(q)
+    setFound({ hits: res.hits, total: res.total })
   }
 
   const faces = save.faces
@@ -78,6 +85,53 @@ export default function ArtFolder() {
         ) : null}
       </div>
       {note ? <div style={{ marginTop: 9 }}><Meta size={9}>{note.toUpperCase()}</Meta></div> : null}
+
+      {/* What is in the folder that DCC has not learned to read yet.
+          Faces, logos, helmets and jerseys are matched by pattern; bowl crests,
+          trophies and stadiums are not, because nobody has seen what they are
+          called. Guessing a pattern is how the art pack once shipped at 208
+          bytes, so this looks instead. */}
+      {faces ? (
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+          <Kicker>Look inside the folder</Kicker>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            DCC reads faces, logos, helmets and jerseys because it knows how they are named.
+            Bowl crests, trophies and stadiums it does not — so search for one and tell me what
+            comes back, and it can be matched the same way.
+          </p>
+          <div className="row" style={{ gap: 8, marginTop: 8, alignItems: 'center' }}>
+            <span style={{ flex: 1 }}>
+              <Input
+                placeholder="bowl, playoff, trophy, stadium…"
+                value={look}
+                onChange={(e) => setLook(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void search(look) }}
+              />
+            </span>
+            <Btn onClick={() => void search(look)}>Look</Btn>
+          </div>
+          <div className="row" style={{ gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
+            {['bowl', 'playoff', 'cfp', 'trophy', 'stadium', 'award'].map((w) => (
+              <Chip key={w} on={look === w} onClick={() => { setLook(w); void search(w) }}>{w}</Chip>
+            ))}
+          </div>
+          {found ? (
+            <div style={{ marginTop: 10 }}>
+              <Meta size={9}>
+                {found.total.toLocaleString()} FILES MATCH
+                {found.total > found.hits.length ? ` — FIRST ${found.hits.length}` : ''}
+              </Meta>
+              {found.hits.length ? (
+                <pre style={{
+                  marginTop: 6, maxHeight: 220, overflow: 'auto', fontSize: 11,
+                  color: 'var(--ink2)', background: 'var(--surface)',
+                  border: '1px solid var(--line)', borderRadius: 6, padding: 10,
+                }}>{found.hits.join('\n')}</pre>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </Card>
   )
 }

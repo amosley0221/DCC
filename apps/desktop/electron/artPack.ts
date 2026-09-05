@@ -29,6 +29,8 @@ export interface PackManifest {
   schools: Record<string, string[]>
   /** Asset ids with a face in the pack. */
   players: string[]
+  /** Named art that is not a school: "trophy:heisman", "bowl:rosebowl", "playoff:round1". */
+  awards: string[]
   bytes: number
 }
 
@@ -76,6 +78,18 @@ export const schoolEntryName = (school: string, mark: string) =>
 export const playerEntryName = (assetId: string) => `players/${safe(assetId)}.png`
 
 /**
+ * Trophies, bowl crests and playoff marks travel too.
+ *
+ * Their keys are "kind:name" and a colon is not a filename on Windows, so the
+ * separator becomes a double underscore — the same rule the school marks use,
+ * and the phone rebuilds the name rather than being told it.
+ */
+export const awardEntryName = (key: string) => {
+  const [kind, ...rest] = key.split(':')
+  return `awards/${safe(kind)}__${safe(rest.join(':'))}.png`
+}
+
+/**
  * Which of a school's files to carry, and under what name.
  *
  * `icon` and `logoLight` both become "logo", and the first listed wins, because
@@ -103,17 +117,21 @@ export function schoolPlan(schoolArt: Record<string, string>): Map<string, Map<s
 export function packEntries(entries: PackEntry[], now = new Date()): PackResult {
   const schools: Record<string, string[]> = {}
   const players: string[] = []
+  const awards: string[] = []
   for (const e of entries) {
     const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(e.name)
     if (school) { (schools[school[1]] ??= []).push(school[2]); continue }
     const player = /^players\/(.+)\.png$/.exec(e.name)
-    if (player) players.push(player[1])
+    if (player) { players.push(player[1]); continue }
+    const award = /^awards\/([^/]+)__([^/]+)\.png$/.exec(e.name)
+    if (award) awards.push(`${award[1]}:${award[2]}`)
   }
   const manifest: PackManifest = {
     version: PACK_VERSION,
     built: now.toISOString(),
     schools,
     players,
+    awards,
     bytes: entries.reduce((n, e) => n + e.data.length, 0),
   }
   const all: PackEntry[] = [

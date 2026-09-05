@@ -203,3 +203,116 @@ export function visibleGames<T extends LeagueGame>(
   return games.filter((g) =>
     !(g.played && g.week >= holdFrom && g.home !== team && g.away !== team))
 }
+
+/* ------------------------------------------------------------ the playoff */
+
+export const PLAYOFF_SIZE = 12
+/** Conference champions that qualify on their title alone. */
+export const PLAYOFF_AUTO_BIDS = 5
+
+export interface PlayoffTeam {
+  /** 1 through 12. */
+  seed: number
+  row: LeagueRow
+  /** In on a conference title rather than on the strength of the résumé. */
+  champion: boolean
+  /** Seeds one to four sit out the first round. */
+  bye: boolean
+}
+
+export interface PlayoffField {
+  teams: PlayoffTeam[]
+  /** Conference name to the program leading it. */
+  leaders: Map<string, string>
+  /** True while this is a projection rather than a bracket the save has played. */
+  projected: boolean
+}
+
+/**
+ * The twelve-team field, projected from the table.
+ *
+ * The five highest-ranked conference champions are in on their titles; the
+ * remaining seven places go to the best of everyone left; and all twelve are
+ * then seeded strictly by the ranking, which is the straight-seeding format the
+ * sport moved to. Seeds one to four sit out the first round.
+ *
+ * "Champion" is the program leading its conference, because a conference title
+ * game has not been played in November and the save cannot be asked who will
+ * win one. Every screen that shows this says it is a projection.
+ */
+export function projectPlayoff(table: Map<string, LeagueRow>): PlayoffField {
+  const order = rankings(table)
+  const leaders = new Map<string, string>()
+  for (const [name, rows] of conferences(table)) {
+    if (rows.length) leaders.set(name, rows[0].name)
+  }
+  const isLeader = new Set(leaders.values())
+
+  const chosen: { row: LeagueRow; champion: boolean }[] = []
+  const taken = new Set<string>()
+  for (const r of order) {
+    if (chosen.length >= PLAYOFF_AUTO_BIDS) break
+    if (!isLeader.has(r.name)) continue
+    chosen.push({ row: r, champion: true })
+    taken.add(r.name)
+  }
+  for (const r of order) {
+    if (chosen.length >= PLAYOFF_SIZE) break
+    if (taken.has(r.name)) continue
+    chosen.push({ row: r, champion: false })
+    taken.add(r.name)
+  }
+
+  // Seeded by the ranking, not by how they got in: a champion ranked eleventh
+  // is the eleventh seed.
+  const rank = new Map(order.map((r, i) => [r.name, i]))
+  chosen.sort((a, b) => (rank.get(a.row.name) ?? 999) - (rank.get(b.row.name) ?? 999))
+
+  return {
+    leaders,
+    projected: true,
+    teams: chosen.map((c, i) => ({
+      seed: i + 1, row: c.row, champion: c.champion, bye: i < 4,
+    })),
+  }
+}
+
+/** First-round pairings, higher seed first. Seeds one to four are not here. */
+export const FIRST_ROUND: [number, number][] = [[5, 12], [6, 11], [7, 10], [8, 9]]
+
+/** Quarterfinals: a bye seed against the winner of one first-round game. */
+export const QUARTERFINALS: { seed: number; from: [number, number] }[] = [
+  { seed: 1, from: [8, 9] },
+  { seed: 4, from: [5, 12] },
+  { seed: 3, from: [6, 11] },
+  { seed: 2, from: [7, 10] },
+]
+
+/**
+ * The art key for a conference's championship mark.
+ *
+ * The game's art names a conference the way a broadcast graphic does —
+ * `confchamp__BIG10Championship`, `confchamp__PAC12Championship`,
+ * `confchamp__CUSAChampionship` — while the save names it the way a table does,
+ * "Big Ten", "Pac-12", "Conference USA". Stripping punctuation settles some of
+ * it and the rest is spelled out, the same way the school aliases are.
+ */
+const CONFERENCE_ART: Record<string, string> = {
+  bigten: 'big10', big10: 'big10', b1g: 'big10',
+  big12: 'big12', bigxii: 'big12',
+  pac12: 'pac12', pacific12: 'pac12',
+  sec: 'sec', acc: 'acc', mac: 'mac',
+  american: 'american', americanathletic: 'american', aac: 'aac',
+  conferenceusa: 'cusa', cusa: 'cusa',
+  mountainwest: 'mountainwest', mwc: 'mountainwest',
+  sunbelt: 'sunbelt',
+}
+
+/** Keys to try, best first. An unknown conference simply has no mark. */
+export function conferenceArtKeys(conference: string | null): string[] {
+  if (!conference) return []
+  const norm = conference.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const mapped = CONFERENCE_ART[norm]
+  const names = mapped && mapped !== norm ? [mapped, norm] : [norm]
+  return names.map((n) => `confchamp:${n}championship`)
+}

@@ -10,6 +10,42 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.41.0] - 2026-09-05
+
+### Added
+
+- **The game's own trophies, bowl crests and playoff marks.** The art folder
+  carries them under their own names — `trophies_Heisman`, `bowl_RoseBowl`,
+  `playoff_Qtr_Final`, `confchamp__BIG10Championship` — so they are matched the
+  same way logos and helmets are and travel to the phone in the art pack. The
+  Heisman panel now sits on the real trophy, each conference's table carries its
+  own championship mark, and the bracket's rounds carry the CFP marks.
+
+  Rebuild the art pack once to send them to the phone.
+
+- **A twelve-team playoff bracket.** First round, quarterfinals and the path to
+  the title, on both apps. The five highest-ranked conference leaders are in on
+  their titles, the best seven of everyone else fill the field, and all twelve
+  seed by the ranking. December's games appear underneath as they are played.
+
+  It is labelled a projection, because that is what it is until the save has one.
+
+### Changed
+
+- **Bigger.** Logos, helmets, faces and the type beside them were all a size or
+  two below what they should have been — a 16px crest in a table of a hundred
+  and forty-three programs. Tables, score rails, feature rows and roster rows
+  all move up a step on both apps, and the phone's Saturday cards widened to
+  match.
+
+- **The League screen picks a conference instead of searching for one.** There
+  are eleven of them and you already know which you want, so the search box is
+  gone: it opens on yours and changes with a dropdown on the PC, a row of chips
+  on the phone.
+
+- **The scores rail names your league.** The tab says BIG TEN rather than MINE,
+  and the kicker that repeated it beside them is gone.
+
 ## [0.40.0] - 2026-09-05
 
 ### Added

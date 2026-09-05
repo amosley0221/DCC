@@ -1,4 +1,4 @@
-import { playerEntryName, schoolEntryName, schoolPlan } from '../electron/artPack'
+import { awardEntryName, playerEntryName, schoolEntryName, schoolPlan } from '../electron/artPack'
 
 /**
  * Reading the game's art, on the one thing in DCC that can already read it.
@@ -136,6 +136,7 @@ export async function buildPack(
   schoolArt: Record<string, string>,
   facePaths: Record<string, string>,
   assetIds: string[],
+  awardArt: Record<string, string>,
   opts: { schoolPx?: number; playerPx?: number; batch?: number } = {},
   onProgress?: (p: PackProgress) => void,
 ): Promise<PackOutcome> {
@@ -159,6 +160,11 @@ export async function buildPack(
   for (const id of assetIds) {
     const file = facePaths[id]
     if (file) jobs.push({ name: playerEntryName(id), file, max: playerPx })
+  }
+  // Trophies, bowl crests, playoff marks and conference championships. Small,
+  // few, and the same on every screen, so they always travel.
+  for (const [key, file] of Object.entries(awardArt)) {
+    if (file) jobs.push({ name: awardEntryName(key), file, max: schoolPx })
   }
 
   await window.dcc.packStart()

@@ -21,7 +21,7 @@ import { currentWeek } from './season'
 import type { WeekGame } from './season'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
-  indexFaces, matchFaces, matchSchools,
+  indexFaces, matchAwards, matchFaces, matchSchools,
 } from './gameAssets'
 import { writeStory } from './press'
 import type { PressRequest } from './press'
@@ -46,6 +46,17 @@ let win: BrowserWindow | null = null
  * so a renderer cannot name its own root and walk out of it.
  */
 let faceRoot: string | null = null
+
+/**
+ * The last art index, kept so the folder can be searched by name.
+ *
+ * DCC matches faces, logos, helmets and jerseys by pattern, and anything whose
+ * naming scheme is not yet known — bowl crests, trophies, stadiums — is
+ * invisible until someone looks. This is what lets the art screen answer "what
+ * is in here called", without re-walking a folder of a hundred thousand files
+ * on every keystroke.
+ */
+let faceIndexMap: Record<string, string> = {}
 
 
 /**
@@ -532,6 +543,7 @@ ipcMain.handle('assets:indexFaces', (
   try {
     const index = indexFaces(dir)
     faceRoot = dir
+    faceIndexMap = index.map
     const schoolArt = matchSchools(index, schools ?? [])
     return {
       ok: true as const,
@@ -539,6 +551,7 @@ ipcMain.handle('assets:indexFaces', (
       sample: index.sample, truncated: index.truncated, dirs: index.dirs,
       match: matchFaces(index, assetIds),
       schoolArt,
+      awardArt: matchAwards(index),
       // Only the ids that actually resolved cross to the renderer, which keeps
       // this to the players present rather than the whole folder.
       paths: Object.fromEntries(
@@ -548,6 +561,26 @@ ipcMain.handle('assets:indexFaces', (
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
+})
+
+/**
+ * Filenames in the art folder that contain a word.
+ *
+ * The answer to "what does this art folder call its bowl logos" is a search,
+ * not a guess: a pattern written from memory would match the wrong files or
+ * none, and DCC has already shipped one bug of exactly that shape.
+ */
+ipcMain.handle('assets:searchArt', (_e, query: string) => {
+  const q = String(query ?? '').trim().toLowerCase()
+  if (!q) return { ok: true as const, hits: [] as string[], total: 0 }
+  const hits: string[] = []
+  let total = 0
+  for (const [stem, file] of Object.entries(faceIndexMap)) {
+    if (!stem.includes(q)) continue
+    total++
+    if (hits.length < 60) hits.push(file)
+  }
+  return { ok: true as const, hits, total }
 })
 
 ipcMain.handle('assets:findInstall', () => {

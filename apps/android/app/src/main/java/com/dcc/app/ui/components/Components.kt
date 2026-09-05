@@ -598,6 +598,19 @@ fun ArtImage(
     return true
 }
 
+/**
+ * A trophy, bowl crest or playoff mark from the art pack, or nothing.
+ *
+ * Nothing rather than a placeholder: these sit beside a label that already says
+ * what the thing is, so a missing image costs a picture and not a meaning.
+ */
+@Composable
+fun AwardMark(key: String, size: Dp = 24.dp) {
+    val context = LocalContext.current
+    val file = remember(key) { ArtPack.award(context, key) }
+    if (file != null) ArtImage(file, Modifier.size(size))
+}
+
 @Composable
 fun PlayerFace(name: String, assetId: String?, size: Dp) {
     val context = LocalContext.current

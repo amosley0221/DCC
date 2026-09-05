@@ -68,6 +68,8 @@ declare global {
       >
       pickInstall(): Promise<string | null>
       pickFaces(): Promise<string | null>
+      /** Filenames in the art folder containing a word, for naming schemes DCC has not learned. */
+      searchArt(query: string): Promise<{ ok: true; hits: string[]; total: number }>
       indexFaces(
         dir: string,
         assetIds: string[],
@@ -88,6 +90,8 @@ declare global {
               matchedSample: { id: string; file: string }[]
             }
             paths: Record<string, string>
+            /** Trophy art by award name, lowercased and stripped: "heisman", "maxwellaward". */
+            awardArt: Record<string, string>
             schoolArt: {
               art: Record<string, string>
               matched: string[]

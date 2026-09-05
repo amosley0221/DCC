@@ -57,6 +57,8 @@ export interface SaveState {
   schoolArt: Record<string, string>
   /** School name -> the colour read out of its own logo. */
   schoolColors: Record<string, string>
+  /** Trophy art by award name, from the same pass that indexes the faces. */
+  awardArt: Record<string, string>
   schoolArtMissing: string[]
   facesBusy: boolean
 }
@@ -66,7 +68,8 @@ const blank: SaveState = {
   diff: null, diffing: false, scan: null, scanning: false,
   dict: null, dictResult: null, restoring: false, roster: null, rosterBusy: false,
   install: null, installBusy: false, installNote: null, tables: null, art: null,
-  faces: null, facePaths: {}, facesBusy: false, schoolArt: {}, schoolColors: {}, schoolArtMissing: [],
+  faces: null, facePaths: {}, facesBusy: false, schoolArt: {}, schoolColors: {}, awardArt: {},
+  schoolArtMissing: [],
 }
 
 interface Ctx {
@@ -107,6 +110,7 @@ export async function indexArt(
       facePaths: res.paths,
       schoolArt: res.schoolArt.art,
       schoolArtMissing: res.schoolArt.missing,
+      awardArt: res.awardArt ?? {},
     },
   }
 }

@@ -22,6 +22,7 @@ var artPack_exports = {};
 __export(artPack_exports, {
   PACK_CATEGORIES: () => PACK_CATEGORIES,
   PACK_VERSION: () => PACK_VERSION,
+  awardEntryName: () => awardEntryName,
   crc32: () => crc32,
   packEntries: () => packEntries,
   playerEntryName: () => playerEntryName,
@@ -41,6 +42,10 @@ var PACK_CATEGORIES = {
 var safe = (s) => s.replace(/[^A-Za-z0-9._-]+/g, "_");
 var schoolEntryName = (school, mark) => `schools/${safe(school)}__${mark}.png`;
 var playerEntryName = (assetId) => `players/${safe(assetId)}.png`;
+var awardEntryName = (key) => {
+  const [kind, ...rest] = key.split(":");
+  return `awards/${safe(kind)}__${safe(rest.join(":"))}.png`;
+};
 function schoolPlan(schoolArt) {
   const order = Object.keys(PACK_CATEGORIES);
   const out = /* @__PURE__ */ new Map();
@@ -64,6 +69,7 @@ function schoolPlan(schoolArt) {
 function packEntries(entries, now = /* @__PURE__ */ new Date()) {
   const schools = {};
   const players = [];
+  const awards = [];
   for (const e of entries) {
     const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(e.name);
     if (school) {
@@ -71,13 +77,19 @@ function packEntries(entries, now = /* @__PURE__ */ new Date()) {
       continue;
     }
     const player = /^players\/(.+)\.png$/.exec(e.name);
-    if (player) players.push(player[1]);
+    if (player) {
+      players.push(player[1]);
+      continue;
+    }
+    const award = /^awards\/([^/]+)__([^/]+)\.png$/.exec(e.name);
+    if (award) awards.push(`${award[1]}:${award[2]}`);
   }
   const manifest = {
     version: PACK_VERSION,
     built: now.toISOString(),
     schools,
     players,
+    awards,
     bytes: entries.reduce((n, e) => n + e.data.length, 0)
   };
   const all = [
@@ -175,6 +187,7 @@ function zip(entries) {
 0 && (module.exports = {
   PACK_CATEGORIES,
   PACK_VERSION,
+  awardEntryName,
   crc32,
   packEntries,
   playerEntryName,

@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Card, Chip, Empty, Input, Kicker, Meta, SchoolArt, SectionHeader, Tab } from '../ui'
+import { Card, Chip, Empty, Kicker, Meta, SchoolArt, SectionHeader, Tab } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
-import { buildLeague, conferences, margin, played, rankings, visibleGames, winPct } from '../../electron/league'
-import type { LeagueRow } from '../../electron/league'
+import {
+  buildLeague, conferenceArtKeys, conferences, FIRST_ROUND, margin, played,
+  projectPlayoff, QUARTERFINALS, rankings, visibleGames, winPct,
+} from '../../electron/league'
+import type { LeagueRow, PlayoffField } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
 
-const TABS = ['STANDINGS', 'RANKINGS', 'SCORES', 'STATS', 'SCHEDULES'] as const
+const TABS = ['STANDINGS', 'RANKINGS', 'SCORES', 'POSTSEASON', 'STATS', 'SCHEDULES'] as const
+
+/** The conference picker's "no conference" option. Not a conference name. */
+const ALL = '\u0000all'
 type TabName = (typeof TABS)[number]
 
 const pct = (r: LeagueRow) => (played(r) ? winPct(r).toFixed(3).replace(/^0/, '') : '—')
@@ -30,7 +36,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
   const { state } = useStore()
   const roster = save.roster
   const [tab, setTab] = useState<TabName>('STANDINGS')
-  const [query, setQuery] = useState('')
+  const [conf, setConf] = useState<string | null>(null)
   const [week, setWeek] = useState<number | null>(null)
   const [pick, setPick] = useState<string | null>(null)
   const [spoilers, setSpoilers] = useState(false)
@@ -81,6 +87,17 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
     return m
   }, [roster, state.teamNames])
 
+  /**
+   * The twelve-team field. A projection until the save has played one — there is
+   * no bracket in a November file, and no conference title game has happened
+   * yet, so its "champions" are the programs leading their conferences.
+   */
+  const field = useMemo(() => projectPlayoff(table), [table])
+  const bowls = useMemo(
+    () => all.filter((g) => g.postseason).sort((a, b) => a.week - b.week || a.row - b.row),
+    [all],
+  )
+
   const weeks = useMemo(() => {
     const s = new Set<number>()
     for (const g of games) if (g.played) s.add(g.week)
@@ -107,13 +124,37 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
     )
   }
 
-  const q = query.trim().toLowerCase()
-  const matches = (r: LeagueRow) =>
-    !q || r.name.toLowerCase().includes(q) || (r.conference ?? '').toLowerCase().includes(q)
+  /**
+   * Which conference the screen is looking at.
+   *
+   * Yours until you change it, because that is the table you open this for.
+   * ALL is there for the days you want the whole country, but a search box was
+   * the wrong control: there are eleven conferences and you already know which
+   * one you want.
+   */
+  const myConference = me ? table.get(me)?.conference ?? null : null
+  const shownConf = conf ?? myConference ?? groups[0]?.[0] ?? ALL
+  const inConf = (r: LeagueRow) => shownConf === ALL || r.conference === shownConf
+
+  const confPicker = (
+    <select className="gs-select" value={shownConf} onChange={(e) => setConf(e.target.value)}>
+      {groups.map(([name]) => <option key={name} value={name}>{name}</option>)}
+      <option value={ALL}>All {table.size} programs</option>
+    </select>
+  )
+
+  /** A conference's own championship mark, when the art folder carries one. */
+  const confMark = (conference: string | null) => {
+    for (const k of conferenceArtKeys(conference)) {
+      const f = save.awardArt[k]
+      if (f) return f
+    }
+    return undefined
+  }
 
   const schoolCell = (name: string | null, onPick?: () => void) => (
     <span className="row" style={{ gap: 7, alignItems: 'center' }}>
-      <SchoolArt size={16} file={art(name)} />
+      <SchoolArt size={24} file={art(name)} />
       <button onClick={onPick} style={{
         all: 'unset', cursor: onPick ? 'pointer' : 'default',
         color: name === me ? 'var(--accent)' : 'var(--ink)',
@@ -125,7 +166,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
     <>
       <SectionHeader
         title="The league"
-        mark={<SchoolArt size={22} file={art(me)} />}
+        mark={<SchoolArt size={30} file={art(me)} />}
         sub={<Meta>{[`${table.size} PROGRAMS`, `${groups.length} CONFERENCES`,
           shownWeek ? `THROUGH WEEK ${shownWeek}` : null].filter(Boolean).join(' · ')}</Meta>}
         right={<div className="subtabs">
@@ -145,14 +186,19 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
 
         {tab === 'STANDINGS' ? (
           <>
-            <Input placeholder="search a school or a conference" value={query}
-              onChange={(e) => setQuery(e.target.value)} />
+            <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+              <Meta size={10}>CONFERENCE</Meta>
+              {confPicker}
+            </div>
             {groups
-              .filter(([conf, rows]) => !q || conf.toLowerCase().includes(q) || rows.some(matches))
+              .filter(([name]) => shownConf === ALL || name === shownConf)
               .map(([conf, rows]) => (
                 <Card className="card-pad" key={conf}>
                   <div className="card-head">
-                    <Kicker>{conf}</Kicker>
+                    <span className="row" style={{ gap: 9, alignItems: 'center' }}>
+                      <SchoolArt size={26} file={confMark(conf)} />
+                      <Kicker>{conf}</Kicker>
+                    </span>
                     <Meta size={10}>{rows.length} TEAMS</Meta>
                   </div>
                   <table className="tbl">
@@ -214,7 +260,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
                 </tr>
               </thead>
               <tbody>
-                {order.filter(matches).slice(0, 40).map((r) => (
+                {order.slice(0, 40).map((r) => (
                   <tr key={r.name} style={{ background: r.name === me ? 'var(--rule)' : undefined }}>
                     <td className="num" style={{ color: (rankOf.get(r.name) ?? 99) <= 25 ? 'var(--accent)' : 'var(--ink3)' }}>
                       {rankOf.get(r.name)}
@@ -253,7 +299,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
                   const homeWon = g.homeScore > g.awayScore
                   const side = ([name, score, won]: [string | null, number, boolean], i: number) => (
                     <div key={i} className="row" style={{ gap: 8, alignItems: 'center' }}>
-                      <SchoolArt size={18} file={art(name)} />
+                      <SchoolArt size={26} file={art(name)} />
                       <span style={{
                         flex: 1, minWidth: 0, fontSize: 12,
                         color: name === me ? 'var(--accent)' : won ? 'var(--ink)' : 'var(--ink3)',
@@ -277,6 +323,17 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
           </Card>
         ) : null}
 
+        {tab === 'POSTSEASON' ? (
+          <Postseason
+            field={field}
+            bowls={bowls}
+            art={art}
+            award={(k) => save.awardArt[k]}
+            me={me}
+            onPick={(n) => { setPick(n); setTab('SCHEDULES') }}
+          />
+        ) : null}
+
         {tab === 'STATS' ? (
           <Card className="card-pad">
             <div className="card-head">
@@ -288,8 +345,10 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
               the rest of a stat sheet are not in the season rows DCC reads, so they are not printed
               here as blanks. Roster is the mean of a program's best 25.
             </p>
-            <Input placeholder="search a school or a conference" value={query}
-              onChange={(e) => setQuery(e.target.value)} />
+            <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+              <Meta size={10}>CONFERENCE</Meta>
+              {confPicker}
+            </div>
             <table className="tbl" style={{ marginTop: 10 }}>
               <thead>
                 <tr>
@@ -303,7 +362,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
                 </tr>
               </thead>
               <tbody>
-                {order.filter(matches).slice(0, 60).map((r) => (
+                {order.filter(inConf).slice(0, 60).map((r) => (
                   <tr key={r.name} style={{ background: r.name === me ? 'var(--rule)' : undefined }}>
                     <td className="name">{schoolCell(r.name, () => { setPick(r.name); setTab('SCHEDULES') })}</td>
                     <td className="num" style={{ color: 'var(--ink3)' }}>{played(r)}</td>
@@ -363,7 +422,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
                             <td className="name">
                               <span className="row" style={{ gap: 7, alignItems: 'center' }}>
                                 <Meta size={9}>{home ? 'VS' : 'AT'}</Meta>
-                                <SchoolArt size={16} file={art(home ? g.away : g.home)} />
+                                <SchoolArt size={24} file={art(home ? g.away : g.home)} />
                                 <button onClick={() => setPick(home ? g.away : g.home)}
                                   style={{ all: 'unset', cursor: 'pointer' }}>
                                   {(home ? g.away : g.home) ?? 'TBD'}
@@ -390,16 +449,16 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
               ) : null}
             </Card>
             <Card className="card-pad">
-              <Kicker>Every school</Kicker>
-              <div style={{ marginTop: 9 }}>
-                <Input placeholder="search" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <div className="card-head">
+                <Kicker>{shownConf === ALL ? 'Every school' : shownConf}</Kicker>
               </div>
+              <div style={{ marginTop: 9 }}>{confPicker}</div>
               <div className="col" style={{ gap: 0, marginTop: 10 }}>
-                {order.filter(matches).slice(0, 60).map((r) => (
+                {order.filter(inConf).slice(0, 60).map((r) => (
                   <button key={r.name} onClick={() => setPick(r.name)}
                     style={{ all: 'unset', cursor: 'pointer', borderTop: '1px solid var(--line)', padding: '5px 0' }}>
                     <span className="row" style={{ gap: 8, alignItems: 'center' }}>
-                      <SchoolArt size={16} file={art(r.name)} />
+                      <SchoolArt size={24} file={art(r.name)} />
                       <span style={{
                         flex: 1, fontSize: 12,
                         color: r.name === pick || r.name === me ? 'var(--accent)' : 'var(--ink)',
@@ -414,5 +473,204 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
         ) : null}
       </div>
     </>
+  )
+}
+
+/* ----------------------------------------------------------- the postseason */
+
+type SeasonGameish = {
+  row: number; week: number; home: string | null; away: string | null
+  homeScore: number; awayScore: number; played: boolean; postseason: boolean
+}
+
+/**
+ * The playoff, and the rest of bowl season.
+ *
+ * Before December there is no bracket in the save, so this is DCC's projection:
+ * the five highest-ranked conference leaders on their titles, the best seven of
+ * everyone else, and all twelve seeded by the ranking. It is labelled a
+ * projection everywhere it appears, because a conference title game has not
+ * been played and nothing in the file says who will win one.
+ *
+ * Once the save has December games they are shown as they were played. What DCC
+ * cannot do yet is name them: the save marks a row as postseason but the bowl's
+ * own name is not decoded, so there is no Rose Bowl crest to draw. That is the
+ * one thing standing between this and bowl logos.
+ */
+function Postseason({ field, bowls, art, award, me, onPick }: {
+  field: PlayoffField
+  bowls: SeasonGameish[]
+  art: (name: string | null) => string | undefined
+  /** Art that is not a school: "playoff:round1", "bowl:rosebowl", "trophy:heisman". */
+  award: (key: string) => string | undefined
+  me: string | null
+  onPick: (name: string) => void
+}) {
+  const bySeed = new Map(field.teams.map((t) => [t.seed, t]))
+  const seed = (n: number) => bySeed.get(n) ?? null
+
+  const Slot = ({ n, note }: { n: number | null; note?: string }) => {
+    const t = n === null ? null : seed(n)
+    return (
+      <div className="cfp-slot">
+        <span className="cfp-seed">{n ?? ''}</span>
+        {t ? <SchoolArt size={22} file={art(t.row.name)} /> : <span style={{ width: 22 }} />}
+        <button
+          onClick={t ? () => onPick(t.row.name) : undefined}
+          style={{
+            all: 'unset', cursor: t ? 'pointer' : 'default', flex: 1, minWidth: 0,
+            color: t && t.row.name === me ? 'var(--accent)' : t ? 'var(--ink)' : 'var(--ink3)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >{t ? t.row.name : note ?? 'TBD'}</button>
+        {t ? (
+          <span className="num" style={{ fontSize: 12, color: 'var(--ink3)' }}>
+            {t.row.wins}-{t.row.losses}
+          </span>
+        ) : null}
+        {t?.champion ? <Meta size={9} color="var(--accent)">CH</Meta> : null}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <Card className="card-pad">
+        <div className="card-head">
+          <span className="row" style={{ gap: 9, alignItems: 'center' }}>
+            <SchoolArt size={26} file={award('playoff:nationalchampionship')} />
+            <Kicker>The playoff — projected</Kicker>
+          </span>
+          <Meta size={10}>{field.teams.length} OF {12}</Meta>
+        </div>
+        <p className="body-serif" style={{ marginTop: 7 }}>
+          The five highest-ranked conference leaders are in on their titles, the next seven places
+          go to the best of everyone else, and all twelve are seeded by the ranking — the straight
+          seeding the sport uses. Seeds one to four sit out the first round.
+          <br />
+          This is a projection and stays one until December. No conference title game has been
+          played, so a leader is not yet a champion, and the save carries no bracket of its own.
+        </p>
+      </Card>
+
+      <div className="cfp">
+        <div className="cfp-col">
+          <RoundHead file={award('playoff:round1')} label="First round" />
+          {FIRST_ROUND.map(([a, b]) => (
+            <Card className="cfp-game" key={a}>
+              <Slot n={a} /><Slot n={b} />
+            </Card>
+          ))}
+        </div>
+        <div className="cfp-col">
+          <RoundHead file={award('playoff:qtrfinal')} label="Quarterfinals" />
+          {QUARTERFINALS.map(({ seed: s, from }) => (
+            <Card className="cfp-game" key={s}>
+              <Slot n={s} />
+              <div className="cfp-slot">
+                <span className="cfp-seed" />
+                <span style={{ width: 22 }} />
+                <span style={{ flex: 1, color: 'var(--ink3)' }}>
+                  Winner of {from[0]} v {from[1]}
+                </span>
+              </div>
+            </Card>
+          ))}
+        </div>
+        <div className="cfp-col">
+          <RoundHead file={award('playoff:semigame')} label="Semifinals" />
+          <Card className="cfp-game">
+            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
+              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 1 bracket</span></div>
+            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
+              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 4 bracket</span></div>
+          </Card>
+          <Card className="cfp-game">
+            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
+              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 3 bracket</span></div>
+            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
+              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 2 bracket</span></div>
+          </Card>
+          <Card className="cfp-game" style={{ borderColor: 'var(--accent)' }}>
+            <div className="cfp-slot">
+              <span className="cfp-seed" />
+              <SchoolArt size={22} file={award('playoff:nationalchampionship')} />
+              <span style={{ flex: 1, color: 'var(--accent)' }}>National championship</span>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <Card className="card-pad">
+        <div className="card-head">
+          <Kicker>Conference leaders</Kicker>
+          <Meta size={10}>{field.leaders.size} CONFERENCES</Meta>
+        </div>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          {[...field.leaders.entries()].map(([conf, team]) => (
+            <button key={conf} onClick={() => onPick(team)}
+              style={{ all: 'unset', cursor: 'pointer' }}>
+              <span className="row" style={{ gap: 7, alignItems: 'center', border: '1px solid var(--line)', borderRadius: 99, padding: '5px 12px 5px 6px' }}>
+                <SchoolArt size={22} file={art(team)} />
+                <span style={{ fontSize: 12, color: team === me ? 'var(--accent)' : 'var(--ink)' }}>{team}</span>
+                <Meta size={9}>{conf}</Meta>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="card-pad">
+        <div className="card-head">
+          <Kicker>Bowl season</Kicker>
+          <Meta size={10}>{bowls.length} GAMES IN THE SAVE</Meta>
+        </div>
+        {bowls.length === 0 ? (
+          <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
+            Nothing yet — the save's December rows fill in as you play the postseason, and they
+            appear here as they do. DCC can see that a game is a bowl but not which bowl: the
+            name is a field it has not decoded, so there is no crest to put beside one.
+          </p>
+        ) : (
+          <div className="col" style={{ gap: 0, marginTop: 8 }}>
+            {bowls.map((g) => {
+              const homeWon = g.homeScore > g.awayScore
+              return (
+                <div key={g.row} className="row"
+                  style={{ gap: 10, alignItems: 'center', borderTop: '1px solid var(--line)', padding: '8px 0' }}>
+                  <SchoolArt size={22} file={award('bowl:default')} />
+                  <Meta size={9}>WK {g.week}</Meta>
+                  <span className="row" style={{ gap: 7, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                    <SchoolArt size={24} file={art(g.away)} />
+                    <span style={{ color: g.played && homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.away}</span>
+                  </span>
+                  <span className="num" style={{ color: g.played && homeWon ? 'var(--ink3)' : 'var(--ink)' }}>
+                    {g.played ? g.awayScore : ''}
+                  </span>
+                  <Meta size={9}>AT</Meta>
+                  <span className="row" style={{ gap: 7, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                    <SchoolArt size={24} file={art(g.home)} />
+                    <span style={{ color: g.played && !homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.home}</span>
+                  </span>
+                  <span className="num" style={{ color: g.played && !homeWon ? 'var(--ink3)' : 'var(--ink)' }}>
+                    {g.played ? g.homeScore : ''}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </Card>
+    </>
+  )
+}
+
+/** A round of the bracket, under its own CFP mark when the art folder has one. */
+function RoundHead({ file, label }: { file?: string; label: string }) {
+  return (
+    <span className="row" style={{ gap: 8, alignItems: 'center' }}>
+      <SchoolArt size={22} file={file} />
+      <Kicker>{label}</Kicker>
+    </span>
   )
 }

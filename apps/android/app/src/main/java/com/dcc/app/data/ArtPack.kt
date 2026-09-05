@@ -33,6 +33,8 @@ object ArtPack {
         val built: String = "",
         val schools: Map<String, List<String>> = emptyMap(),
         val players: List<String> = emptyList(),
+        /** Named art that is not a school: "trophy:heisman", "playoff:round1". */
+        val awards: List<String> = emptyList(),
         val bytes: Long = 0,
     )
 
@@ -63,7 +65,8 @@ object ArtPack {
                 val name = entry.name
                 if (entry.isDirectory) continue
                 val ok = name == "manifest.json" ||
-                    ((name.startsWith("schools/") || name.startsWith("players/")) &&
+                    ((name.startsWith("schools/") || name.startsWith("players/") ||
+                        name.startsWith("awards/")) &&
                         !name.contains("..") && name.count { it == '/' } == 1)
                 if (!ok) continue
                 val out = File(dir, name)
@@ -98,6 +101,21 @@ object ArtPack {
     fun school(context: Context, name: String?, kind: String): File? {
         if (name.isNullOrBlank()) return null
         return File(root(context), "schools/${safe(name)}__$kind.png").takeIf { it.exists() }
+    }
+
+    /**
+     * A trophy, bowl crest, playoff mark or conference championship.
+     *
+     * Keyed "kind:name" the way the PC keys it — the colon becomes a double
+     * underscore in the file, which is a name this side rebuilds rather than
+     * being told.
+     */
+    fun award(context: Context, key: String?): File? {
+        if (key.isNullOrBlank()) return null
+        val kind = key.substringBefore(':')
+        val name = key.substringAfter(':', "")
+        if (name.isBlank()) return null
+        return File(root(context), "awards/${safe(kind)}__${safe(name)}.png").takeIf { it.exists() }
     }
 
     fun player(context: Context, assetId: String?): File? {

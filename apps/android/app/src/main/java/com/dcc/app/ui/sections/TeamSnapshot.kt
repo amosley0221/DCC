@@ -219,7 +219,7 @@ fun SnapshotTeamRow(t: SnapshotTeam, isUser: Boolean, onClick: (() -> Unit)? = n
     val c = Dcc.colors
     DccCard(borderColor = if (isUser) c.accent else c.surfaceLine, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SchoolBadge(t.monogram, t.name, isUser, 24.dp)
+            SchoolBadge(t.monogram, t.name, isUser, 30.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(t.name, c.ink, 15)
@@ -329,7 +329,7 @@ private fun TeamGameRow(g: SnapshotGame, teamIndex: Int, next: Boolean, open: Bo
             }
             Spacer(Modifier.width(6.dp))
             MonoLabel(if (home) "VS" else "@", c.ink4, 9, Modifier.width(22.dp))
-            SchoolBadge(mono(opponent), opponent, false, 22.dp, "helmet")
+            SchoolBadge(mono(opponent), opponent, false, 28.dp, "helmet")
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(opponent, c.ink, 15)
@@ -368,9 +368,9 @@ private fun LeagueGameRow(
             // Helmets rather than logos on a scoreboard, which is what a
             // scoreboard has always had.
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                SchoolBadge(mono(g.away), g.away.orEmpty(), false, 22.dp, "helmet")
+                SchoolBadge(mono(g.away), g.away.orEmpty(), false, 28.dp, "helmet")
                 Spacer(Modifier.height(4.dp))
-                SchoolBadge(mono(g.home), g.home.orEmpty(), false, 22.dp, "helmet")
+                SchoolBadge(mono(g.home), g.home.orEmpty(), false, 28.dp, "helmet")
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {

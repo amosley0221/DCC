@@ -130,7 +130,7 @@ export default function TeamSave() {
     <>
       <SectionHeader
         title="The program"
-        mark={<SchoolArt size={22} file={
+        mark={<SchoolArt size={30} file={
           mine ? (save.schoolArt[`${nameOf(mine.id) ?? ''}|logoLight`] ??
                   save.schoolArt[`${nameOf(mine.id) ?? ''}|icon`]) : undefined} />}
         sub={<Meta>{!roster ? (rosterBusy || save.restoring ? 'READING YOUR SAVE…' : 'ROSTER NOT READ YET')
@@ -380,7 +380,7 @@ function PlayerRow({ p, names, open, onToggle, face }: {
     <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 8 }}>
       <button onClick={onToggle} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
         <div className="row" style={{ gap: 10, alignItems: 'center' }}>
-          <PlayerFace file={face} first={p.first} last={p.last} size={28} />
+          <PlayerFace file={face} first={p.first} last={p.last} size={36} />
           <span className="num" style={{ fontSize: 17, color: ovrColour(p.overall), width: 30 }}>{p.overall}</span>
           <Meta size={9}>{p.position}</Meta>
           <strong style={{ color: 'var(--ink)' }}>{p.first} {p.last}</strong>

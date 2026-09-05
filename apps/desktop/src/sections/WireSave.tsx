@@ -284,7 +284,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
               aria-selected={open?.kind === 'player' && open.index === p.index}
               onClick={() => setOpen(open?.kind === 'player' && open.index === p.index ? null : { kind: 'player', index: p.index })}
             >
-              <Face p={p} size={30} />
+              <Face p={p} size={36} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span className="gs-row-title">{p.first} {p.last}</span>
                 <span className="gs-row-sub" style={{ display: 'block' }}>
@@ -349,7 +349,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                     <button key={g.row} className="gs-feature-row"
                       onClick={() => setOpen({ kind: 'game', row: g.row })}>
                       <span className="row" style={{ gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
-                        <SchoolArt size={20} file={artOf(g.away, 'helmet')} />
+                        <SchoolArt size={28} file={artOf(g.away, 'helmet')} />
                         <span className="gs-feature-name" style={{ color: homeWon ? 'var(--ink3)' : 'var(--ink)' }}>
                           {rankOf.get(g.away ?? '') && rankOf.get(g.away ?? '')! <= 25
                             ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(g.away ?? '')} </span> : null}
@@ -359,7 +359,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                       <span className="gs-feature-num" style={{ color: homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.awayScore}</span>
                       <span style={{ color: 'var(--ink3)', fontSize: 11 }}>at</span>
                       <span className="row" style={{ gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
-                        <SchoolArt size={20} file={artOf(g.home, 'helmet')} />
+                        <SchoolArt size={28} file={artOf(g.home, 'helmet')} />
                         <span className="gs-feature-name" style={{ color: homeWon ? 'var(--ink)' : 'var(--ink3)' }}>
                           {rankOf.get(g.home ?? '') && rankOf.get(g.home ?? '')! <= 25
                             ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(g.home ?? '')} </span> : null}
@@ -378,18 +378,19 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                 standfirst={'No season statistics are decoded out of the save yet, so this is not yards ' +
                   'and touchdowns. It is the field by rating, by the positions the award goes to, and by ' +
                   'whether their team is winning.'}
-                bg={artOf(heisman[0]?.school)}
+                bg={save.awardArt['trophy:heisman'] ?? save.awardArt['trophy:heismanmemorialtrophy']
+                  ?? artOf(heisman[0]?.school)}
                 tint={save.schoolColors[heisman[0]?.school ?? ''] ?? null}
               >
                 {heisman.map(({ p, school }) => (
                   <button key={p.index} className="gs-feature-row"
                     onClick={() => setOpen({ kind: 'player', index: p.index })}>
-                    <Face p={p} size={30} />
+                    <Face p={p} size={36} />
                     <span className="gs-feature-name">
                       {p.first} {p.last}
                       <span style={{ color: 'var(--ink3)' }}>{'  '}{p.position} · {school ?? '—'}</span>
                     </span>
-                    <SchoolArt size={18} file={artOf(school, 'helmet')} />
+                    <SchoolArt size={24} file={artOf(school, 'helmet')} />
                     <span className="gs-feature-num" style={{ color: 'var(--accent)' }}>{p.overall}</span>
                   </button>
                 ))}
@@ -406,7 +407,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                 {board.slice(0, 5).map((p) => (
                   <button key={p.index} className="gs-feature-row"
                     onClick={() => setOpen({ kind: 'player', index: p.index })}>
-                    <Face p={p} size={30} />
+                    <Face p={p} size={36} />
                     <span className="gs-feature-name">
                       {p.first} {p.last}
                       <span style={{ color: 'var(--ink3)' }}>{'  '}{p.position} · {p.homeState ?? p.hometown}</span>
@@ -425,18 +426,19 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
 
       {/* ── the week, and what is next ────────────────────────────────── */}
       <aside className="gs-rail-right">
-        <div className="card-head">
-          <Kicker>{rail === 'CONF' ? conference ?? 'Saturday' : 'Top 25'}</Kicker>
-          <div className="row" style={{ gap: 4 }}>
-            <Tab on={rail === 'CONF'} onClick={() => setRail('CONF')}>MINE</Tab>
-            <Tab on={rail === 'TOP25'} onClick={() => setRail('TOP25')}>TOP 25</Tab>
-          </div>
+        {/* The tab names the league rather than saying "mine", and there is no
+            kicker repeating it beside them. */}
+        <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+          <Tab on={rail === 'CONF'} onClick={() => setRail('CONF')}>
+            {(conference ?? 'Saturday').toUpperCase()}
+          </Tab>
+          <Tab on={rail === 'TOP25'} onClick={() => setRail('TOP25')}>TOP 25</Tab>
         </div>
         {railGames.slice(0, 9).map((g) => {
           const homeWon = g.homeScore > g.awayScore
           const row = (name: string | null, score: number, lost: boolean) => (
             <div className={`gs-score-row${lost ? ' is-lost' : ''}`}>
-              <SchoolArt size={17} file={artOf(name, 'helmet')} />
+              <SchoolArt size={26} file={artOf(name, 'helmet')} />
               <span className="gs-score-team" style={{ color: name === me ? 'var(--accent)' : undefined }}>
                 {rankOf.get(name ?? '') && rankOf.get(name ?? '')! <= 25
                   ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(name ?? '')} </span> : null}
@@ -466,7 +468,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
             <div style={{ marginTop: 6 }}><Kicker>Next up</Kicker></div>
             <div className="card card-pad">
               <div className="row" style={{ gap: 9, alignItems: 'center' }}>
-                <SchoolArt size={26} file={artOf(next.home === me ? next.away : next.home, 'helmet')} />
+                <SchoolArt size={34} file={artOf(next.home === me ? next.away : next.home, 'helmet')} />
                 <div className="gs-row-title" style={{ fontSize: 22, fontFamily: 'var(--serif)', fontWeight: 600 }}>
                   {(next.home === me ? next.away : next.home) ?? 'TBD'}
                 </div>
@@ -495,7 +497,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                   aria-selected={open?.kind === 'player' && open.index === p.index}
                   onClick={() => setOpen(open?.kind === 'player' && open.index === p.index
                     ? null : { kind: 'player', index: p.index })}>
-                  <Face p={p} size={30} />
+                  <Face p={p} size={36} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="gs-row-title">{p.first} {p.last}</span>
                     <span className="gs-row-sub" style={{ display: 'block' }}>
@@ -769,11 +771,11 @@ function ProspectCard({ p, revealed, onReveal, onClose, teamName }: {
       </div>
 
       <div className="row" style={{ gap: 16, marginTop: 14, alignItems: 'center' }}>
-        <Face p={p} size={54} />
+        <Face p={p} size={64} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 className="headline">{p.first} {p.last}</h2>
           <div className="row" style={{ marginTop: 4, gap: 7, alignItems: 'center' }}>
-            <SchoolArt size={18} file={logo} />
+            <SchoolArt size={24} file={logo} />
             {p.stars ? <span className="gs-stars">{'★'.repeat(p.stars)}</span> : null}
             <Meta size={10}>
               {[p.position, rostered ? p.classYear : null, p.archetype, p.hometown]
