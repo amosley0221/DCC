@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
+import Schedule from './Schedule'
 
 const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
@@ -58,7 +59,7 @@ export default function TeamSave() {
     const res = await window.dcc.roster(path)
     patch({ rosterBusy: false })
     if (res.ok) {
-      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, players: res.players } })
+      patch({ roster: { count: res.count, ratingNames: res.ratingNames, unverifiedPairs: res.unverifiedPairs, schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games, players: res.players } })
       dispatch({ type: 'log', line: { text: `read ${res.count.toLocaleString()} players from the save`, kind: 'good' } })
     }
   }
@@ -262,12 +263,14 @@ export default function TeamSave() {
               </div>
             ))}
           </Card>
+        ) : tab === 'SCHEDULE' && roster ? (
+          <Schedule games={roster.games ?? []} team={mine ? nameOf(mine.id) : null} art={save.schoolArt} />
         ) : tab !== 'ROSTER' ? (
           <Card className="card-pad">
-            <Kicker>Not decoded yet</Kicker>
+            <Kicker>{tab === 'SCHEDULE' ? 'Schedule' : 'Not decoded yet'}</Kicker>
             <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
               {tab === 'SCHEDULE'
-                ? 'Fixtures, results and rankings are not decoded. The player ratings gave themselves up to controlled edits; the equivalent for games has not been located yet.'
+                ? 'Read the roster first; the schedule comes out of the save in the same pass.'
                 : 'A trade needs writing back to the save, which is deliberately not attempted yet — reading is solved, and a wrong byte in a 31 MB save is a lost dynasty.'}
             </p>
           </Card>

@@ -50,6 +50,10 @@ jobs:
         run: npm run check:assets
         working-directory: apps/desktop
 
+      - name: Check the game-table reader
+        run: npm run check:save
+        working-directory: apps/desktop
+
       - name: Smoke test the built app
         run: |
           # Boots the real Electron app and clicks through every section, which

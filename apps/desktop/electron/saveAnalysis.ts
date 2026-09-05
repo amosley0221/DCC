@@ -1462,3 +1462,125 @@ export function readTeamNames(payload: Buffer): TeamRecord[] {
   }
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
+
+
+/* ------------------------------------------------------------- schedule */
+
+export interface SeasonGame {
+  /** Row in SeasonGameStore. */
+  row: number
+  week: number
+  month: number
+  day: number
+  /** Minutes after midnight; 2047 is the schema default for "unset". */
+  kickoff: number
+  attendance: number
+  temperatureF: number
+  weather: number
+  windMph: number
+  /** Team-table index of each side, or -1 when the slot is empty. */
+  homeIndex: number
+  awayIndex: number
+  home: string | null
+  away: string | null
+  homeScore: number
+  awayScore: number
+  homeQ: number[]
+  awayQ: number[]
+  homeOT: number
+  awayOT: number
+  played: boolean
+  /** The user played this one rather than simulating it. */
+  userPlayed: boolean
+  overtime: boolean
+  /** December rows are bowl games; the season's own weeks run August to November. */
+  postseason: boolean
+}
+
+/**
+ * Offsets of the game store's scalar fields, in bits from the start of a row.
+ * Each was located by searching for a box-score value at every position in the
+ * row and requiring the same position to reproduce nine games' worth — see
+ * docs/SAVE-FORMAT.md.
+ */
+const G = {
+  kickoff: [578, 11], attendance: [589, 19],
+  homeScore: [640, 8], awayScore: [648, 8], temperature: [664, 8],
+  homeOT: [676, 7], awayOT: [683, 7],
+  awayQ1: [690, 7], awayQ2: [697, 7], homeQ4: [708, 7], homeQ3: [715, 7], homeQ2: [722, 7], homeQ1: [729, 7],
+  wind: [736, 5], awayQ3: [747, 7], awayQ4: [754, 7],
+  month: [778, 4], weather: [782, 4], week: [791, 4], day: [795, 5],
+  /** 1 for a simulated game, 0 for one the user played; bit 789 is the reverse. */
+  simmed: [786, 1], userPlayed: [789, 1], overtime: [790, 1],
+} as const
+
+/** Byte offsets, within a row, of the two team references (tag 0x319e). */
+const G_AWAY_REF = 12
+const G_HOME_REF = 40
+const TEAM_TAG = 0x319e
+export const SEASON_GAME_ROW = 100
+
+/**
+ * The order the game's team table uses: every school sorted by its full name,
+ * with UConn filed under Connecticut. Verified against 44 team appearances in
+ * 29 games named by the user's own schedule and a week's scoreboard.
+ */
+export function teamTableOrder(teams: TeamRecord[]): TeamRecord[] {
+  const key = (t: TeamRecord) => (t.name === 'UConn' ? 'Connecticut' : (t.fullName ?? t.name))
+  return [...teams].sort((a, b) => key(a).localeCompare(key(b), 'en'))
+}
+
+/**
+ * Reads the season's games out of `SeasonGameStore`.
+ *
+ * A row is 100 bytes: 72 bytes of references first, then the packed scalar
+ * fields. The references are ordinary four-byte handles — a 16-bit table tag
+ * and a 16-bit row — and the two that matter here point into the team table:
+ * away at byte 12, home at byte 40. The scalars are bit-packed, MSB first, at
+ * the offsets in `G`; the first of them, kickoff, starts two bits into byte 72.
+ *
+ * Teams are not stored as the ids players carry but as rows of the 143-row
+ * team table, whose order is `teamTableOrder`. Kickoff is minutes after
+ * midnight, temperature is Fahrenheit plus 40 (the schema's floor is -40), and
+ * the final score already includes overtime, which is also kept separately.
+ */
+export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGame[] {
+  const store = readStores(payload).find((s) => s.name === 'SeasonGameStore')
+  if (!store) return []
+  const bsft = payload.indexOf(Buffer.from('BSFT', 'latin1'), store.offset)
+  if (bsft < 0) return []
+  // Header words, then one word per member, then the rows.
+  const data = bsft + 28 + store.members * 4
+  const order = teamTableOrder(teams)
+  const nameOf = (i: number) => (i >= 0 && i < order.length ? order[i].name : null)
+
+  const out: SeasonGame[] = []
+  for (let r = 0; r < store.rows; r++) {
+    const o = data + r * SEASON_GAME_ROW
+    if (o + SEASON_GAME_ROW > payload.length) break
+    const rd = ([bit, w]: readonly [number, number]) => {
+      let v = 0
+      for (let b = bit; b < bit + w; b++) v = (v << 1) | ((payload[o + (b >> 3)] >> (7 - (b & 7))) & 1)
+      return v
+    }
+    const ref = (at: number) => (payload.readUInt16BE(o + at) === TEAM_TAG ? payload.readUInt16BE(o + at + 2) : -1)
+    const homeIndex = ref(G_HOME_REF), awayIndex = ref(G_AWAY_REF)
+    const week = rd(G.week)
+    if (homeIndex < 0 || awayIndex < 0 || homeIndex >= order.length || awayIndex >= order.length) continue
+    const homeQ = [rd(G.homeQ1), rd(G.homeQ2), rd(G.homeQ3), rd(G.homeQ4)]
+    const awayQ = [rd(G.awayQ1), rd(G.awayQ2), rd(G.awayQ3), rd(G.awayQ4)]
+    const homeScore = rd(G.homeScore), awayScore = rd(G.awayScore)
+    out.push({
+      row: r, week, month: rd(G.month), day: rd(G.day),
+      kickoff: rd(G.kickoff), attendance: rd(G.attendance),
+      temperatureF: rd(G.temperature) - 40, weather: rd(G.weather), windMph: rd(G.wind),
+      homeIndex, awayIndex, home: nameOf(homeIndex), away: nameOf(awayIndex),
+      homeScore, awayScore, homeQ, awayQ, homeOT: rd(G.homeOT), awayOT: rd(G.awayOT),
+      played: homeScore + awayScore > 0 || homeQ.some(Boolean) || awayQ.some(Boolean),
+      userPlayed: rd(G.userPlayed) === 1,
+      overtime: rd(G.overtime) === 1,
+      postseason: rd(G.month) === 12 || rd(G.month) === 1,
+    })
+  }
+  return out.sort((a, b) => a.week - b.week || a.row - b.row)
+}

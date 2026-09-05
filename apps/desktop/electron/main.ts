@@ -6,7 +6,7 @@ import { autoUpdater } from 'electron-updater'
 import {
   analyzeSave, diffSaves, findDictionary, sampleFrames, readSavePayload,
   checkDictionary, decodeFrames, autoFindDictionary, readRoster, readTeamNames,
-  RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readStores,
+  RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
 } from './saveAnalysis'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
@@ -205,15 +205,17 @@ ipcMain.handle('save:roster', (_e, path: string) => {
     const payload = readSavePayload(path)
     if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
     const players = readRoster(payload)
+    const schools = readTeamNames(payload)
     // The renderer only ever shows a page at a time; sending 16,000 full rating
     // sets across the bridge would cost more than reading the save did.
     return {
       ok: true as const,
       count: players.length,
       ratingNames: Object.keys(RATING_BITS),
-      schools: readTeamNames(payload),
+      schools,
       coaches: readCoaches(payload),
       stores: readStores(payload),
+      games: readSeasonGames(payload, schools),
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
     }

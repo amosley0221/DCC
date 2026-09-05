@@ -1,5 +1,5 @@
 import type { UpdateStatus } from './updates'
-import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord } from '../electron/saveAnalysis'
+import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 
 declare global {
@@ -15,7 +15,7 @@ declare global {
       analyzeSave(path: string): Promise<{ ok: true; report: SaveReport } | { ok: false; message: string }>
       roster(path: string): Promise<
         | { ok: true; count: number; ratingNames: string[]; unverifiedPairs: [string, string][]
-            schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; players: RosterPlayer[] }
+            schools: TeamRecord[]; coaches: CoachRecord[]; stores: StoreRecord[]; games: SeasonGame[]; players: RosterPlayer[] }
         | { ok: false; message: string }
       >
       pickInstall(): Promise<string | null>

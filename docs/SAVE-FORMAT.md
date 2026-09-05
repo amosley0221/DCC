@@ -1062,3 +1062,62 @@ his height in inches. DCC now lists 52 ratings and names the 53rd as unplaced.
 The working method is unchanged: find a store by name in the directory, find a
 field by its value, confirm the stride. It is slower than a rule would be, and
 it is what has actually worked.
+
+
+## The season's games
+
+`SeasonGameStore` holds every game of the season: 983 rows of 100 bytes,
+starting after the store's `BSFT` header words and its one word per member.
+The rows are the schedule, the results and the conditions.
+
+**A row is references first, then packed scalars.** The first 72 bytes are
+four-byte handles — a 16-bit table tag and a 16-bit row — most of which point at
+stat caches and are empty for a game that has not been played. The scalars begin
+two bits into byte 72 and are bit-packed, most significant bit first.
+
+| Field | Bit | Width | Notes |
+| --- | --- | --- | --- |
+| Kickoff | 578 | 11 | minutes after midnight; 2047 is the schema's "unset" |
+| Attendance | 589 | 19 | |
+| Home score | 640 | 8 | includes overtime |
+| Away score | 648 | 8 | |
+| Temperature | 664 | 8 | °F + 40; the schema's floor is -40 |
+| Home OT / Away OT | 676 / 683 | 7 | one total, not per period |
+| Away Q1–Q4 | 690, 697, 747, 754 | 7 | |
+| Home Q4–Q1 | 708, 715, 722, 729 | 7 | stored in reverse order |
+| Wind speed | 736 | 5 | mph |
+| Month | 778 | 4 | |
+| Weather | 782 | 4 | the game's own `Weather` enum |
+| Simulated | 786 | 1 | |
+| Season week | 791 | 4 | |
+| User played | 789 | 1 | |
+| Overtime | 790 | 1 | |
+| Day | 795 | 5 | |
+
+**Teams are the two handles at bytes 12 and 40**, away first, then home, both
+tagged `0x319e`. They are *not* the team ids players carry. They index the
+143-row team table, whose order is every school sorted by full name with UConn
+filed under Connecticut — verified against 44 team appearances across 29 games
+named from a season schedule and one week's scoreboard.
+
+**How it was found.** Every field above was located by taking a box score,
+searching every bit position in the row for that value, and keeping only
+positions that reproduced all nine of one team's games. The team fields resisted
+that method entirely: no field of any width from 6 to 16 bits is consistent for
+a team across the games it plays, because the teams are references rather than
+values. The give-away was that a row's own references belong to the *next*
+row's game — the record framing is offset by one from the scalar block — so
+reading the handles from the preceding row's slot resolved all 28 test games at
+once.
+
+**Negatives worth keeping.**
+
+- The TV network is not in the save. `BroadcastNetwork` exists but its enum is
+  only National, Streaming, TBD and None, so the FOX/CBS/BTN labels other tools
+  show are derived from conference and kickoff slot, not read.
+- `TimeOfDayEnum` (a 31-value slot list, `T1100` through `T2300`) belongs to
+  `ScheduleKnownGame`, not to a season game. A season game stores plain minutes.
+- `ScheduleKnownGameStore` turned out to be 960 rows of 16 bytes holding index
+  entries, not team references. It is not the schedule in any useful sense.
+- December rows carry week numbers from the regular-season range, so week alone
+  does not separate bowls; the month does.

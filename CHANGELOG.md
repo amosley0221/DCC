@@ -10,6 +10,29 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.22.0] - 2026-09-05
+
+### Added
+
+- **The schedule, with box scores.** Team gained a working SCHEDULE tab: your
+  season with results, and the whole country a week at a time. Opening a game
+  shows kickoff, temperature, conditions, wind, attendance, whether you played
+  it or simmed it, and the quarter-by-quarter line including overtime.
+- **Results you have not reached are held back.** The game simulates the rest
+  of the country before you play your own game, and those scores sit in the
+  save unseen. DCC hides them for weeks you have not played, with one click to
+  show them anyway.
+
+### Notes
+
+- Teams in a game row are references into the save's 143-row team table, not
+  the team ids players carry. The table's order is every school by full name,
+  with UConn under Connecticut, and it is verified against 44 team appearances
+  across 29 games.
+- Team and player statistics are only kept by the game for the current week, so
+  a box score older than that is the line score and conditions, which is all
+  the save still holds.
+
 ## [0.21.3] - 2026-09-05
 
 ### Fixed
