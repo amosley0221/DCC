@@ -12,6 +12,7 @@ import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
   indexFaces, matchFaces, matchSchools,
 } from './gameAssets'
+import { buildSnapshot } from './snapshot'
 import { writeGameEdits } from './saveWrite'
 import type { GameEdit } from './saveWrite'
 
@@ -220,6 +221,28 @@ ipcMain.handle('save:roster', (_e, path: string) => {
       games: readSeasonGames(payload, schools),
       unverifiedPairs: RATING_PAIRS_UNVERIFIED,
       players,
+    }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:snapshot', async (_e, { path, teamId }: { path: string; teamId: number | null }) => {
+  try {
+    const payload = readSavePayload(path)
+    if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
+    const snap = buildSnapshot(payload, teamId)
+    const res = await dialog.showSaveDialog(win!, {
+      title: 'Save the dynasty snapshot',
+      defaultPath: 'dcc-snapshot.json',
+      filters: [{ name: 'DCC snapshot', extensions: ['json'] }],
+    })
+    if (res.canceled || !res.filePath) return { ok: false as const, message: 'cancelled' }
+    writeFileSync(res.filePath, JSON.stringify(snap))
+    return {
+      ok: true as const, path: res.filePath,
+      teams: snap.teams.length, games: snap.games.length,
+      players: snap.players.length, recruits: snap.recruits.length,
     }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }

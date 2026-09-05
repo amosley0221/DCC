@@ -10,6 +10,24 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.24.0] - 2026-09-05
+
+### Added
+
+- **Export a dynasty snapshot for the phone.** One file holding every team, the
+  whole season's games and results, your roster with ratings, and the recruiting
+  pool. The save can only be read on the machine it lives on, so this is how the
+  data reaches the Android app. Save → Snapshot for the phone.
+
+### Notes
+
+- School interest is decoded: each recruit's ten schools and the influence value
+  behind each, verified against an export of all 4,100 recruits. Recruiting
+  stage and commit score are not; the schema names them but their records are
+  not in the player record, not in the store directory, and not in any table
+  ordered by rank or player index. `docs/SAVE-FORMAT.md` records what was ruled
+  out.
+
 ## [0.23.0] - 2026-09-05
 
 ### Added

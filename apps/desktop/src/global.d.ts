@@ -20,6 +20,10 @@ declare global {
         | { ok: false; message: string }
       >
       writeGames(path: string, edits: GameEdit[]): Promise<WriteResult>
+      snapshot(path: string, teamId: number | null): Promise<
+        | { ok: true; path: string; teams: number; games: number; players: number; recruits: number }
+        | { ok: false; message: string }
+      >
       pickInstall(): Promise<string | null>
       pickFaces(): Promise<string | null>
       indexFaces(

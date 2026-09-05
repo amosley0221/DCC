@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { useSave } from '../saveStore'
 import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
@@ -11,11 +11,15 @@ import { Btn, Card, Empty, Kicker, Meta, SectionHeader, Track } from '../ui'
  * section and coming back does not throw it away.
  */
 export default function Save() {
-  const { dispatch } = useStore()
+  const { state, dispatch } = useStore()
   const { save, patch } = useSave()
   const { path, report, busy, error, backup, diff, diffing, scan, scanning, dict, dictResult, restoring } = save
   const { install, installBusy, installNote, tables, art } = save
   const { roster, rosterBusy } = save
+  // The snapshot is a one-shot export rather than analysis worth keeping, so it
+  // lives here rather than in the save store.
+  const [snapBusy, setSnapBusy] = useState(false)
+  const [snap, setSnap] = useState<string | null>(null)
 
   const setPath = (v: typeof path) => patch({ path: v })
   const setReport = (v: typeof report) => patch({ report: v })
@@ -486,6 +490,36 @@ export default function Save() {
                 <Btn onClick={compare}>Compare with another save…</Btn>
               </div>
               {backup ? <div className="effect" style={{ marginTop: 10 }}>BACKED UP TO {backup}</div> : null}
+            </Card>
+
+            <Card className="card-pad">
+              <Kicker>Snapshot for the phone</Kicker>
+              <p className="body-serif" style={{ marginTop: 7 }}>
+                The save lives on this machine and only this app can read it, so the phone needs
+                the data handed to it. A snapshot is one file holding every team, the whole
+                season's games and results, your roster with ratings, and the recruiting pool.
+                Move it to the phone and import it in the Android app's settings.
+              </p>
+              <Btn variant="primary" disabled={snapBusy} onClick={async () => {
+                if (!path) return
+                setSnapBusy(true)
+                const res = await window.dcc.snapshot(path, state.teamId)
+                setSnapBusy(false)
+                if (res.ok) {
+                  setSnap(`${res.teams} teams, ${res.games} games, ${res.players.toLocaleString()} players and ${res.recruits.toLocaleString()} recruits written to ${res.path}`)
+                  dispatch({ type: 'log', line: { text: `snapshot written to ${res.path}`, kind: 'good' } })
+                } else if (res.message !== 'cancelled') {
+                  setSnap(res.message)
+                }
+              }}>
+                {snapBusy ? 'Building…' : 'Export a snapshot…'}
+              </Btn>
+              {state.teamId === null ? (
+                <Meta size={9} color="var(--warn)">
+                  PICK YOUR TEAM IN THE TEAM SECTION FIRST, OR THE SNAPSHOT WILL NOT KNOW WHICH ROSTER IS YOURS
+                </Meta>
+              ) : null}
+              {snap ? <div className="effect" style={{ marginTop: 10 }}>{snap.toUpperCase()}</div> : null}
             </Card>
 
             <Card className="card-pad">

@@ -1163,3 +1163,51 @@ Validation comes from the schema rather than from guesswork, which matters:
 DynastyOS offers Fog as a condition, and the game's `Weather` field has no Fog,
 so choosing it fails with *"Argument is not a valid enum value for this field.
 You passed in Fog."* DCC only offers values the field can hold.
+
+
+## Recruiting
+
+### School interest, solved
+
+`HighSchoolProspectTopSchoolsStore` holds 41,010 rows of four bytes each: a
+16-bit team id and a 16-bit influence value, matching the schema's
+`ProspectTargetSchool` with its `TeamId` and `TeamInfluence`. Rows are grouped
+ten to a recruit.
+
+A recruit's block starts at row `(nationalRank - 1) * 10 + 1`. That was verified
+against an independent export of the whole 4,100-recruit class: for 4,086 of
+them, all ten team-and-influence pairs match in order, and the fourteen that do
+not are recruits whose data moved between the export and the save. The team ids
+are the same ones players carry, not the team-table rows the schedule uses.
+
+### What is not solved, and what was ruled out
+
+The schema's `Recruit` type carries exactly the fields still missing —
+`CommitScore` (0–1023), `RecruitStage` (4 bits), `NationalRank`, `PositionRank`,
+`StateRank`, `TotalScholarshipOffers`, `QualityModifier` (gem and bust) — but
+its records have not been located. What was tried, so it need not be tried
+again:
+
+- **Not in the player record.** All 4,100 recruits were tested against every bit
+  position and plausible width in the 192-byte player record, scoring by
+  agreement rather than demanding a perfect match. Nothing reached 70%.
+- **Not in the store directory.** There is no `RecruitStore`; the 88 stores are
+  listed above and none has ~4,101 rows. Like the player records, these live
+  outside the directory.
+- **Not a table ordered by national rank or by player index.** Searching the
+  whole payload for a ten-bit field reproducing six consecutive recruits' commit
+  scores, at every byte-aligned stride from 8 to 128, finds nothing.
+- **The dense run of `0x2dc0` handles near the top-schools store is not it.**
+  It looked like a 40-byte record array, but it is one flat index of all 41,010
+  top-schools rows, four bytes each, incrementing by one. Every tenth handle has
+  a row ending in 1, which is what made it look strided.
+- **Player and top-schools references are not adjacent.** Requiring a recruit's
+  player handle and its top-schools block handle within 80 bytes of each other
+  finds no consistent geometry across six sampled recruits.
+
+One useful behavioural finding came out of it. Spending recruiting hours on a
+prospect changes 28 bytes, none of them in a recruit record: the action lands in
+a queue and the tutorial and portal tables, and the effect is applied when the
+week advances. Offering a scholarship behaves the same way. So a controlled diff
+of two saves taken either side of a recruiting action does not localise the
+recruit record, which is what made this harder than the schedule.
