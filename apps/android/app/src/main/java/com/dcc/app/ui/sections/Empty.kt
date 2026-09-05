@@ -29,12 +29,12 @@ fun NoDynasty(section: String, state: Persisted, onOpenSettings: () -> Unit) {
             BodySerif(
                 "This app shows your dynasty and nothing else, so it stays empty until your " +
                     "save reaches it. The Windows app reads the save on your gaming PC and " +
-                    "sends the parsed data to the relay on your home server; this phone picks " +
-                    "it up from there.",
+                    "hands the parsed dynasty to this phone: over your home Wi-Fi while you " +
+                    "are in the house, or through your own GitHub when you are not.",
             )
             Spacer(Modifier.height(12.dp))
             MetaText(
-                if (state.relayUrl.isBlank()) "RELAY NOT CONFIGURED" else "RELAY ${state.relayUrl}",
+                if (state.relayUrl.isBlank()) "NO DESKTOP ADDRESS SAVED" else "DESKTOP ${state.relayUrl}",
                 if (state.relayUrl.isBlank()) c.warn else c.ink3,
             )
             Spacer(Modifier.height(12.dp))
@@ -47,10 +47,11 @@ fun NoDynasty(section: String, state: Persisted, onOpenSettings: () -> Unit) {
             Kicker("Bring it across by hand", c.ink3)
             Spacer(Modifier.height(8.dp))
             BodySerif(
-                "The relay does not exist yet, but the Windows app can already write your whole " +
-                    "dynasty to a single file. Copy dcc-snapshot.json to this phone and import " +
-                    "it in Settings, and Team and Recruit fill with your real save. Settings can " +
-                    "also load a sample dynasty — invented data, for looking at the screens.",
+                "There is a third way in, for when neither the network nor GitHub suits: the " +
+                    "Windows app writes your whole dynasty to a single file. Copy " +
+                    "dcc-snapshot.json to this phone and import it in Settings, and Team and " +
+                    "Recruit fill with your real save. Settings can also load a sample dynasty " +
+                    "— invented data, for looking at the screens.",
             )
         }
 

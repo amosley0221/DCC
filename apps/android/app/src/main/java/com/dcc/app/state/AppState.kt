@@ -159,8 +159,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _snapshot = MutableStateFlow<SnapshotView?>(null)
     val snapshot: StateFlow<SnapshotView?> = _snapshot.asStateFlow()
 
-    private val _importing = MutableStateFlow(false)
-    val importing: StateFlow<Boolean> = _importing.asStateFlow()
+    /**
+     * The route a snapshot is coming in on right now — "file", "wifi" or
+     * "github" — and null when nothing is in flight. One flow rather than a
+     * flag per route, because only one import can be running at a time and the
+     * screen has to say which one it is waiting on.
+     */
+    private val _busy = MutableStateFlow<String?>(null)
+    val busy: StateFlow<String?> = _busy.asStateFlow()
 
     private val _importError = MutableStateFlow<String?>(null)
     val importError: StateFlow<String?> = _importError.asStateFlow()
@@ -194,11 +200,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _loading.value = true
             val d = withContext(Dispatchers.IO) { Repository.loadDynasty(getApplication()) }
-            val next = Repository.seed(d).copy(
-                theme = _state.value.theme,
-                relayUrl = _state.value.relayUrl,
-                relayToken = _state.value.relayToken,
-            )
+            val next = Repository.seed(d).keepingSettings()
             _dynasty.value = d
             _state.value = next
             _derived.value = Derived(d, next)
@@ -208,21 +210,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Imports a snapshot the user picked with the document picker. A file that
-     * does not parse never reaches disk, so a bad import leaves the phone
-     * showing the snapshot it already had.
+     * The one path a snapshot takes in, whichever route carried it. Reading,
+     * parsing and the six megabytes of JSON all happen off the main thread, and
+     * a document that does not parse never reaches disk — so a bad payload
+     * leaves the phone showing the snapshot it already had, and every screen
+     * picks up a good one on its own.
      */
-    fun importSnapshot(uri: Uri) {
+    private fun bringIn(route: String, load: suspend () -> Result<DynastySnapshot>) {
         viewModelScope.launch {
-            _importing.value = true
+            _busy.value = route
             _importError.value = null
-            val result = withContext(Dispatchers.IO) {
-                Repository.importSnapshot(getApplication(), uri).map { SnapshotView(it) }
-            }
+            val result = withContext(Dispatchers.IO) { load().map { SnapshotView(it) } }
             result
-                .onSuccess { _snapshot.value = it }
-                .onFailure { _importError.value = it.message ?: "that file could not be read" }
-            _importing.value = false
+                .onSuccess {
+                    _snapshot.value = it
+                    update { s -> s.copy(snapshotSource = route) }
+                }
+                .onFailure { _importError.value = it.message ?: "that snapshot could not be read" }
+            _busy.value = null
+        }
+    }
+
+    /** Hands a document that arrived over the network to the file import's own path. */
+    private fun accept(fetched: SnapshotFetch.Fetched): Result<DynastySnapshot> = when (fetched) {
+        is SnapshotFetch.Fetched.Ok -> Repository.acceptSnapshot(getApplication(), fetched.document)
+        is SnapshotFetch.Fetched.Failed -> Result.failure(IllegalArgumentException(fetched.message))
+    }
+
+    /** Imports a snapshot the user picked with the document picker. */
+    fun importSnapshot(uri: Uri) = bringIn("file") {
+        Repository.importSnapshot(getApplication(), uri)
+    }
+
+    /**
+     * Asks the desktop for the snapshot over the home network. The address and
+     * code are saved first, so a fetch that fails on a stale code still leaves
+     * the user with one field to correct rather than two to retype.
+     */
+    fun fetchOverWifi(url: String, token: String) {
+        update { it.copy(relayUrl = url, relayToken = token) }
+        bringIn("wifi") { accept(SnapshotFetch.overWifi(url, token)) }
+    }
+
+    /** Reads the snapshot the desktop published, for when the phone is not at home. */
+    fun fetchFromGitHub(repo: String, token: String) {
+        update { it.copy(githubRepo = repo, githubToken = token) }
+        bringIn("github") { accept(SnapshotFetch.fromGitHub(repo, token)) }
+    }
+
+    /**
+     * Fetches again by whichever route last worked. This is the everyday case —
+     * the desktop has moved the dynasty on a week and the phone wants to catch
+     * up — so it asks for nothing that has already been typed once.
+     */
+    fun refreshSnapshot() {
+        val s = _state.value
+        when (s.snapshotSource) {
+            "wifi" -> fetchOverWifi(s.relayUrl, s.relayToken)
+            "github" -> fetchFromGitHub(s.githubRepo, s.githubToken)
         }
     }
 
@@ -244,18 +289,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Drops whatever is loaded and returns the app to its empty state. */
     fun clearDynasty() {
-        val next = Persisted(
-            theme = _state.value.theme,
-            relayUrl = _state.value.relayUrl,
-            relayToken = _state.value.relayToken,
-        )
+        val next = Persisted().keepingSettings()
         _dynasty.value = null
         _derived.value = null
         _state.value = next
         viewModelScope.launch(Dispatchers.IO) { Repository.saveState(getApplication(), next) }
     }
 
-    fun setRelay(url: String, token: String) = update { it.copy(relayUrl = url, relayToken = token) }
+    /**
+     * Carries across the settings that describe this phone rather than the
+     * dynasty on it: the theme, and everything about how a snapshot gets here.
+     * Clearing a dynasty should not cost the user an address and two tokens
+     * typed in again to get back to where they already were.
+     */
+    private fun Persisted.keepingSettings(): Persisted {
+        val kept = _state.value
+        return copy(
+            theme = kept.theme,
+            relayUrl = kept.relayUrl,
+            relayToken = kept.relayToken,
+            githubRepo = kept.githubRepo,
+            githubToken = kept.githubToken,
+            snapshotSource = kept.snapshotSource,
+        )
+    }
 
     private fun update(persist: Boolean = true, block: (Persisted) -> Persisted) {
         val next = block(_state.value)
@@ -405,6 +462,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun reset() {
         val d = _dynasty.value ?: return clearDynasty()
         Repository.clearState(getApplication())
-        update { Repository.seed(d).copy(theme = _state.value.theme) }
+        update { Repository.seed(d).keepingSettings() }
     }
 }

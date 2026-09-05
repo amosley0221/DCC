@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
             val dynasty by vm.dynasty.collectAsState()
             val derived by vm.derived.collectAsState()
             val snapshot by vm.snapshot.collectAsState()
-            val importing by vm.importing.collectAsState()
+            val busy by vm.busy.collectAsState()
             val importError by vm.importError.collectAsState()
             val loading by vm.loading.collectAsState()
 
@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
                                 // does not need it loaded. Everything else still
                                 // needs a dynasty to have something to show.
                                 if (section == "SETTINGS") {
-                                    SettingsSection(vm, state, dy, snap, importing, importError)
+                                    SettingsSection(vm, state, dy, snap, busy, importError)
                                 } else if (section == "TEAM" && snap != null) {
                                     TeamSnapshotSection(snap)
                                 } else if (section == "RECRUIT" && snap != null) {

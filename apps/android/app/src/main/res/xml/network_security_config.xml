@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Why this file exists: the Windows app serves the snapshot over plain HTTP on
+  the home network. It runs on a machine with no domain name and no certificate
+  anyone could issue one for, so there is nothing to secure the connection with,
+  and nothing to secure it against — the request never leaves the house, and the
+  token on it is the access control.
+
+  Android would rather that be all or nothing: android:usesCleartextTraffic in
+  the manifest switches cleartext on for every host the app touches, GitHub
+  included, which is exactly what should not happen. This config is the narrower
+  form the platform allows. Cleartext is permitted by the base config, because
+  the user types their own LAN address and <domain> matches host names rather
+  than address ranges — there is no way to write "private ranges only" here —
+  but every host this app reaches over the internet is named below and refuses
+  cleartext outright. An update check, a release lookup or a snapshot download
+  therefore cannot quietly fall off TLS, and the permission that remains covers
+  only the address the user typed off their own desktop screen.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Everything the app reaches beyond the home network. TLS or nothing. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+        <domain includeSubdomains="true">githubassets.com</domain>
+    </domain-config>
+</network-security-config>

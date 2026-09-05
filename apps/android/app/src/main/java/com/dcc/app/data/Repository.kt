@@ -71,17 +71,23 @@ object Repository {
     }
 
     /**
-     * Reads a snapshot the user picked with the document picker. Nothing is
-     * written until the document has parsed, so a wrong or damaged file leaves
-     * the phone showing the dynasty it already had.
+     * Takes in a snapshot document however it arrived — a file the user picked,
+     * the desktop over Wi-Fi, or GitHub. Nothing is written until the document
+     * has parsed, so a wrong or damaged one leaves the phone showing the
+     * dynasty it already had.
      */
+    fun acceptSnapshot(context: Context, document: String): Result<DynastySnapshot> = runCatching {
+        val snapshot = decodeSnapshot(document)
+        saveSnapshot(context, document)
+        snapshot
+    }
+
+    /** Reads a snapshot the user picked with the document picker. */
     fun importSnapshot(context: Context, uri: Uri): Result<DynastySnapshot> = runCatching {
         val document = context.contentResolver.openInputStream(uri)
             ?.use { it.readBytes().decodeToString() }
             ?: error("that file could not be opened")
-        val snapshot = decodeSnapshot(document)
-        saveSnapshot(context, document)
-        snapshot
+        acceptSnapshot(context, document).getOrThrow()
     }
 
     /**

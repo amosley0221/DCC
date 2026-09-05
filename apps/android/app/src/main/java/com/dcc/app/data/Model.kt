@@ -245,9 +245,27 @@ data class Persisted(
     val heat: Int = 0,
     val gameRunning: Boolean = true,
     val leaseHolder: String = "gaming-pc",
-    /** Relay base URL, e.g. http://den-server.local:8080 — empty until paired. */
+    /**
+     * The desktop app's own server on the home network, e.g.
+     * http://192.168.1.42:7327, with the code it prints beside it. Both are
+     * read off the desktop screen, and the code is made fresh every time that
+     * server is switched on.
+     */
     val relayUrl: String = "",
     val relayToken: String = "",
+    /**
+     * Where the desktop publishes for the times the phone is not at home:
+     * "owner/name" of a repository the user owns, and a token with repo access
+     * to it. A secret, so it is shown as one and never written to the log.
+     */
+    val githubRepo: String = "",
+    val githubToken: String = "",
+    /**
+     * Which route last brought a snapshot in — "file", "wifi" or "github", and
+     * empty until one has. Remembered so a refresh is one tap with nothing to
+     * type again.
+     */
+    val snapshotSource: String = "",
     val queue: List<QueueItem> = emptyList(),
     val storyStatus: Map<String, String> = emptyMap(),
     val board: List<String> = emptyList(),

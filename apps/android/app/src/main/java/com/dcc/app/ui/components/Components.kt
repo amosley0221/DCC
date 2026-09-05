@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +20,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -281,6 +285,8 @@ fun DccField(
     placeholder: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** Masks what is typed, for the tokens that are the whole access control. */
+    secret: Boolean = false,
     onValueChange: (String) -> Unit,
 ) {
     val c = Dcc.colors
@@ -299,6 +305,12 @@ fun DccField(
             onValueChange = onValueChange,
             enabled = enabled,
             singleLine = true,
+            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+            // A token is neither a word nor a sentence, so the keyboard should
+            // not be trying to help with either.
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text,
+            ),
             cursorBrush = SolidColor(c.accent),
             textStyle = TextStyle(
                 fontFamily = Dcc.fonts.mono, fontSize = 12.sp, letterSpacing = 0.6.sp, color = c.ink,
