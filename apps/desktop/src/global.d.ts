@@ -34,9 +34,13 @@ declare global {
         message: string; season: number | null; week: number | null
       }): Promise<{ ok: true; thread: TamperThreadView } | { ok: false; message: string }>
       tamperForget(key: string): Promise<{ ok: true }>
-      packStart(): Promise<{ ok: true }>
-      packAdd(entries: { name: string; data: Uint8Array }[]): Promise<{ ok: boolean; entries?: number }>
+      packStart(): Promise<{ ok: true; id: number }>
+      packAdd(entries: { name: string; data: Uint8Array }[], id?: number): Promise<
+        { ok: true; entries: number } | { ok: false; message: string }
+      >
       packFinish(req: {
+        /** The pack this build opened, so a stale finish cannot close another one. */
+        id?: number
         publish: boolean; repo?: string
         /** How the jersey sits on the portrait, so the phone draws a player as the PC does. */
         fit?: { jerseyScale?: number; jerseyDrop?: number }

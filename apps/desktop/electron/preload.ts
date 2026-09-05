@@ -64,9 +64,11 @@ const api = {
     { ok: true; thread: TamperThreadView } | { ok: false; message: string }
   >,
   tamperForget: (key: string) => ipcRenderer.invoke('tamper:forget', key) as Promise<{ ok: true }>,
-  packStart: () => ipcRenderer.invoke('art:packStart') as Promise<{ ok: true }>,
-  packAdd: (entries: { name: string; data: Uint8Array }[]) =>
-    ipcRenderer.invoke('art:packAdd', entries) as Promise<{ ok: boolean; entries?: number }>,
+  packStart: () => ipcRenderer.invoke('art:packStart') as Promise<{ ok: true; id: number }>,
+  packAdd: (entries: { name: string; data: Uint8Array }[], id?: number) =>
+    ipcRenderer.invoke('art:packAdd', { entries, id }) as Promise<
+      { ok: true; entries: number } | { ok: false; message: string }
+    >,
   packFinish: (req: {
     publish: boolean; repo?: string
     fit?: { jerseyScale?: number; jerseyDrop?: number }

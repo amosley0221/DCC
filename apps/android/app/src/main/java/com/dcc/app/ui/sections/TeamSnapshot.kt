@@ -499,15 +499,24 @@ private fun PlayerCard(
             .clickable { onClick() },
     ) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            // The crest, behind the player the way it sits on a shirt.
-            if (!ArtImage(mark, Modifier.align(Alignment.Center).fillMaxSize(0.72f), alpha = 0.22f)) {
+            // Nobody has a portrait for every player. With one, the crest sits
+            // behind him the way it sits on a shirt; without one the crest is
+            // the card, rather than a monogram floating in an empty frame with
+            // a jersey that has no shoulders in it.
+            val faded = face != null
+            if (!ArtImage(
+                    mark,
+                    Modifier.align(Alignment.Center).fillMaxSize(if (faded) 0.72f else 0.64f),
+                    alpha = if (faded) 0.22f else 0.9f,
+                )
+            ) {
                 Text(
                     monogram,
                     modifier = Modifier.align(Alignment.Center),
                     style = TextStyle(
                         fontFamily = Dcc.fonts.serif,
                         fontSize = 64.sp,
-                        color = (if (champion) gold else ink).copy(alpha = 0.20f),
+                        color = (if (champion) gold else ink).copy(alpha = if (faded) 0.20f else 0.5f),
                     ),
                 )
             }
@@ -515,7 +524,7 @@ private fun PlayerCard(
             // same box, so the collar lands on the neck rather than in the
             // bottom corners — which is where a bottom-anchored jersey at 118%
             // of a 92% portrait was putting it.
-            PlayerKit(face, jersey, Modifier.fillMaxSize())
+            if (face != null) PlayerKit(face, jersey, Modifier.fillMaxSize())
             NumText(
                 p.overall.toString(),
                 size = 24,

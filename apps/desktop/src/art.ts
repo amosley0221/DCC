@@ -109,6 +109,8 @@ export interface PackProgress {
 }
 
 export interface PackOutcome {
+  /** The pack this build opened, so the finish cannot close somebody else's. */
+  id: number
   entries: number
   skipped: number
   /** Extensions of the files that would not load, so an empty pack names its cause. */
@@ -167,7 +169,7 @@ export async function buildPack(
     if (file) jobs.push({ name: awardEntryName(key), file, max: schoolPx })
   }
 
-  await window.dcc.packStart()
+  const started = await window.dcc.packStart()
 
   const colors: Record<string, string> = {}
   const kinds = new Map<string, number>()
@@ -175,9 +177,18 @@ export async function buildPack(
   let skipped = 0
   let pending: { name: string; data: Uint8Array }[] = []
 
+  /**
+   * Sends a batch, and stops the whole build if it does not land.
+   *
+   * The result used to be thrown away, so a pack that had been lost partway —
+   * the app restarted, a second build started — was only noticed at the end,
+   * after every remaining image had been read and resized for an archive that
+   * no longer existed. It reported "no pack is open" and nothing else.
+   */
   const flush = async () => {
     if (!pending.length) return
-    await window.dcc.packAdd(pending)
+    const res = await window.dcc.packAdd(pending, started.id)
+    if (!res.ok) throw new Error(res.message)
     pending = []
   }
 
@@ -209,6 +220,7 @@ export async function buildPack(
   onProgress?.({ done: jobs.length, total: jobs.length, label: '' })
 
   return {
+    id: started.id,
     entries,
     skipped,
     skippedKinds: [...kinds.entries()]

@@ -122,24 +122,30 @@ export function schoolPlan(schoolArt: Record<string, string>): Map<string, Map<s
   return out
 }
 
-/** Assembles the archive and its manifest from the resized images. */
-export function packEntries(
-  entries: PackEntry[],
+/**
+ * What a pack holds, worked out from the entry names alone.
+ *
+ * Names rather than entries, because the streaming writer has already written
+ * the images out and does not keep them: all it has is the list.
+ */
+export function packManifest(
+  names: string[],
+  bytes: number,
   now = new Date(),
   fit: { jerseyScale?: number; jerseyDrop?: number } = {},
-): PackResult {
+): PackManifest {
   const schools: Record<string, string[]> = {}
   const players: string[] = []
   const awards: string[] = []
-  for (const e of entries) {
-    const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(e.name)
+  for (const name of names) {
+    const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(name)
     if (school) { (schools[school[1]] ??= []).push(school[2]); continue }
-    const player = /^players\/(.+)\.png$/.exec(e.name)
+    const player = /^players\/(.+)\.png$/.exec(name)
     if (player) { players.push(player[1]); continue }
-    const award = /^awards\/([^/]+)__([^/]+)\.png$/.exec(e.name)
+    const award = /^awards\/([^/]+)__([^/]+)\.png$/.exec(name)
     if (award) awards.push(`${award[1]}:${award[2]}`)
   }
-  const manifest: PackManifest = {
+  return {
     version: PACK_VERSION,
     built: now.toISOString(),
     schools,
@@ -149,8 +155,21 @@ export function packEntries(
       jerseyScale: Number.isFinite(fit.jerseyScale) ? Number(fit.jerseyScale) : 1,
       jerseyDrop: Number.isFinite(fit.jerseyDrop) ? Number(fit.jerseyDrop) : 0,
     },
-    bytes: entries.reduce((n, e) => n + e.data.length, 0),
+    bytes,
   }
+}
+
+/** Assembles the whole archive in memory. Used by the tests and by small packs. */
+export function packEntries(
+  entries: PackEntry[],
+  now = new Date(),
+  fit: { jerseyScale?: number; jerseyDrop?: number } = {},
+): PackResult {
+  const manifest = packManifest(
+    entries.map((e) => e.name),
+    entries.reduce((n, e) => n + e.data.length, 0),
+    now, fit,
+  )
   const all: PackEntry[] = [
     { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest), 'utf8') },
     ...entries,
@@ -179,42 +198,77 @@ export function crc32(buf: Uint8Array): number {
 const u16le = (v: number) => { const b = Buffer.alloc(2); b.writeUInt16LE(v & 0xffff); return b }
 const u32le = (v: number) => { const b = Buffer.alloc(4); b.writeUInt32LE(v >>> 0); return b }
 
-/**
- * A ZIP the phone's own `java.util.zip` opens.
+/*
+ * A ZIP the phone's own `java.util.zip` opens, written in three pieces so it can
+ * be streamed to a file rather than assembled in memory.
+ *
+ * A pack of every face in the country is a few hundred megabytes of PNG, and
+ * holding all of it plus the archive it is being concatenated into is how the
+ * main process runs out of room on the largest scope — the same shape of bug
+ * that was fixed on the phone in 0.39.2 and left standing here.
  *
  * Stored, not deflated: every entry is a PNG, which is already a deflate
  * stream, and compressing it again costs time to make it very slightly bigger.
  */
-function zip(entries: PackEntry[]): Buffer {
-  const local: Buffer[] = []
-  const central: Buffer[] = []
-  let offset = 0
-  for (const e of entries) {
-    const name = Buffer.from(e.name, 'utf8')
-    const crc = crc32(e.data)
-    const header = Buffer.concat([
-      u32le(0x04034b50), u16le(20), u16le(0), u16le(0),
-      u16le(0), u16le(0),                       // time, date: not kept
-      u32le(crc), u32le(e.data.length), u32le(e.data.length),
-      u16le(name.length), u16le(0), name,
-    ])
-    local.push(header, e.data)
-    central.push(Buffer.concat([
+
+/** What the central directory needs to remember about an entry already written. */
+export interface ZipRecord {
+  name: string
+  crc: number
+  size: number
+  /** Where this entry's local header starts in the file. */
+  offset: number
+}
+
+/** One entry's local header and its bytes, ready to append. */
+export function zipChunk(entry: PackEntry, offset: number): { bytes: Buffer; record: ZipRecord } {
+  const name = Buffer.from(entry.name, 'utf8')
+  const crc = crc32(entry.data)
+  const header = Buffer.concat([
+    u32le(0x04034b50), u16le(20), u16le(0), u16le(0),
+    u16le(0), u16le(0),                       // time, date: not kept
+    u32le(crc), u32le(entry.data.length), u32le(entry.data.length),
+    u16le(name.length), u16le(0), name,
+  ])
+  return {
+    bytes: Buffer.concat([header, entry.data]),
+    record: { name: entry.name, crc, size: entry.data.length, offset },
+  }
+}
+
+/** The central directory and the end record, for everything already appended. */
+export function zipDirectory(records: ZipRecord[], offset: number): Buffer {
+  const central = records.map((r) => {
+    const name = Buffer.from(r.name, 'utf8')
+    return Buffer.concat([
       u32le(0x02014b50), u16le(20), u16le(20), u16le(0), u16le(0),
       u16le(0), u16le(0),
-      u32le(crc), u32le(e.data.length), u32le(e.data.length),
+      u32le(r.crc), u32le(r.size), u32le(r.size),
       u16le(name.length), u16le(0), u16le(0), u16le(0), u16le(0),
-      u32le(0), u32le(offset), name,
-    ]))
-    offset += header.length + e.data.length
-  }
+      u32le(0), u32le(r.offset), name,
+    ])
+  })
   const dir = Buffer.concat(central)
   return Buffer.concat([
-    ...local, dir,
+    dir,
     Buffer.concat([
       u32le(0x06054b50), u16le(0), u16le(0),
-      u16le(entries.length), u16le(entries.length),
+      u16le(records.length), u16le(records.length),
       u32le(dir.length), u32le(offset), u16le(0),
     ]),
   ])
+}
+
+function zip(entries: PackEntry[]): Buffer {
+  const parts: Buffer[] = []
+  const records: ZipRecord[] = []
+  let offset = 0
+  for (const e of entries) {
+    const { bytes, record } = zipChunk(e, offset)
+    parts.push(bytes)
+    records.push(record)
+    offset += bytes.length
+  }
+  parts.push(zipDirectory(records, offset))
+  return Buffer.concat(parts)
 }

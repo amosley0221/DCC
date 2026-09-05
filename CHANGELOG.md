@@ -10,6 +10,38 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.43.0] - 2026-09-05
+
+### Fixed
+
+- **"No pack is open."** Building the pack for everyone could spend several
+  minutes reading eight thousand faces and then report that, with nothing to
+  show for it. Three things were wrong at once and all three are fixed.
+
+  The main process held every image in memory until the last one arrived and
+  then concatenated the lot into one more buffer — a few hundred megabytes
+  twice over. It now appends each batch to a file as it goes, so the largest
+  thing alive at any moment is one batch. That is the same fix the phone got in
+  0.39.2, left standing on this side.
+
+  The result of each batch was thrown away, so a pack that had been lost partway
+  went unnoticed until the very end. Each batch is now checked, and a build that
+  has lost its pack stops immediately and says what happened rather than
+  finishing for nothing.
+
+  A build that failed left the screen stuck on *Building…* with no message. It
+  now always comes back, with the real reason.
+
+- **A player with no portrait gets his school's crest, not a monogram.** The
+  game draws some players generically, and an empty frame with two letters and a
+  jersey with no shoulders in it read as a broken card. The crest fills it
+  instead — the one image that is certainly right for him. On both apps.
+
+### Changed
+
+- **The relay streams the art pack** rather than reading it into memory to
+  answer one request.
+
 ## [0.42.0] - 2026-09-05
 
 ### Fixed

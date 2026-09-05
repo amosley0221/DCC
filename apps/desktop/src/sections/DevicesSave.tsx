@@ -106,6 +106,20 @@ export default function DevicesSave() {
    */
   const build = async () => {
     setPacking(true); setPackNote(null); setProgress(null)
+    try {
+      await buildAndSave()
+    } catch (err) {
+      // Anything that goes wrong now says so, and the button comes back. It
+      // used to leave the screen stuck on "Building…" with no explanation.
+      const message = String((err as Error)?.message ?? err)
+      setPackNote(message)
+      dispatch({ type: 'log', line: { text: `art pack failed — ${message}`, kind: 'bad' } })
+    } finally {
+      setPacking(false); setProgress(null)
+    }
+  }
+
+  const buildAndSave = async () => {
     const out = await buildPack(
       save.schoolArt,
       save.facePaths,
@@ -120,6 +134,7 @@ export default function DevicesSave() {
       await window.dcc.setSchoolColors(out.colors)
     }
     const res = await window.dcc.packFinish({
+      id: out.id,
       publish: !!repo.trim() && !!state.githubToken,
       repo: repo.trim() || undefined,
       // The alignment you set on the Roster's card view travels with the art,
@@ -129,7 +144,6 @@ export default function DevicesSave() {
         jerseyDrop: Number(localStorage.getItem('dcc.kit.y') ?? 0),
       },
     })
-    setPacking(false); setProgress(null)
     if (!res.ok) { setPackNote(res.message); return }
     const mb = (res.bytes / 1024 / 1024).toFixed(1)
     const note = [

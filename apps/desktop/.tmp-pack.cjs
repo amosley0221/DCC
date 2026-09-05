@@ -25,10 +25,13 @@ __export(artPack_exports, {
   awardEntryName: () => awardEntryName,
   crc32: () => crc32,
   packEntries: () => packEntries,
+  packManifest: () => packManifest,
   playerEntryName: () => playerEntryName,
   safe: () => safe,
   schoolEntryName: () => schoolEntryName,
-  schoolPlan: () => schoolPlan
+  schoolPlan: () => schoolPlan,
+  zipChunk: () => zipChunk,
+  zipDirectory: () => zipDirectory
 });
 module.exports = __toCommonJS(artPack_exports);
 var PACK_VERSION = 1;
@@ -66,25 +69,25 @@ function schoolPlan(schoolArt) {
   }
   return out;
 }
-function packEntries(entries, now = /* @__PURE__ */ new Date(), fit = {}) {
+function packManifest(names, bytes, now = /* @__PURE__ */ new Date(), fit = {}) {
   const schools = {};
   const players = [];
   const awards = [];
-  for (const e of entries) {
-    const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(e.name);
+  for (const name of names) {
+    const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(name);
     if (school) {
       (schools[school[1]] ??= []).push(school[2]);
       continue;
     }
-    const player = /^players\/(.+)\.png$/.exec(e.name);
+    const player = /^players\/(.+)\.png$/.exec(name);
     if (player) {
       players.push(player[1]);
       continue;
     }
-    const award = /^awards\/([^/]+)__([^/]+)\.png$/.exec(e.name);
+    const award = /^awards\/([^/]+)__([^/]+)\.png$/.exec(name);
     if (award) awards.push(`${award[1]}:${award[2]}`);
   }
-  const manifest = {
+  return {
     version: PACK_VERSION,
     built: now.toISOString(),
     schools,
@@ -94,8 +97,16 @@ function packEntries(entries, now = /* @__PURE__ */ new Date(), fit = {}) {
       jerseyScale: Number.isFinite(fit.jerseyScale) ? Number(fit.jerseyScale) : 1,
       jerseyDrop: Number.isFinite(fit.jerseyDrop) ? Number(fit.jerseyDrop) : 0
     },
-    bytes: entries.reduce((n, e) => n + e.data.length, 0)
+    bytes
   };
+}
+function packEntries(entries, now = /* @__PURE__ */ new Date(), fit = {}) {
+  const manifest = packManifest(
+    entries.map((e) => e.name),
+    entries.reduce((n, e) => n + e.data.length, 0),
+    now,
+    fit
+  );
   const all = [
     { name: "manifest.json", data: Buffer.from(JSON.stringify(manifest), "utf8") },
     ...entries
@@ -126,30 +137,33 @@ var u32le = (v) => {
   b.writeUInt32LE(v >>> 0);
   return b;
 };
-function zip(entries) {
-  const local = [];
-  const central = [];
-  let offset = 0;
-  for (const e of entries) {
-    const name = Buffer.from(e.name, "utf8");
-    const crc = crc32(e.data);
-    const header = Buffer.concat([
-      u32le(67324752),
-      u16le(20),
-      u16le(0),
-      u16le(0),
-      u16le(0),
-      u16le(0),
-      // time, date: not kept
-      u32le(crc),
-      u32le(e.data.length),
-      u32le(e.data.length),
-      u16le(name.length),
-      u16le(0),
-      name
-    ]);
-    local.push(header, e.data);
-    central.push(Buffer.concat([
+function zipChunk(entry, offset) {
+  const name = Buffer.from(entry.name, "utf8");
+  const crc = crc32(entry.data);
+  const header = Buffer.concat([
+    u32le(67324752),
+    u16le(20),
+    u16le(0),
+    u16le(0),
+    u16le(0),
+    u16le(0),
+    // time, date: not kept
+    u32le(crc),
+    u32le(entry.data.length),
+    u32le(entry.data.length),
+    u16le(name.length),
+    u16le(0),
+    name
+  ]);
+  return {
+    bytes: Buffer.concat([header, entry.data]),
+    record: { name: entry.name, crc, size: entry.data.length, offset }
+  };
+}
+function zipDirectory(records, offset) {
+  const central = records.map((r) => {
+    const name = Buffer.from(r.name, "utf8");
+    return Buffer.concat([
       u32le(33639248),
       u16le(20),
       u16le(20),
@@ -157,35 +171,46 @@ function zip(entries) {
       u16le(0),
       u16le(0),
       u16le(0),
-      u32le(crc),
-      u32le(e.data.length),
-      u32le(e.data.length),
+      u32le(r.crc),
+      u32le(r.size),
+      u32le(r.size),
       u16le(name.length),
       u16le(0),
       u16le(0),
       u16le(0),
       u16le(0),
       u32le(0),
-      u32le(offset),
+      u32le(r.offset),
       name
-    ]));
-    offset += header.length + e.data.length;
-  }
+    ]);
+  });
   const dir = Buffer.concat(central);
   return Buffer.concat([
-    ...local,
     dir,
     Buffer.concat([
       u32le(101010256),
       u16le(0),
       u16le(0),
-      u16le(entries.length),
-      u16le(entries.length),
+      u16le(records.length),
+      u16le(records.length),
       u32le(dir.length),
       u32le(offset),
       u16le(0)
     ])
   ]);
+}
+function zip(entries) {
+  const parts = [];
+  const records = [];
+  let offset = 0;
+  for (const e of entries) {
+    const { bytes, record } = zipChunk(e, offset);
+    parts.push(bytes);
+    records.push(record);
+    offset += bytes.length;
+  }
+  parts.push(zipDirectory(records, offset));
+  return Buffer.concat(parts);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
@@ -194,8 +219,11 @@ function zip(entries) {
   awardEntryName,
   crc32,
   packEntries,
+  packManifest,
   playerEntryName,
   safe,
   schoolEntryName,
-  schoolPlan
+  schoolPlan,
+  zipChunk,
+  zipDirectory
 });

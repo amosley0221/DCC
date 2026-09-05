@@ -86,6 +86,56 @@ const P = require(process.argv[2])
   assert.deepEqual(manifest, res.manifest, 'the manifest in the archive is the one reported')
 }
 
+/* ------------------------------------------------------ written in pieces */
+{
+  // The main process appends each batch to a file and never holds the whole
+  // archive, so the pieces it writes have to add up to the same bytes the
+  // in-memory writer produces. This is that, done by hand.
+  const png = (n) => Buffer.from(`streamed ${n}`.repeat(3), 'utf8')
+  const entries = [
+    { name: P.schoolEntryName('Penn State', 'logo'), data: png(1) },
+    { name: P.playerEntryName('Generic_0002_P_T0000_D_1_1'), data: png(2) },
+    { name: P.awardEntryName('trophy:heisman'), data: png(3) },
+  ]
+
+  const parts = []
+  const records = []
+  let offset = 0
+  for (const e of entries) {
+    const { bytes, record } = P.zipChunk(e, offset)
+    assert.equal(record.offset, offset, 'each record remembers where its header went')
+    assert.equal(record.size, e.data.length)
+    parts.push(bytes)
+    records.push(record)
+    offset += bytes.length
+  }
+  // The manifest goes last when streaming: the writer only knows what it holds
+  // once it has written it, and a reader takes entries in any order.
+  const manifest = P.packManifest(records.map((r) => r.name),
+    entries.reduce((n, e) => n + e.data.length, 0), new Date('2026-09-05T12:00:00.000Z'))
+  const mBytes = Buffer.from(JSON.stringify(manifest), 'utf8')
+  const last = P.zipChunk({ name: 'manifest.json', data: mBytes }, offset)
+  parts.push(last.bytes)
+  records.push(last.record)
+  offset += last.bytes.length
+  parts.push(P.zipDirectory(records, offset))
+
+  const back = readZip(Buffer.concat(parts))
+  assert.deepEqual([...back.keys()].sort(), [
+    'awards/trophy__heisman.png',
+    'manifest.json',
+    'players/Generic_0002_P_T0000_D_1_1.png',
+    'schools/Penn_State__logo.png',
+  ], 'a streamed archive holds the same entries')
+  for (const e of entries) assert.deepEqual(back.get(e.name), e.data, `${e.name} survives streaming`)
+  assert.deepEqual(JSON.parse(back.get('manifest.json').toString('utf8')), manifest)
+
+  // And the manifest built from names alone matches the one built from entries.
+  const fromEntries = P.packEntries(entries, new Date('2026-09-05T12:00:00.000Z')).manifest
+  assert.deepEqual({ ...manifest, bytes: fromEntries.bytes }, fromEntries,
+    'names alone are enough to describe a pack')
+}
+
 /* --------------------------------------------------------------- empty pack */
 {
   // The failure that shipped: every file skipped, so the archive holds only the
@@ -104,7 +154,7 @@ const P = require(process.argv[2])
     { jerseyScale: 1, jerseyDrop: 0 })
 }
 
-console.log('check-pack: names round-trip, the plan picks one mark each, the ZIP reads back')
+console.log('check-pack: names round-trip, one mark each, and the ZIP reads back whole or streamed')
 
 /** Reads a stored-entry ZIP the way any unzipper does: from the end. */
 function readZip(buf) {

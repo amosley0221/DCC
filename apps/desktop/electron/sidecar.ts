@@ -13,7 +13,7 @@
  */
 import { app } from 'electron'
 import { join } from 'node:path'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { emptyLedger, moves, LEDGER_VERSION } from './transfers'
 import type { Ledger } from './transfers'
 import { standing } from './tamper'
@@ -77,14 +77,25 @@ export const rememberTitles = (t: typeof titleCache) => { titleCache = t }
 export const readTitles = () => titleCache
 
 /**
- * The art pack, last time one was built.
+ * The art pack, last time one was built — as a file on disk.
  *
- * Kept in memory rather than on disk: it is rebuilt from the art folder in a
- * second or two, and the relay needs something to hand the phone when it asks.
+ * Not in memory: a pack of every face in the country is a few hundred
+ * megabytes, and holding it for the length of a session so the relay can hand
+ * it over is not a trade worth making. The relay streams it from here instead.
+ *
+ * The previous one is deleted when a new one replaces it, so a session of
+ * rebuilds does not fill the temp folder.
  */
-let packCache: Buffer | null = null
-export const rememberPack = (b: Buffer) => { packCache = b }
-export const readPack = () => packCache
+let packFile: { file: string; bytes: number } | null = null
+
+export function rememberPack(file: string, bytes: number) {
+  if (packFile && packFile.file !== file) {
+    try { rmSync(packFile.file, { force: true }) } catch { /* it is a temp file */ }
+  }
+  packFile = { file, bytes }
+}
+
+export const readPack = () => (packFile && existsSync(packFile.file) ? packFile : null)
 
 const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
 const tamperFile = () => join(app.getPath('userData'), 'tampering.json')

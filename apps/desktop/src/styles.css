@@ -1002,3 +1002,20 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
   transform-origin: 50% 100%;
 }
 .kit-face { z-index: 0; }
+
+/* A player the game draws generically has no portrait, and a monogram in an
+   empty frame beside forty faces reads as a broken card. The school's crest
+   fills it instead — the one image that is certainly right for him. */
+.playercard-crest {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+}
+.playercard-crest img {
+  width: 64%;
+  height: 64%;
+  object-fit: contain;
+  opacity: 0.9;
+}

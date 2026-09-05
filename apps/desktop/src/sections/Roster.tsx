@@ -290,14 +290,24 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
                 onClick={() => setSheet(p.index)}
                 style={{ background: teamColor ?? 'var(--bg0)' }}
               >
-                {/* The school's mark, gold once they have won it. */}
-                <span className="playercard-mark"><SchoolArt size={86} file={cardMark} /></span>
-                <span className="kit playercard-kit">
-                  {jersey ? <img className="kit-jersey" alt="" loading="lazy" src={artSrc(jersey)} /> : null}
-                  {faceOf(p)
-                    ? <img className="kit-face" alt="" loading="lazy" src={artSrc(faceOf(p)!)} />
-                    : <span className="playercard-initials">{(p.first[0] ?? '') + (p.last[0] ?? '')}</span>}
-                </span>
+                {/* Nobody has a portrait for every player. Rather than a
+                    monogram floating in an empty frame — and a jersey with no
+                    shoulders in it — the school's crest becomes the card. */}
+                {faceOf(p) ? (
+                  <>
+                    <span className="playercard-mark"><SchoolArt size={86} file={cardMark} /></span>
+                    <span className="kit playercard-kit">
+                      {jersey ? <img className="kit-jersey" alt="" loading="lazy" src={artSrc(jersey)} /> : null}
+                      <img className="kit-face" alt="" loading="lazy" src={artSrc(faceOf(p)!)} />
+                    </span>
+                  </>
+                ) : cardMark ? (
+                  <span className="playercard-crest">
+                    <img alt="" loading="lazy" src={artSrc(cardMark)} />
+                  </span>
+                ) : (
+                  <span className="playercard-initials">{(p.first[0] ?? '') + (p.last[0] ?? '')}</span>
+                )}
                 <span className="playercard-shade" />
 
                 <span className="playercard-ovr num">{p.overall}</span>

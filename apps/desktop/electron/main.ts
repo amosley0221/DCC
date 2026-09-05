@@ -1,6 +1,10 @@
 import { app, BrowserWindow, ipcMain, shell, dialog, protocol, net } from 'electron'
 import { join, resolve, sep } from 'node:path'
-import { readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs'
+import {
+  readFileSync, existsSync, writeFileSync, mkdirSync, copyFileSync,
+  openSync, writeSync, closeSync, rmSync, statSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { autoUpdater } from 'electron-updater'
 import {
@@ -30,8 +34,8 @@ import type { TamperCoach, TamperTarget } from './tamper'
 import { sendText } from './tamperTalk'
 import { buildSnapshot } from './snapshot'
 import { publishArt, publishSnapshot } from './publish'
-import { packEntries } from './artPack'
-import type { PackEntry } from './artPack'
+import { packManifest, zipChunk, zipDirectory } from './artPack'
+import type { ZipRecord } from './artPack'
 import { rememberPack } from './sidecar'
 import { relayState, startRelay, stopRelay } from './relay'
 import { writeGameEdits, writePlayerEdits, writeDepthEdits } from './saveWrite'
@@ -525,48 +529,122 @@ ipcMain.handle('assets:pickFaces', async () => {
  * decodes and a hand-written PNG reader does not. That reader is why the first
  * pack came out 208 bytes: a manifest, and every file skipped.
  */
-let building: PackEntry[] | null = null
+/**
+ * The pack being written, as a file rather than as an array.
+ *
+ * Every image used to be held here until the last one arrived and then
+ * concatenated into one more buffer — a few hundred megabytes twice over on the
+ * widest scope. The archive is appended to a temp file as the batches come in,
+ * so the largest thing alive at any moment is one batch.
+ *
+ * The id is what makes a lost pack say so. Two builds, or a restart in the
+ * middle of one, used to end in "no pack is open" after several minutes of
+ * reading images for an archive that no longer existed.
+ */
+interface OpenPack {
+  id: number
+  file: string
+  fd: number
+  offset: number
+  records: ZipRecord[]
+  bytes: number
+}
+let building: OpenPack | null = null
+let packSeq = 0
 
-ipcMain.handle('art:packStart', () => { building = []; return { ok: true as const } })
+const closePack = (p: OpenPack | null) => {
+  if (!p) return
+  try { closeSync(p.fd) } catch { /* already closed */ }
+  try { rmSync(p.file, { force: true }) } catch { /* it is a temp file */ }
+}
 
-ipcMain.handle('art:packAdd', (_e, entries: { name: string; data: Uint8Array }[]) => {
-  if (!building) return { ok: false as const, message: 'no pack is open' }
-  for (const e of entries) building.push({ name: e.name, data: Buffer.from(e.data) })
-  return { ok: true as const, entries: building.length }
+ipcMain.handle('art:packStart', () => {
+  // A build that was abandoned leaves its file behind; this is where it goes.
+  closePack(building)
+  const id = ++packSeq
+  const file = join(tmpdir(), `dcc-art-${process.pid}-${id}.zip`)
+  building = { id, file, fd: openSync(file, 'w'), offset: 0, records: [], bytes: 0 }
+  return { ok: true as const, id }
+})
+
+ipcMain.handle('art:packAdd', (_e, req: { id?: number; entries: { name: string; data: Uint8Array }[] }) => {
+  const entries = req?.entries ?? []
+  if (!building) return { ok: false as const, message: 'the pack was closed before this batch arrived' }
+  if (req?.id !== undefined && req.id !== building.id) {
+    return { ok: false as const, message: 'another build replaced this one' }
+  }
+  for (const e of entries) {
+    const data = Buffer.from(e.data)
+    const { bytes, record } = zipChunk({ name: e.name, data }, building.offset)
+    writeSync(building.fd, bytes)
+    building.offset += bytes.length
+    building.records.push(record)
+    building.bytes += data.length
+  }
+  return { ok: true as const, entries: building.records.length }
 })
 
 ipcMain.handle('art:packFinish', async (_e, req: {
+  id?: number
   publish: boolean; repo?: string
   fit?: { jerseyScale?: number; jerseyDrop?: number }
 }) => {
-  const entries = building
+  const open = building
   building = null
-  if (!entries) return { ok: false as const, message: 'no pack is open' }
+  if (!open) {
+    return {
+      ok: false as const,
+      message: 'the pack was closed before it finished — the app restarted, or another build replaced it',
+    }
+  }
+  if (req.id !== undefined && req.id !== open.id) {
+    closePack(open)
+    return { ok: false as const, message: 'another build replaced this one' }
+  }
   try {
-    const pack = packEntries(entries, new Date(), req.fit ?? {})
-    rememberPack(pack.bytes)
+    // The manifest is the last entry rather than the first: a streaming writer
+    // only knows what it holds once it has written it, and the phone reads the
+    // manifest off disk after unpacking, so its position does not matter.
+    const manifest = packManifest(open.records.map((r) => r.name), open.bytes, new Date(), req.fit ?? {})
+    const { bytes: manifestChunk, record } = zipChunk(
+      { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest), 'utf8') },
+      open.offset,
+    )
+    writeSync(open.fd, manifestChunk)
+    open.offset += manifestChunk.length
+    open.records.push(record)
+    writeSync(open.fd, zipDirectory(open.records, open.offset))
+    closeSync(open.fd)
+
+    const size = statSync(open.file).size
 
     const dest = await dialog.showSaveDialog(win!, {
       title: 'Save the art pack',
       defaultPath: 'dcc-art.zip',
       filters: [{ name: 'DCC art pack', extensions: ['zip'] }],
     })
-    if (!dest.canceled && dest.filePath) writeFileSync(dest.filePath, pack.bytes)
+    if (!dest.canceled && dest.filePath) copyFileSync(open.file, dest.filePath)
 
     let published: string | null = null
     if (req.publish && req.repo) {
       const token = String(readSettings().githubToken ?? '')
-      published = (await publishArt({ repo: req.repo, token }, pack.bytes)).message
+      // Reading it back is the one moment the whole pack is in memory, and it
+      // only happens when it is being uploaded.
+      published = (await publishArt({ repo: req.repo, token }, readFileSync(open.file))).message
     }
+
+    // Kept on disk for the relay to serve. The previous pack's file goes now.
+    rememberPack(open.file, size)
     return {
       ok: true as const,
-      bytes: pack.bytes.length,
-      schools: Object.keys(pack.manifest.schools).length,
-      players: pack.manifest.players.length,
+      bytes: size,
+      schools: Object.keys(manifest.schools).length,
+      players: manifest.players.length,
       file: dest.canceled ? null : dest.filePath ?? null,
       published,
     }
   } catch (err) {
+    closePack(open)
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
 })

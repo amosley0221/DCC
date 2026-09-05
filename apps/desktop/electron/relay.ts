@@ -14,6 +14,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { readSavePayload } from './saveAnalysis'
 import { buildSnapshot } from './snapshot'
 import { readPack, snapshotExtras } from './sidecar'
@@ -108,10 +109,14 @@ function handle(ctx: RelayContext, req: IncomingMessage, res: ServerResponse) {
     }
     res.writeHead(200, {
       'content-type': 'application/zip',
-      'content-length': String(pack.length),
+      'content-length': String(pack.bytes),
       'cache-control': 'no-store',
     })
-    res.end(pack)
+    // Streamed rather than read into memory: the pack can be a few hundred
+    // megabytes, and the phone is already reading it a chunk at a time.
+    const stream = createReadStream(pack.file)
+    stream.on('error', () => res.destroy())
+    stream.pipe(res)
     return
   }
 
