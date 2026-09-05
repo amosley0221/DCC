@@ -40,7 +40,8 @@ app.whenReady().then(async () => {
   const probe = () =>
     win.webContents.executeJavaScript(`(() => ({
       text: document.body.innerText.slice(0, 200),
-      nav: [...document.querySelectorAll('.nav-item')].map(n => n.textContent.replace(/\\d+$/, '')),
+      nav: [...document.querySelectorAll('.gs-nav-item')].map(n => n.textContent.replace(/\\d+$/, '')),
+      ops: [...document.querySelectorAll('.subtabs .tab')].map(n => n.textContent.trim()),
       cards: document.querySelectorAll('.card').length,
       title: (document.querySelector('.screen-title') || {}).textContent || '',
     }))()`)
@@ -50,7 +51,7 @@ app.whenReady().then(async () => {
 
   const visited = []
   for (let i = 0; i < r.nav.length; i++) {
-    await win.webContents.executeJavaScript(`document.querySelectorAll('.nav-item')[${i}].click()`)
+    await win.webContents.executeJavaScript(`document.querySelectorAll('.gs-nav-item')[${i}].click()`)
     await wait(500)
     const s = await probe()
     visited.push(`${r.nav[i].padEnd(10)} title="${s.title}" cards=${s.cards}`)
@@ -94,18 +95,27 @@ app.whenReady().then(async () => {
   // Scoped to the section body on purpose: the title bar also shows the save
   // name, so searching the whole page would pass even if the section lost it.
   const SECTION_HAS_SAVE =
-    `/DYNASTY-SMOKE/.test((document.querySelector('.content-narrow')||{}).innerText||'')`
+    `/DYNASTY-SMOKE/.test((document.querySelector('.gs-page-in')||{}).innerText||'')`
   const savePersist = await (async () => {
-    const saveIdx = r.nav.indexOf('SAVE')
-    const otherIdx = r.nav.indexOf('WIRE')
-    if (saveIdx < 0 || otherIdx < 0) return 'SAVE or WIRE missing from the nav'
+    const otherIdx = r.nav.indexOf('Home')
+    if (otherIdx < 0) return 'Home missing from the nav'
+    // Everything operational is behind the gear in Gold Standard.
+    const openSave = async () => {
+      await win.webContents.executeJavaScript(`document.querySelector('.gs-gear').click()`)
+      await wait(400)
+      return win.webContents.executeJavaScript(
+        `(() => { const t = [...document.querySelectorAll('.subtabs .tab')]
+            .find(x => /Dynasty file/i.test(x.textContent)); if (t) t.click(); return !!t })()`)
+    }
+    if (!(await openSave())) return 'Dynasty file missing from the settings tabs'
 
     const click = async (i) => {
-      await win.webContents.executeJavaScript(`document.querySelectorAll('.nav-item')[${i}].click()`)
+      if (i === 'save') await openSave()
+      else await win.webContents.executeJavaScript(`document.querySelectorAll('.gs-nav-item')[${i}].click()`)
       await wait(400)
     }
     answerDialog = true
-    await click(saveIdx)
+    await click('save')
     await win.webContents.executeJavaScript(`(() => {
       const b = [...document.querySelectorAll('button')].find(x => /CHOOSE SAVE FILE/i.test(x.textContent))
       if (b) b.click()
@@ -121,7 +131,7 @@ app.whenReady().then(async () => {
       SECTION_HAS_SAVE)
     if (!before) return 'the save never appeared after choosing it'
     await click(otherIdx)
-    await click(saveIdx)
+    await click('save')
     await wait(400)
     const after = await win.webContents.executeJavaScript(
       SECTION_HAS_SAVE)
@@ -134,13 +144,13 @@ app.whenReady().then(async () => {
   // than the sample dynasty. Asserted in the DOM, because "the component
   // exists" has passed before while the screen showed something else.
   const recruitFromSave = await (async () => {
-    const idx = r.nav.indexOf('RECRUIT')
-    if (idx < 0) return 'RECRUIT missing from the nav'
-    await win.webContents.executeJavaScript(`document.querySelectorAll('.nav-item')[${idx}].click()`)
+    const idx = r.nav.indexOf('Recruiting')
+    if (idx < 0) return 'Recruiting missing from the nav'
+    await win.webContents.executeJavaScript(`document.querySelectorAll('.gs-nav-item')[${idx}].click()`)
     await wait(500)
     const text = await win.webContents.executeJavaScript(
-      `((document.querySelector('.content-narrow')||{}).innerText||'')`)
-    if (!/RECRUITING POOL/i.test(text)) return 'Recruit did not show the save-backed pool: ' + text.slice(0, 120)
+      `((document.querySelector('.gs-page-in')||{}).innerText||'')`)
+    if (!/IN THE POOL|RECRUITING POOL|NARROW THE POOL/i.test(text)) return 'Recruit did not show the save-backed pool: ' + text.slice(0, 120)
     return null
   })()
   console.log('RECRUIT FROM SAVE: ' + (recruitFromSave ?? 'shows the recruiting pool'))
@@ -189,7 +199,7 @@ app.whenReady().then(async () => {
   const zstdOk = typeof require('node:zlib').zstdDecompressSync === 'function'
   console.log('ZSTD: node ' + process.versions.node + ' -> ' + (zstdOk ? 'supported' : 'MISSING'))
 
-  const ok = errors.length === 0 && r.nav.length >= 10 && zstdOk && !savePersist &&
+  const ok = errors.length === 0 && r.nav.length >= 6 && zstdOk && !savePersist &&
     visited.every((v) => !v.includes('title=""'))
   console.log(ok ? 'SMOKE OK' : 'SMOKE FAIL')
   app.exit(ok ? 0 : 1)

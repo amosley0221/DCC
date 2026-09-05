@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { StoreProvider, useBootstrap, useStore } from './store'
+import { StoreProvider, blankPersisted, useBootstrap, useStore } from './store'
 import { SaveProvider, useSave } from './saveStore'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
 import { applyTheme } from './theme'
@@ -214,7 +214,6 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
               {section === 'LEGACY' ? <Coach /> : null}
             </>
           )}
-          {section === 'LEGACY' && save.report ? <Coach /> : null}
         </div>
       </main>
 
@@ -340,7 +339,8 @@ export default function App() {
   useEffect(() => {
     // Paint the default theme before the dynasty finishes loading so the first
     // frame is never unstyled.
-    applyTheme('night')
+    const d0 = blankPersisted()
+    applyTheme(d0.theme, d0.mode, d0.accent)
     void window.dcc.info().then((i) => setVersion(i.version))
     // Pick up anything the updater reported before this subscribed.
     void window.dcc.lastUpdateStatus().then((s) => { if (s) setUpdate((cur) => cur ?? s) })
