@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.31.0] - 2026-09-05
+
+### Added
+
+- **The Program's roster, in three shapes.** List for scanning eighty-five
+  names, gallery for putting a face to each, cards for looking at one — same
+  filters throughout. Four tiles above: the team, offense and defense
+  averages, and what the roster costs in NIL.
+- **A redshirt mark** on every view.
+- **Open a player.** Clicking a name, a row or a card brings up the profile and
+  all 52 ratings, grouped the way a player card reads them.
+- **Editing from the player sheet**, writing the overall, the ratings, the
+  redshirt flag and the NIL figure. Fields DCC cannot yet place in the record
+  are named on the profile rather than offered as boxes that do nothing.
+
+
 ## [0.30.3] - 2026-09-05
 
 ### Fixed
