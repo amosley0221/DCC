@@ -55,7 +55,7 @@ const ovrColour = (o: number) =>
 
 export default function RecruitSave() {
   const { save, patch } = useSave()
-  const { dispatch } = useStore()
+  const { state, dispatch } = useStore()
 
   const pickFaces = async () => {
     const dir = await window.dcc.pickFaces()
@@ -106,6 +106,10 @@ export default function RecruitSave() {
     : unrostered
   ), [unrostered, kind])
 
+  // Scouting is a mechanic, so an unscouted recruit's overall stays hidden.
+  const revealed = useMemo(() => new Set(state.revealedRecruits), [state.revealedRecruits])
+  const isShown = (p: RosterPlayer) => state.revealAllRecruits || revealed.has(p.playerId)
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
     const want = GROUPS.find(([g]) => g === group)?.[1] ?? []
@@ -114,8 +118,13 @@ export default function RecruitSave() {
         (stars === null || p.stars === stars) &&
         (!q || `${p.first} ${p.last} ${p.hometown} ${p.homeState ?? ''} ${p.pipeline ?? ''} ` +
           `${p.archetype ?? ''} ${p.position}`.toLowerCase().includes(q)))
-      .sort((a, b) => b.stars - a.stars || b.overall - a.overall)
-  }, [pool, group, query, stars])
+      // Ordering by a hidden overall would give it away — the top of the list
+      // would be the best players whether or not their number is on screen. With
+      // overalls hidden the order is stars then name, which is public knowledge.
+      .sort((a, b) => (state.revealAllRecruits
+        ? b.stars - a.stars || b.overall - a.overall
+        : b.stars - a.stars || (a.last + a.first).localeCompare(b.last + b.first)))
+  }, [pool, group, query, stars, state.revealAllRecruits])
 
   const load = async () => {
     if (!save.path) return
@@ -207,6 +216,16 @@ export default function RecruitSave() {
       </div>
 
       <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
+        <Chip on={state.revealAllRecruits} accent
+          onClick={() => dispatch({ type: 'revealAllRecruits', on: !state.revealAllRecruits })}>
+          {state.revealAllRecruits ? 'OVERALLS SHOWN' : 'OVERALLS HIDDEN'}
+        </Chip>
+        {!state.revealAllRecruits && revealed.size > 0 ? (
+          <Meta size={9}>{revealed.size} SCOUTED</Meta>
+        ) : null}
+      </div>
+
+      <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
         <Chip on={stars === null} onClick={() => setStars(null)}>ALL STARS</Chip>
         {[5, 4, 3, 2, 1].map((n) => (
           <Chip key={n} on={stars === n} onClick={() => setStars(stars === n ? null : n)}>
@@ -231,6 +250,8 @@ export default function RecruitSave() {
           <RecruitRow key={p.index} p={p} open={open === p.index}
             ratingNames={save.roster!.ratingNames}
             face={save.facePaths[p.assetId]}
+            shown={isShown(p)}
+            onReveal={() => dispatch({ type: 'revealRecruit', playerId: p.playerId })}
             onClick={() => setOpen(open === p.index ? null : p.index)} />
         ))}
       </div>
@@ -246,8 +267,11 @@ export default function RecruitSave() {
 }
 
 function RecruitRow(
-  { p, open, onClick, ratingNames, face }:
-  { p: RosterPlayer; open: boolean; onClick: () => void; ratingNames: string[]; face?: string },
+  { p, open, onClick, ratingNames, face, shown, onReveal }:
+  {
+    p: RosterPlayer; open: boolean; onClick: () => void; ratingNames: string[]; face?: string
+    shown: boolean; onReveal: () => void
+  },
 ) {
   return (
     <div>
@@ -267,8 +291,11 @@ function RecruitRow(
         <span style={{ width: 150, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
           {p.hometown}{p.homeState ? `, ${p.homeState}` : ''}
         </span>
-        <span style={{ width: 30, textAlign: 'right', color: ovrColour(p.overall), fontWeight: 600 }}>
-          {p.overall}
+        <span style={{
+          width: 30, textAlign: 'right', fontWeight: 600,
+          color: shown ? ovrColour(p.overall) : 'var(--ink3)',
+        }}>
+          {shown ? p.overall : '––'}
         </span>
       </button>
       {open && (
@@ -289,16 +316,26 @@ function RecruitRow(
               </Chip>
             ))}
           </div>
-          <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-          {ratingNames.map((n) => {
-            const v = p.ratings[n]
-            return v === undefined ? null : (
-              <Chip key={n} on={false}>
-                <span style={{ color: 'var(--ink3)' }}>{n}</span> {v}
-              </Chip>
-            )
-          })}
-          </div>
+          {shown ? (
+            <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+              {ratingNames.map((n) => {
+                const v = p.ratings[n]
+                return v === undefined ? null : (
+                  <Chip key={n} on={false}>
+                    <span style={{ color: 'var(--ink3)' }}>{n}</span> {v}
+                  </Chip>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+              <Btn size="sm" onClick={onReveal}>Scout {p.first} {p.last}</Btn>
+              <Meta size={9}>OVERALL AND ALL RATINGS ARE IN THE SAVE — THIS ONLY DECIDES WHETHER YOU SEE THEM</Meta>
+            </div>
+          )}
+          {shown ? (
+            <div><Btn size="sm" onClick={onReveal}>Hide again</Btn></div>
+          ) : null}
         </div>
       )}
     </div>

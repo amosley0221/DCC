@@ -142,6 +142,15 @@ export interface Persisted {
    */
   anthropicKey: string
   /**
+   * Recruits whose overall and ratings the user has chosen to see. The game
+   * hides them until a recruit is scouted, so DCC does too rather than handing
+   * over the answer to a mechanic the dynasty is built on. Player ids, not row
+   * indices, so the list survives the save being re-read.
+   */
+  revealedRecruits: number[]
+  /** Reveal every recruit at once, for a user who does not want the mechanic. */
+  revealAllRecruits: boolean
+  /**
    * A GitHub token with repo access, used only to publish the dynasty snapshot
    * so the phone can read it away from home. Kept on this machine.
    */

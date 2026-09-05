@@ -16,6 +16,8 @@ export const blankPersisted = (): Persisted => ({
   teamId: null,
   teamNames: {},
   anthropicKey: '',
+  revealedRecruits: [],
+  revealAllRecruits: false,
   githubToken: '',
   publishRepo: '',
   relayUrl: '',
@@ -87,6 +89,8 @@ export type Action =
   | { type: 'teamId'; id: number | null }
   | { type: 'teamName'; id: number; name: string | null }
   | { type: 'anthropicKey'; key: string }
+  | { type: 'revealRecruit'; playerId: number }
+  | { type: 'revealAllRecruits'; on: boolean }
   | { type: 'githubToken'; token: string }
   | { type: 'publishRepo'; repo: string }
 
@@ -200,6 +204,23 @@ export function reducer(state: Persisted, action: Action): Persisted {
       return { ...state, teamId: action.id }
     case 'anthropicKey':
       return { ...state, anthropicKey: action.key }
+    case 'revealRecruit': {
+      const has = state.revealedRecruits.includes(action.playerId)
+      return {
+        ...state,
+        revealedRecruits: has
+          ? state.revealedRecruits.filter((id) => id !== action.playerId)
+          : [...state.revealedRecruits, action.playerId],
+      }
+    }
+    case 'revealAllRecruits':
+      // Turning the switch off also forgets the individual reveals, so "hide"
+      // means hidden rather than hidden-except-the-ones-you-forgot-about.
+      return {
+        ...state,
+        revealAllRecruits: action.on,
+        revealedRecruits: action.on ? state.revealedRecruits : [],
+      }
     case 'githubToken':
       return { ...state, githubToken: action.token }
     case 'publishRepo':
