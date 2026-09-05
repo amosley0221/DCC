@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSave } from '../saveStore'
+import { useKit, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
@@ -41,13 +41,19 @@ function cardRatings(pos: string): string[] {
  * already indexed for the roster screens; there was no reason Home was the one
  * place that did not use it.
  */
-function Face({ p, size }: { p: { first: string; last: string; assetId?: string | null }; size: number }) {
+function Face({ p, size }: {
+  p: { first: string; last: string; assetId?: string | null; team?: number }
+  size: number
+}) {
   const { save } = useSave()
+  const { state } = useStore()
+  const kit = useKit(state.teamNames)
   return (
     <PlayerFace
       className="gs-row-avatar" round size={size}
       first={p.first} last={p.last}
       file={p.assetId ? save.facePaths[p.assetId] : undefined}
+      {...kit(p.team)}
     />
   )
 }

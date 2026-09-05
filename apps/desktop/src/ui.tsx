@@ -286,12 +286,20 @@ export function SchoolArt(
  * initials fallback, which needs a shape, gets a ground.
  */
 export function PlayerFace(
-  { file, first, last, size = 30, className, round }:
-  { file?: string; first: string; last: string; size?: number; className?: string; round?: boolean },
+  { file, first, last, size = 30, className, round, jersey, tint }:
+  {
+    file?: string; first: string; last: string; size?: number
+    className?: string; round?: boolean
+    /** The school's jersey, drawn over the portrait's generic grey shirt. */
+    jersey?: string
+    /** The school's own colour, behind everything. */
+    tint?: string | null
+  },
 ) {
   const box: React.CSSProperties = {
     width: size, height: size, borderRadius: round ? '50%' : 4, flex: '0 0 auto',
-    objectFit: 'cover',
+    background: tint ?? 'var(--rule)',
+    position: 'relative',
   }
   // Initials are the fallback rather than a broken image: a face is missing
   // whenever the art folder has not been pointed at, or the player is one the
@@ -299,11 +307,19 @@ export function PlayerFace(
   if (!file) {
     return (
       <span className={className}
-        style={{ ...box, background: 'var(--rule)', display: 'grid', placeItems: 'center', fontSize: size * 0.36, color: 'var(--ink3)' }}>
+        style={{ ...box, display: 'grid', placeItems: 'center', fontSize: size * 0.36, color: 'var(--ink3)' }}>
         {(first[0] ?? '') + (last[0] ?? '')}
       </span>
     )
   }
-  return <img className={className} style={box} alt="" loading="lazy"
-    src={'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')} />
+  return (
+    <span className={cx('kit', className)} style={box}>
+      {jersey ? <img className="kit-jersey" alt="" loading="lazy" src={artSrc(jersey)} /> : null}
+      <img className="kit-face" alt="" loading="lazy" src={artSrc(file)} />
+    </span>
+  )
 }
+
+/** The one place a relative art path becomes a URL the page can load. */
+export const artSrc = (file: string) =>
+  'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')

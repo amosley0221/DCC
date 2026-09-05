@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
 import { useStore } from '../store'
-import { Card, Chip, Input, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
+import { artSrc, Card, Chip, Input, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
 import { POSITION_RANK, UNITS } from '../../electron/positions'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
 import PlayerSheet from './PlayerSheet'
@@ -197,6 +197,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
             <Chip key={y} on={year === y} onClick={() => setYear(year === y ? null : y)}>{y} {n}</Chip>
           ))}
         </div>
+        {view === 'CARDS' ? <KitFit /> : null}
         <div className="row" style={{ gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
           {[...counts.entries()]
             .sort((a, b) => (POSITION_RANK.get(a[0]) ?? 99) - (POSITION_RANK.get(b[0]) ?? 99))
@@ -224,7 +225,8 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
               {shown.map((p) => (
                 <tr key={p.index}>
                   <td style={{ width: 34 }}>
-                    <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={34} />
+                    <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={34}
+                      jersey={jersey} tint={teamColor} />
                   </td>
                   <td className="name">
                     <button onClick={() => setSheet(p.index)}
@@ -253,7 +255,8 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
             <Card key={p.index} className="card-pad"
               style={{ cursor: 'pointer' }} onClick={() => setSheet(p.index)}>
               <div className="row" style={{ gap: 14, alignItems: 'center' }}>
-                <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={64} />
+                <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={64}
+                  jersey={jersey} tint={teamColor} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                     <h3 className="headline" style={{ fontSize: 18 }}>{p.first} {p.last}</h3>
@@ -289,17 +292,13 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
               >
                 {/* The school's mark, gold once they have won it. */}
                 <span className="playercard-mark"><SchoolArt size={86} file={cardMark} /></span>
+                <span className="kit playercard-kit">
+                  {jersey ? <img className="kit-jersey" alt="" loading="lazy" src={artSrc(jersey)} /> : null}
+                  {faceOf(p)
+                    ? <img className="kit-face" alt="" loading="lazy" src={artSrc(faceOf(p)!)} />
+                    : <span className="playercard-initials">{(p.first[0] ?? '') + (p.last[0] ?? '')}</span>}
+                </span>
                 <span className="playercard-shade" />
-                {faceOf(p) ? (
-                  <img className="playercard-face" alt="" loading="lazy"
-                    src={'dccart://art/' + faceOf(p)!.split(/[\\/]/).map(encodeURIComponent).join('/')} />
-                ) : (
-                  <span className="playercard-initials">{(p.first[0] ?? '') + (p.last[0] ?? '')}</span>
-                )}
-                {jersey ? (
-                  <img className="playercard-jersey" alt="" loading="lazy"
-                    src={'dccart://art/' + jersey.split(/[\\/]/).map(encodeURIComponent).join('/')} />
-                ) : null}
 
                 <span className="playercard-ovr num">{p.overall}</span>
                 {p.redshirt ? <span className="playercard-rs">RS</span> : null}
@@ -324,6 +323,61 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Lining the jersey up with the portrait, once.
+ *
+ * The game's portraits and its jerseys are two different sets of art on two
+ * canvases nobody here has measured, so where the collar of one meets the neck
+ * of the other cannot be worked out from the files — it has to be looked at.
+ * Two numbers settle it, they are set on the app root, and every avatar, card
+ * and sheet in the app reads them, so this is adjusted once rather than per
+ * screen.
+ *
+ * Kept in the browser's own storage rather than in the dynasty: it describes
+ * your copy of the art, not your save.
+ */
+function KitFit() {
+  const [scale, setScale] = useState(() => Number(localStorage.getItem('dcc.kit.scale') ?? 1))
+  const [drop, setDrop] = useState(() => Number(localStorage.getItem('dcc.kit.y') ?? 0))
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.style.setProperty('--kit-jersey-scale', String(scale))
+    root.style.setProperty('--kit-jersey-y', `${drop}%`)
+    localStorage.setItem('dcc.kit.scale', String(scale))
+    localStorage.setItem('dcc.kit.y', String(drop))
+  }, [scale, drop])
+
+  if (!open) {
+    return (
+      <div style={{ marginTop: 9 }}>
+        <button onClick={() => setOpen(true)} style={{ all: 'unset', cursor: 'pointer' }}>
+          <Meta size={9} color="var(--ink4)">LINE UP THE JERSEY</Meta>
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="row" style={{ gap: 14, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Meta size={9}>JERSEY SIZE</Meta>
+      <input type="range" min={0.6} max={2} step={0.02} value={scale}
+        onChange={(e) => setScale(Number(e.target.value))} style={{ width: 150 }} />
+      <span className="num" style={{ fontSize: 11, color: 'var(--ink3)', width: 34 }}>{scale.toFixed(2)}</span>
+      <Meta size={9}>HEIGHT</Meta>
+      <input type="range" min={-40} max={40} step={1} value={drop}
+        onChange={(e) => setDrop(Number(e.target.value))} style={{ width: 150 }} />
+      <span className="num" style={{ fontSize: 11, color: 'var(--ink3)', width: 34 }}>{drop}%</span>
+      <button onClick={() => { setScale(1); setDrop(0) }} style={{ all: 'unset', cursor: 'pointer' }}>
+        <Meta size={9} color="var(--accent)">RESET</Meta>
+      </button>
+      <button onClick={() => setOpen(false)} style={{ all: 'unset', cursor: 'pointer' }}>
+        <Meta size={9} color="var(--ink4)">DONE</Meta>
+      </button>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSave } from '../saveStore'
+import { useKit, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Input, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
@@ -36,6 +36,7 @@ export default function PlayerSheet({ player, teamName, onClose, onSaved }: {
   player: RosterPlayer; teamName: string | null; onClose: () => void; onSaved: () => void
 }) {
   const { save } = useSave()
+  const kit = useKit()
   const { dispatch } = useStore()
   const [tab, setTab] = useState<TabName>('PROFILE')
   const [editing, setEditing] = useState(false)
@@ -82,7 +83,8 @@ export default function PlayerSheet({ player, teamName, onClose, onSaved }: {
   return (
     <Card className="card-pad" style={{ borderColor: 'var(--accent)' }}>
       <div className="row" style={{ gap: 14, alignItems: 'center' }}>
-        <PlayerFace file={save.facePaths[player.assetId]} first={player.first} last={player.last} size={72} />
+        <PlayerFace file={save.facePaths[player.assetId]} first={player.first} last={player.last} size={72}
+          {...kit(teamName)} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="row" style={{ gap: 9, alignItems: 'center' }}>
             <h2 className="headline" style={{ fontSize: 21 }}>{player.first} {player.last}</h2>

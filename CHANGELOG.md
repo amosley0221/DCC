@@ -10,6 +10,35 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.42.0] - 2026-09-05
+
+### Fixed
+
+- **The jersey did not line up with the player.** The portrait was drawn at 92%
+  of the card's width from the top; the jersey at 118% from the bottom. Two
+  different scales in two different places, so the collar could never land on
+  the neck — what showed was a triangle of shoulder in each bottom corner.
+
+  Both are now drawn into the same box with the same crop, so whatever their own
+  canvases turn out to be they stay registered to each other. The portrait fills
+  the card as a result, which is the other half of what was wrong with it.
+
+- **The jersey is on everywhere a player is, on both apps.** One composite —
+  the school's colour, the school's jersey over the portrait's generic grey
+  shirt, the portrait on top — now draws every card, list row, depth-chart slot,
+  tampering row and player sheet. It used to be the card and nothing else.
+
+### Added
+
+- **Line up the jersey once.** On the Roster's card view, two sliders: jersey
+  size and height. The game's portraits and its jerseys are two sets of art on
+  canvases nobody here has measured, so where one's collar meets the other's
+  neck has to be looked at rather than derived — and looking at it once should
+  be enough.
+
+  The setting rides in the art pack, so the phone draws a player exactly as the
+  PC does. Rebuild the pack after adjusting it.
+
 ## [0.41.1] - 2026-09-05
 
 ### Added

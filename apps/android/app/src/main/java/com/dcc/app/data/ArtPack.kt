@@ -35,8 +35,13 @@ object ArtPack {
         val players: List<String> = emptyList(),
         /** Named art that is not a school: "trophy:heisman", "playoff:round1". */
         val awards: List<String> = emptyList(),
+        /** How the jersey sits on the portrait, as lined up on the PC. */
+        val fit: Fit = Fit(),
         val bytes: Long = 0,
     )
+
+    @Serializable
+    data class Fit(val jerseyScale: Float = 1f, val jerseyDrop: Float = 0f)
 
     private fun root(context: Context) = File(context.filesDir, "art")
     private fun manifestFile(context: Context) = File(root(context), "manifest.json")
@@ -78,6 +83,7 @@ object ArtPack {
         if (written == 0) error("that file is not a DCC art pack")
 
         cache.evictAll()
+        fitCache = null
         val text = manifestFile(context).takeIf { it.exists() }?.readText()
             ?: error("that pack has no manifest")
         Repository.json.decodeFromString(Manifest.serializer(), text)
@@ -92,7 +98,23 @@ object ArtPack {
         manifestFile(context).takeIf { it.exists() }
             ?.let { runCatching { Repository.json.decodeFromString(Manifest.serializer(), it.readText()) }.getOrNull() }
 
+    /**
+     * The pack's jersey alignment, read once and held.
+     *
+     * Every card and every avatar asks for it while drawing, and parsing a
+     * manifest per frame is not something to do to a scrolling grid.
+     */
+    @Volatile private var fitCache: Fit? = null
+
+    fun fit(context: Context): Fit {
+        fitCache?.let { return it }
+        val f = manifest(context)?.fit ?: Fit()
+        fitCache = f
+        return f
+    }
+
     fun clear(context: Context) {
+        fitCache = null
         root(context).deleteRecursively()
         cache.evictAll()
     }

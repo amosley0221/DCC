@@ -29,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -582,6 +584,7 @@ fun ArtImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
     alpha: Float = 1f,
+    alignment: Alignment = Alignment.Center,
 ): Boolean {
     if (file == null) return false
     val bitmap by produceState<ImageBitmap?>(null, file.path) {
@@ -593,9 +596,52 @@ fun ArtImage(
         contentDescription = null,
         modifier = modifier,
         contentScale = contentScale,
+        alignment = alignment,
         alpha = alpha,
     )
     return true
+}
+
+/**
+ * A player in his school's kit, at any size.
+ *
+ * The portrait and the jersey are drawn into the same box with the same crop,
+ * so whatever their own canvases are they stay registered to each other — and
+ * the two numbers that line them up ride in the art pack, set once on the PC.
+ * Every avatar, card and row uses this, which is what makes a player look the
+ * same everywhere instead of once per screen.
+ *
+ * The jersey goes over the portrait, not under it: the game's renders ship
+ * wearing a generic grey shirt, and covering it is the whole job.
+ */
+@Composable
+fun PlayerKit(
+    face: File?,
+    jersey: File?,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val fit = remember { ArtPack.fit(context) }
+    Box(modifier) {
+        ArtImage(
+            face, Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop, alignment = Alignment.TopCenter,
+        )
+        if (jersey != null) {
+            ArtImage(
+                jersey,
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = fit.jerseyScale
+                        scaleY = fit.jerseyScale
+                        transformOrigin = TransformOrigin(0.5f, 1f)
+                        translationY = size.height * fit.jerseyDrop / 100f
+                    },
+                contentScale = ContentScale.Crop, alignment = Alignment.TopCenter,
+            )
+        }
+    }
 }
 
 /**
@@ -612,15 +658,28 @@ fun AwardMark(key: String, size: Dp = 24.dp) {
 }
 
 @Composable
-fun PlayerFace(name: String, assetId: String?, size: Dp) {
+fun PlayerFace(
+    name: String,
+    assetId: String?,
+    size: Dp,
+    /** The school he plays for, so he wears its jersey rather than a grey shirt. */
+    school: String? = null,
+    tint: Color? = null,
+) {
     val context = LocalContext.current
     val file = remember(assetId) { ArtPack.player(context, assetId) }
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        val drawn = ArtImage(
-            file,
-            Modifier.size(size).clip(CircleShape),
-            contentScale = ContentScale.Crop,
-        )
-        if (!drawn) Portrait(name, size)
+    val jersey = remember(school) { ArtPack.school(context, school, "jersey") }
+    if (file == null) {
+        Portrait(name, size)
+        return
+    }
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .then(if (tint != null) Modifier.background(tint) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        PlayerKit(file, jersey, Modifier.fillMaxSize())
     }
 }

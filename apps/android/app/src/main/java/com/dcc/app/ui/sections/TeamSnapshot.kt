@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -137,7 +136,11 @@ fun TeamSnapshotSection(view: SnapshotView) {
             "ROSTER" -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (roster.isEmpty()) item { DccCard { EmptyState("the snapshot has no roster for this team") } }
                 items(roster, key = { it.index }) { p ->
-                    RosterRow(p, openPlayer == p.index) {
+                    RosterRow(
+                        p, openPlayer == p.index,
+                        team?.name,
+                        parseHex(team?.name?.let { view.snapshot.schoolColors[it] }),
+                    ) {
                         openPlayer = if (openPlayer == p.index) null else p.index
                     }
                 }
@@ -239,7 +242,13 @@ fun SnapshotTeamRow(t: SnapshotTeam, isUser: Boolean, onClick: (() -> Unit)? = n
 }
 
 @Composable
-private fun RosterRow(p: SnapshotPlayer, open: Boolean, onToggle: () -> Unit) {
+private fun RosterRow(
+    p: SnapshotPlayer,
+    open: Boolean,
+    school: String?,
+    tint: Color?,
+    onToggle: () -> Unit,
+) {
     val c = Dcc.colors
     DccCard(onClick = onToggle) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -248,7 +257,7 @@ private fun RosterRow(p: SnapshotPlayer, open: Boolean, onToggle: () -> Unit) {
                 if (p.overall >= 90) c.ink else c.ink2, 15, FontWeight.SemiBold,
                 Modifier.width(34.dp),
             )
-            PlayerFace(p.name, p.assetId, 30.dp)
+            PlayerFace(p.name, p.assetId, 34.dp, school, tint)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(p.name, c.ink, 15)
@@ -502,16 +511,11 @@ private fun PlayerCard(
                     ),
                 )
             }
-            ArtImage(
-                face,
-                Modifier.align(Alignment.TopCenter).fillMaxWidth(0.92f),
-                contentScale = ContentScale.FillWidth,
-            )
-            ArtImage(
-                jersey,
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth(1.18f),
-                contentScale = ContentScale.FillWidth,
-            )
+            // The portrait fills the card and the jersey is drawn into the
+            // same box, so the collar lands on the neck rather than in the
+            // bottom corners — which is where a bottom-anchored jersey at 118%
+            // of a 92% portrait was putting it.
+            PlayerKit(face, jersey, Modifier.fillMaxSize())
             NumText(
                 p.overall.toString(),
                 size = 24,

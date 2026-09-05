@@ -66,7 +66,7 @@ function schoolPlan(schoolArt) {
   }
   return out;
 }
-function packEntries(entries, now = /* @__PURE__ */ new Date()) {
+function packEntries(entries, now = /* @__PURE__ */ new Date(), fit = {}) {
   const schools = {};
   const players = [];
   const awards = [];
@@ -90,6 +90,10 @@ function packEntries(entries, now = /* @__PURE__ */ new Date()) {
     schools,
     players,
     awards,
+    fit: {
+      jerseyScale: Number.isFinite(fit.jerseyScale) ? Number(fit.jerseyScale) : 1,
+      jerseyDrop: Number.isFinite(fit.jerseyDrop) ? Number(fit.jerseyDrop) : 0
+    },
     bytes: entries.reduce((n, e) => n + e.data.length, 0)
   };
   const all = [

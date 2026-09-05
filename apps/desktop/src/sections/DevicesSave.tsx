@@ -122,6 +122,12 @@ export default function DevicesSave() {
     const res = await window.dcc.packFinish({
       publish: !!repo.trim() && !!state.githubToken,
       repo: repo.trim() || undefined,
+      // The alignment you set on the Roster's card view travels with the art,
+      // so the phone draws a player exactly as this screen does.
+      fit: {
+        jerseyScale: Number(localStorage.getItem('dcc.kit.scale') ?? 1),
+        jerseyDrop: Number(localStorage.getItem('dcc.kit.y') ?? 0),
+      },
     })
     setPacking(false); setProgress(null)
     if (!res.ok) { setPackNote(res.message); return }

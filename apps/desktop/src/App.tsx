@@ -400,6 +400,12 @@ export default function App() {
     // frame is never unstyled.
     const d0 = blankPersisted()
     applyTheme(d0.theme, d0.mode, d0.accent)
+    // How the jersey sits on the portrait, set once on the Roster's card view.
+    // Applied here so it holds on every screen from the first frame, not only
+    // after that view has been opened.
+    const root = document.documentElement
+    root.style.setProperty('--kit-jersey-scale', localStorage.getItem('dcc.kit.scale') ?? '1')
+    root.style.setProperty('--kit-jersey-y', `${localStorage.getItem('dcc.kit.y') ?? '0'}%`)
     void window.dcc.info().then((i) => setVersion(i.version))
     // Pick up anything the updater reported before this subscribed.
     void window.dcc.lastUpdateStatus().then((s) => { if (s) setUpdate((cur) => cur ?? s) })

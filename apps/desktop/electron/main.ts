@@ -535,12 +535,15 @@ ipcMain.handle('art:packAdd', (_e, entries: { name: string; data: Uint8Array }[]
   return { ok: true as const, entries: building.length }
 })
 
-ipcMain.handle('art:packFinish', async (_e, req: { publish: boolean; repo?: string }) => {
+ipcMain.handle('art:packFinish', async (_e, req: {
+  publish: boolean; repo?: string
+  fit?: { jerseyScale?: number; jerseyDrop?: number }
+}) => {
   const entries = building
   building = null
   if (!entries) return { ok: false as const, message: 'no pack is open' }
   try {
-    const pack = packEntries(entries)
+    const pack = packEntries(entries, new Date(), req.fit ?? {})
     rememberPack(pack.bytes)
 
     const dest = await dialog.showSaveDialog(win!, {

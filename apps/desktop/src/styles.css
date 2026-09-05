@@ -188,28 +188,13 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 .playercard:hover { border-color: var(--accent); }
 .playercard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.playercard-face {
+/* The portrait and the jersey fill the card, cropped to the head, through the
+   same composite every avatar uses — so a player looks the same in a card, a
+   list row and a sheet, and lining the kit up lines it up everywhere. */
+.playercard-kit {
   position: absolute;
-  left: 50%;
-  top: 3%;
-  width: 92%;
-  transform: translateX(-50%);
+  inset: 0;
   z-index: 1;
-}
-
-/* The school's own jersey, over the portrait rather than under it.
-   The game's portrait renders come with a generic grey shirt on transparent
-   ground, and the jersey asset is a transparent shoulders-and-collar image the
-   same width — so laying it on top covers the grey shirt exactly and leaves the
-   head above the collar in the school's kit. Bottom-anchored, because that is
-   where a pair of shoulders belongs. */
-.playercard-jersey {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 118%;
-  transform: translateX(-50%);
-  z-index: 2;
   pointer-events: none;
 }
 .playercard-initials {
@@ -980,3 +965,40 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
   font-size: 12px; color: var(--ink3);
 }
 @media (max-width: 1100px) { .cfp { grid-template-columns: 1fr; } }
+
+/* ── a player in his kit ─────────────────────────────────────────────────────
+   One composite, used at every size: the school's colour behind, the school's
+   jersey over the portrait's generic grey shirt, the portrait on top. The two
+   images are drawn into the same box with the same crop, so whatever their own
+   canvases are, they stay registered to each other — and one pair of numbers
+   lines them up everywhere at once rather than per screen.
+
+   `--kit-jersey-scale` and `--kit-jersey-y` are those numbers. They are set on
+   the app root from settings, so the alignment is adjusted once for your art
+   and every avatar, card and sheet follows. */
+:root { --kit-jersey-scale: 1; --kit-jersey-y: 0%; }
+
+/* No `position` here: the card's own rule sets it absolute, and this block is
+   later in the file, so declaring it would win and break the card. The avatars
+   set it inline instead. */
+.kit { overflow: hidden; display: block; }
+.kit-face,
+.kit-jersey {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Anchored to the top: a portrait is a head on a pair of shoulders, and the
+     head is the part worth keeping when a square box crops it. */
+  object-position: 50% 0%;
+  display: block;
+}
+/* Over the portrait, because it is covering the grey shirt the render ships
+   with. Under it and the shirt would still be there. */
+.kit-jersey {
+  z-index: 1;
+  transform: translateY(var(--kit-jersey-y)) scale(var(--kit-jersey-scale));
+  transform-origin: 50% 100%;
+}
+.kit-face { z-index: 0; }

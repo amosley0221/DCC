@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
+import { TEAM_ID_NAMES } from '../electron/teamIds'
 
 /**
  * The analyzed save, held above the section switch.
@@ -194,4 +195,21 @@ export function SaveProvider({ remembered, rememberedArt, rememberedTeam, onPath
 
   const value = useMemo(() => ({ save, patch }), [save, patch])
   return <SaveCtx.Provider value={value}>{children}</SaveCtx.Provider>
+}
+
+/**
+ * A player's kit: his school's jersey and its colour.
+ *
+ * Every screen that draws a player wants the same two things, and threading
+ * them through eight call sites is how one of them ends up in a grey shirt.
+ * Takes a team id or a school name, because the two halves of the app hold
+ * different ones.
+ */
+export function useKit(names: Record<number, string> = {}) {
+  const { save } = useSave()
+  return (team: number | string | null | undefined): { jersey?: string; tint?: string | null } => {
+    const name = typeof team === 'number' ? names[team] ?? TEAM_ID_NAMES[team] ?? null : team ?? null
+    if (!name) return {}
+    return { jersey: save.schoolArt[`${name}|jersey`], tint: save.schoolColors[name] ?? null }
+  }
 }

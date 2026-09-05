@@ -67,7 +67,10 @@ const api = {
   packStart: () => ipcRenderer.invoke('art:packStart') as Promise<{ ok: true }>,
   packAdd: (entries: { name: string; data: Uint8Array }[]) =>
     ipcRenderer.invoke('art:packAdd', entries) as Promise<{ ok: boolean; entries?: number }>,
-  packFinish: (req: { publish: boolean; repo?: string }) =>
+  packFinish: (req: {
+    publish: boolean; repo?: string
+    fit?: { jerseyScale?: number; jerseyDrop?: number }
+  }) =>
     ipcRenderer.invoke('art:packFinish', req) as Promise<
       | { ok: true; bytes: number; schools: number; players: number
           file: string | null; published: string | null }

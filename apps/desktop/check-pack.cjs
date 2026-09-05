@@ -65,6 +65,7 @@ const P = require(process.argv[2])
   assert.deepEqual(res.manifest.players, ['Generic_0001_P_T0000_D_1_1'])
   assert.deepEqual([...res.manifest.awards].sort(), ['playoff:round1', 'trophy:heisman'],
     'the award keys come back out of the entry names')
+  assert.deepEqual(res.manifest.fit, { jerseyScale: 1, jerseyDrop: 0 }, 'a pack always states its fit')
   assert.equal(res.manifest.bytes, entries.reduce((n, e) => n + e.data.length, 0))
 
   const back = readZip(res.bytes)
@@ -95,6 +96,12 @@ const P = require(process.argv[2])
   assert.deepEqual(res.manifest.schools, {})
   assert.deepEqual(res.manifest.players, [])
   assert.deepEqual(res.manifest.awards, [])
+  // The alignment travels even when nothing else does, and a bad number becomes
+  // the neutral one rather than a NaN the phone would draw with.
+  assert.deepEqual(P.packEntries([], undefined, { jerseyScale: 1.24, jerseyDrop: -8 }).manifest.fit,
+    { jerseyScale: 1.24, jerseyDrop: -8 })
+  assert.deepEqual(P.packEntries([], undefined, { jerseyScale: NaN }).manifest.fit,
+    { jerseyScale: 1, jerseyDrop: 0 })
 }
 
 console.log('check-pack: names round-trip, the plan picks one mark each, the ZIP reads back')

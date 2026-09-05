@@ -36,7 +36,11 @@ declare global {
       tamperForget(key: string): Promise<{ ok: true }>
       packStart(): Promise<{ ok: true }>
       packAdd(entries: { name: string; data: Uint8Array }[]): Promise<{ ok: boolean; entries?: number }>
-      packFinish(req: { publish: boolean; repo?: string }): Promise<
+      packFinish(req: {
+        publish: boolean; repo?: string
+        /** How the jersey sits on the portrait, so the phone draws a player as the PC does. */
+        fit?: { jerseyScale?: number; jerseyDrop?: number }
+      }): Promise<
         | { ok: true; bytes: number; schools: number; players: number
             file: string | null; published: string | null }
         | { ok: false; message: string }

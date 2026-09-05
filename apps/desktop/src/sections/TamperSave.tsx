@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSave } from '../saveStore'
+import { useKit, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Track } from '../ui'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
@@ -34,6 +34,7 @@ const standingOf = (d: DepthStanding | null) =>
 export default function TamperSave() {
   const { save, patch } = useSave()
   const { state, dispatch } = useStore()
+  const kit = useKit(state.teamNames)
   const { path, roster, rosterBusy } = save
 
   const [threads, setThreads] = useState<TamperThreadView[]>([])
@@ -459,7 +460,8 @@ export default function TamperSave() {
                       }}
                     >
                       <span className="row" style={{ gap: 8, flex: 1, minWidth: 0 }}>
-                        <PlayerFace file={save.facePaths[p.assetId]} first={p.first} last={p.last} size={24} round />
+                        <PlayerFace file={save.facePaths[p.assetId]} first={p.first} last={p.last} size={24} round
+                          {...kit(p.team)} />
                         <span style={{ minWidth: 170 }}>{p.first} {p.last}</span>
                         <Meta>{p.position} · {p.overall}</Meta>
                         <SchoolArt file={logoFor(nameOf(p.team))} size={16} />

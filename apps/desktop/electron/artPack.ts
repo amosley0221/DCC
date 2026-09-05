@@ -31,6 +31,15 @@ export interface PackManifest {
   players: string[]
   /** Named art that is not a school: "trophy:heisman", "bowl:rosebowl", "playoff:round1". */
   awards: string[]
+  /**
+   * How the jersey sits on the portrait, as lined up on the PC.
+   *
+   * The two are different sets of art on canvases nobody has measured, so where
+   * one's collar meets the other's neck is looked at rather than derived. It
+   * travels in the pack so the phone draws a player exactly as the PC does,
+   * rather than needing the same two sliders again.
+   */
+  fit: { jerseyScale: number; jerseyDrop: number }
   bytes: number
 }
 
@@ -114,7 +123,11 @@ export function schoolPlan(schoolArt: Record<string, string>): Map<string, Map<s
 }
 
 /** Assembles the archive and its manifest from the resized images. */
-export function packEntries(entries: PackEntry[], now = new Date()): PackResult {
+export function packEntries(
+  entries: PackEntry[],
+  now = new Date(),
+  fit: { jerseyScale?: number; jerseyDrop?: number } = {},
+): PackResult {
   const schools: Record<string, string[]> = {}
   const players: string[] = []
   const awards: string[] = []
@@ -132,6 +145,10 @@ export function packEntries(entries: PackEntry[], now = new Date()): PackResult 
     schools,
     players,
     awards,
+    fit: {
+      jerseyScale: Number.isFinite(fit.jerseyScale) ? Number(fit.jerseyScale) : 1,
+      jerseyDrop: Number.isFinite(fit.jerseyDrop) ? Number(fit.jerseyDrop) : 0,
+    },
     bytes: entries.reduce((n, e) => n + e.data.length, 0),
   }
   const all: PackEntry[] = [

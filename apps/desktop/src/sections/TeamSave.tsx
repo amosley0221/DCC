@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSave } from '../saveStore'
+import { useKit, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab, Track } from '../ui'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
@@ -36,6 +36,7 @@ const UNASSIGNED = 255
 export default function TeamSave() {
   const { save, patch } = useSave()
   const { state, dispatch } = useStore()
+  const kitOf = useKit(state.teamNames)
   const { path, roster, rosterBusy } = save
   const myTeam = state.teamId
   const names = state.teamNames
@@ -336,6 +337,7 @@ export default function TeamSave() {
                   names={roster.ratingNames}
                   open={open === p.index}
                   face={save.facePaths[p.assetId]}
+                  kit={kitOf(p.team)}
                   onToggle={() => setOpen(open === p.index ? null : p.index)}
                 />
               ))}
@@ -373,14 +375,15 @@ export default function TeamSave() {
   )
 }
 
-function PlayerRow({ p, names, open, onToggle, face }: {
+function PlayerRow({ p, names, open, onToggle, face, kit }: {
   p: RosterPlayer; names: string[]; open: boolean; onToggle: () => void; face?: string
+  kit: { jersey?: string; tint?: string | null }
 }) {
   return (
     <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8, marginTop: 8 }}>
       <button onClick={onToggle} style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
         <div className="row" style={{ gap: 10, alignItems: 'center' }}>
-          <PlayerFace file={face} first={p.first} last={p.last} size={36} />
+          <PlayerFace file={face} first={p.first} last={p.last} size={36} {...kit} />
           <span className="num" style={{ fontSize: 17, color: ovrColour(p.overall), width: 30 }}>{p.overall}</span>
           <Meta size={9}>{p.position}</Meta>
           <strong style={{ color: 'var(--ink)' }}>{p.first} {p.last}</strong>

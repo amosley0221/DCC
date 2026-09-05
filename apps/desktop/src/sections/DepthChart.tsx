@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSave } from '../saveStore'
+import { useKit, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Card, Kicker, Meta, PlayerFace } from '../ui'
 import { DEPTH_SLOT_RANK as SLOT_RANK } from '../../electron/positions'
@@ -21,7 +21,8 @@ type Slot = { abbr: string; name: string; side: 'offense' | 'defense' | 'special
  */
 export default function DepthChart({ team, players }: { team: number; players: RosterPlayer[] }) {
   const { save } = useSave()
-  const { dispatch } = useStore()
+  const { state, dispatch } = useStore()
+  const kit = useKit(state.teamNames)
   const path = save.path
   const [slots, setSlots] = useState<Slot[] | null>(null)
   const [charts, setCharts] = useState<{ block: number; slots: number[][] }[] | null>(null)
@@ -187,8 +188,9 @@ export default function DepthChart({ team, players }: { team: number; players: R
                     >
                       <Meta size={9} color="var(--ink4)">{k + 1}</Meta>
                       <PlayerFace
-                        first={p?.first ?? ''} last={p?.last ?? ''} size={26}
+                        first={p?.first ?? ''} last={p?.last ?? ''} size={30}
                         file={p ? save.facePaths[p.assetId] : undefined}
+                        {...kit(team)}
                       />
                       <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p ? `${p.first} ${p.last}` : `row ${row}`}
