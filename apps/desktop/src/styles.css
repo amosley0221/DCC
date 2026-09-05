@@ -101,7 +101,7 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 .btn-primary { background: var(--btnBg); color: var(--btnInk); }
 .btn-primary:hover:not(:disabled) { opacity: 0.88; }
 .btn-secondary { border: 1px solid var(--btn2Line); color: var(--btn2Ink); }
-.btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.05); color: var(--ink2); }
+.btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink2); }
 .btn-accent { background: var(--accent); color: var(--onAccent); }
 .btn-accent:hover:not(:disabled) { opacity: 0.88; }
 .btn-dead { border: 1px solid var(--btn2Line); color: var(--ink4); cursor: default; }
@@ -162,7 +162,7 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
   border-bottom: 1px solid var(--line); white-space: nowrap;
 }
 .tbl td { padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink2); vertical-align: middle; }
-.tbl tbody tr:hover td { background: rgba(255,255,255,0.025); }
+.tbl tbody tr:hover td { background: color-mix(in srgb, var(--ink) 4%, transparent); }
 .tbl tbody tr[aria-selected='true'] td { background: var(--surface); }
 .tbl tbody tr[aria-selected='true'] td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -197,16 +197,12 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: var(--r-card);
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 10px 34px color-mix(in srgb, var(--bg0) 72%, transparent);
 }
-
-
 
 /* Labels stop shouting in letterspaced monospace and become quiet small caps. */
 
 /* A hairline, not a headline. */
-
-
 
 /* The nav becomes a set of rounded rows rather than a ruled list. */
 
@@ -232,7 +228,7 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
   width: 46px; height: 46px; flex: none;
   display: grid; place-items: center;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
   overflow: hidden;
 }
 .scoreboard-mark img { width: 100%; height: 100%; object-fit: contain; }
@@ -272,20 +268,10 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 .statbar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent2Soft), var(--accent2)); }
 .statbar-value { font-size: 12.5px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
 
-.shield {
-  display: grid; place-items: center; flex: none; text-align: center;
-  background: linear-gradient(160deg, rgba(240, 200, 90, 0.18), rgba(240, 200, 90, 0.04));
-  border: 1px solid var(--accent2Soft);
-  border-radius: 12px;
-}
-.shield-label { font-size: 8px; font-weight: 800; letter-spacing: 0.12em; color: var(--accent2); }
-.shield-value { font-weight: 800; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1; }
 
-/* A portrait reads as a person, not an avatar, once it is round and ringed. */
-.face-ring { border-radius: 999px; padding: 2px; background: var(--surfaceLine); flex: none; display: grid; }
-.face-ring > * { border-radius: 999px; overflow: hidden; }
-.face-ring-5 { background: linear-gradient(140deg, var(--accent2), var(--accent2Soft)); }
-.face-ring-4 { background: linear-gradient(140deg, #9AA3B2, #4A5160); }
+
+
+
 
 .tag {
   display: inline-flex; align-items: center; gap: 5px;
@@ -295,7 +281,7 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
   white-space: nowrap;
 }
 .tag-gold { border-color: var(--accent2Soft); color: var(--accent2); }
-.tag-good { border-color: rgba(50, 215, 75, 0.4); color: var(--good); }
+.tag-good { border-color: color-mix(in srgb, var(--good) 45%, transparent); color: var(--good); }
 .tag-live { border-color: var(--accent); color: var(--accent); }
 
 /* Section heads inside a card, with the action sitting opposite. */
@@ -333,8 +319,6 @@ body[data-theme='gold'] {
   --heroMeta: var(--ink3);
   --effectBg: var(--surface);
   --effectInk: var(--ink2);
-  --good: #6FBF87;
-  --warn: #D8B25E;
 }
 body[data-theme='gold'][data-mode='light'] {
   --accent-ui: var(--accent-light);
@@ -342,8 +326,6 @@ body[data-theme='gold'][data-mode='light'] {
   --line-strong: color-mix(in srgb, var(--accent-light) 60%, transparent);
   --haze: color-mix(in srgb, var(--accent-light) 12%, transparent);
   --haze2: color-mix(in srgb, var(--accent-light) 7%, transparent);
-  --good: #1F6B3A;
-  --warn: #8A6B1F;
 }
 
 body[data-theme='gold'] ::-webkit-scrollbar-thumb { background: var(--line-strong); border-color: transparent; }
@@ -455,7 +437,7 @@ body[data-theme='gold'] .effect { border-left-color: var(--accent-ui); font-fami
 .gs-games {
   position: absolute; top: 60px; left: 34px; z-index: 40; min-width: 260px;
   background: var(--sheet); border: 1px solid var(--line); border-radius: 6px;
-  padding: 6px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  padding: 6px; box-shadow: 0 18px 44px color-mix(in srgb, var(--bg0) 55%, transparent);
 }
 .gs-game {
   all: unset; display: flex; align-items: baseline; gap: 10px; width: 100%;
@@ -508,7 +490,7 @@ body[data-theme='gold'] .effect { border-left-color: var(--accent-ui); font-fami
 .gs-search-results {
   position: absolute; top: 42px; right: 0; width: 380px; max-height: 460px; overflow-y: auto;
   z-index: 40; background: var(--sheet); border: 1px solid var(--line); border-radius: 6px;
-  padding: 6px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  padding: 6px; box-shadow: 0 18px 44px color-mix(in srgb, var(--bg0) 55%, transparent);
 }
 .gs-result {
   all: unset; display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box;
@@ -639,7 +621,7 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
 .gs-figure-kicker { position: absolute; left: 22px; top: 20px; }
 .gs-figure-score {
   font-family: var(--serif); font-weight: 600; font-size: 116px; line-height: 1;
-  color: var(--ink); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 22px;
+  color: var(--ink); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 10px;
 }
 .gs-figure-score .is-lost { color: var(--ink3); }
 .gs-figure-caption {
@@ -749,7 +731,7 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
   background: currentColor; vertical-align: 0.28em; margin: 0 0.12em; opacity: 0.75;
 }
 
-.gs-figure-score .gs-dash { width: 0.3em; height: 0.05em; opacity: 0.5; margin: 0 0.06em; vertical-align: 0.36em; }
+.gs-figure-score .gs-dash { width: 0.3em; height: 0.05em; opacity: 0.5; margin: 0 0.06em; align-self: center; }
 .gs-bar-key {
   display: inline-flex; align-items: center; gap: 7px;
   font-family: var(--sans); font-weight: 500; font-size: 11px;

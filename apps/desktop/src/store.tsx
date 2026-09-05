@@ -4,7 +4,7 @@ import React, {
 import type {
   Convo, Dynasty, LogLine, Persisted, Player, Prospect, QueueItem, Stage, Story,
 } from './model'
-import { applyTheme, type ThemeMode, type ThemeName } from './theme'
+import { ACCENTS, applyTheme, type ThemeMode, type ThemeName } from './theme'
 import { SEMANTICS, THEMES } from './theme'
 
 // ── initial state ─────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ export const blankPersisted = (): Persisted => ({
   relayToken: '',
   theme: 'gold',
   mode: 'dark',
-  accent: '#D4AF5A',
+  accent: ACCENTS.champagne.dark,
   themeChosen: false,
   week: 1,
   heat: 0,
@@ -48,7 +48,7 @@ export const emptyPersisted = (d: Dynasty): Persisted => ({
   dynastySource: 'sample',
   theme: 'gold',
   mode: 'dark',
-  accent: '#D4AF5A',
+  accent: ACCENTS.champagne.dark,
   week: d.meta.currentWeek,
   heat: 62,
   gameRunning: true,
