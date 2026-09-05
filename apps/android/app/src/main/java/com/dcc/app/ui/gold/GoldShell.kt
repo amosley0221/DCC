@@ -90,6 +90,14 @@ fun GoldShell(
     var tab by rememberSaveable { mutableStateOf("home") }
     var ops by rememberSaveable { mutableStateOf<String?>(null) }
     var callTarget by rememberSaveable { mutableStateOf<String?>(null) }
+    // The game's row in the save's table — the only stable id it has, and small
+    // enough to survive rotation in saved state.
+    var openGame by rememberSaveable { mutableStateOf<Int?>(null) }
+
+    // Resolved here rather than in the branch, so a row that is no longer in
+    // the snapshot — a save replaced while a game was open — simply falls back
+    // to the tab instead of needing state written during composition.
+    val game = openGame?.let { row -> snapshot?.snapshot?.games?.firstOrNull { it.row == row } }
 
     val week = snapshot?.meta?.currentWeek
     val team = snapshot?.meta?.userTeamName ?: snapshot?.userTeam?.name
@@ -148,7 +156,7 @@ fun GoldShell(
                         .padding(end = 12.dp)
                         .size(38.dp)
                         .clip(CircleShape)
-                        .clickable { ops = if (ops == null) "settings" else null },
+                        .clickable { ops = if (ops == null) "settings" else null; openGame = null },
                     contentAlignment = Alignment.Center,
                 ) {
                     MonoLabel(if (ops != null) "CLOSE" else "•••", if (ops != null) c.accent else c.ink3, if (ops != null) 9 else 13)
@@ -160,10 +168,14 @@ fun GoldShell(
             // ── content ───────────────────────────────────────────────────
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (ops != null) {
+                    // No scroll here on purpose. Every section brings its own —
+                    // Settings a verticalScroll, Queue a LazyColumn — and a
+                    // scrollable nested in a scrollable of the same direction is
+                    // measured with an infinite maximum height, which Compose
+                    // throws on. That threw the moment this opened.
                     Column(
                         Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -172,16 +184,26 @@ fun GoldShell(
                             }
                         }
                         Spacer(Modifier.height(16.dp))
-                        when (ops) {
-                            "queue" -> QueueSection(vm, state)
-                            "dynasty" -> SettingsSection(vm, state, dynasty, snapshot, busy, importError)
-                            else -> SettingsSection(vm, state, dynasty, snapshot, busy, importError)
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            when (ops) {
+                                "queue" -> QueueSection(vm, state)
+                                else -> SettingsSection(vm, state, dynasty, snapshot, busy, importError)
+                            }
                         }
+                    }
+                } else if (game != null) {
+                    Box(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                        GoldGameSheet(game, snapshot?.meta?.userTeamName) { openGame = null }
                     }
                 } else {
                     Box(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
                         when (tab) {
-                            "home" -> GoldHome(snapshot, state) { ops = "dynasty" }
+                            "home" -> GoldHome(
+                                snapshot,
+                                state,
+                                onOpenGame = { openGame = it.row },
+                                onOpenBoard = { tab = "board" },
+                            ) { ops = "dynasty" }
 
                             "board" -> if (snapshot != null) {
                                 RecruitSnapshotSection(vm, state, snapshot)
@@ -229,7 +251,7 @@ fun GoldShell(
                         Column(
                             Modifier
                                 .weight(1f)
-                                .clickable { tab = t.id; callTarget = null },
+                                .clickable { tab = t.id; callTarget = null; openGame = null },
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             MonoLabel(t.label.uppercase(), if (on) c.accent else c.ink3, 10)

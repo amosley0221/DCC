@@ -77,6 +77,49 @@ if adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
     exit 1
   fi
   echo "==> the Gold Standard shell is on screen"
+
+  # Open the masthead control. This is the one that crashed on every tap in
+  # 0.29.0 — Settings brings its own vertical scroll and it was being nested in
+  # another one, which Compose measures with an infinite height and throws on.
+  # Launching proves nothing about a screen nobody opened, so open it.
+  # bounds="[264,150][340,226]" becomes 264,150,340,226.
+  dots=$(grep -o "<node[^>]*text=\"•••\"[^>]*>" ui.xml | head -1 || true)
+  bounds=$(printf '%s' "$dots" \
+    | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1 \
+    | sed 's/bounds="//; s/"$//; s/\]\[/,/; s/[][]//g' || true)
+  x1=$(printf '%s' "$bounds" | cut -d, -f1)
+  y1=$(printf '%s' "$bounds" | cut -d, -f2)
+  x2=$(printf '%s' "$bounds" | cut -d, -f3)
+  y2=$(printf '%s' "$bounds" | cut -d, -f4)
+  if [ -n "$x2" ]; then
+    echo "==> tapping the masthead control at $(( (x1 + x2) / 2 )),$(( (y1 + y2) / 2 ))"
+    adb logcat -c
+    adb shell input tap $(( (x1 + x2) / 2 )) $(( (y1 + y2) / 2 ))
+    sleep 4
+    adb logcat -d > logcat-ops.txt
+    if grep -qE "FATAL EXCEPTION|ANR in $PKG" logcat-ops.txt; then
+      echo "::error::The app crashed when the masthead control was tapped."
+      grep -A 40 -E "FATAL EXCEPTION" logcat-ops.txt | head -60
+      exit 1
+    fi
+    if ! adb shell pidof "$PKG" > /dev/null 2>&1; then
+      echo "::error::The app died when the masthead control was tapped."
+      tail -60 logcat-ops.txt
+      exit 1
+    fi
+    adb shell uiautomator dump /sdcard/ops.xml > /dev/null 2>&1 || true
+    adb shell cat /sdcard/ops.xml > ops.xml 2>/dev/null || true
+    adb exec-out screencap -p > launch-ops.png || true
+    echo "----- after the tap -----"
+    grep -o 'text="[^"]*"' ops.xml | sed 's/text="//;s/"$//' | grep -v '^$' | sort -u || true
+    if ! grep -qi 'text="[^"]*Appearance' ops.xml; then
+      echo "::error::Tapping the masthead control did not open the settings screen."
+      exit 1
+    fi
+    echo "==> the masthead control opens settings without crashing"
+  else
+    echo "(could not locate the masthead control; skipping the tap)"
+  fi
 else
   echo "(could not read the view hierarchy; skipping the shell check)"
 fi

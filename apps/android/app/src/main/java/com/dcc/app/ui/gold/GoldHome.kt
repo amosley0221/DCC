@@ -2,6 +2,7 @@ package com.dcc.app.ui.gold
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,10 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dcc.app.data.Persisted
@@ -38,60 +37,6 @@ import com.dcc.app.ui.theme.Dcc
 import com.dcc.app.ui.theme.initialsOf
 import com.dcc.app.ui.theme.toneFor
 
-/* ── the type roles, per theme/fonts.md ────────────────────────────────────
-   Bodoni carries every headline and every number read as data; Manrope
-   carries everything functional. The shared components put numbers in the
-   mono slot, which under Gold Standard is Manrope — right for a label, wrong
-   for a score — so the numeric styles are spelled out here. */
-
-@Composable
-private fun Display(text: String, size: Int, color: Color, modifier: Modifier = Modifier, maxLines: Int = 3) = Text(
-    text,
-    modifier = modifier,
-    maxLines = maxLines,
-    overflow = TextOverflow.Ellipsis,
-    style = TextStyle(
-        fontFamily = Dcc.fonts.serif, fontWeight = FontWeight.SemiBold,
-        fontSize = size.sp, lineHeight = (size * 1.15).sp, color = color,
-    ),
-)
-
-/** A number the user reads as data: Bodoni, always. */
-@Composable
-fun GoldNum(text: String, size: Int, color: Color, modifier: Modifier = Modifier) = Text(
-    text,
-    modifier = modifier,
-    maxLines = 1,
-    style = TextStyle(
-        fontFamily = Dcc.fonts.serif, fontWeight = FontWeight.SemiBold,
-        fontSize = size.sp, lineHeight = size.sp, color = color,
-    ),
-)
-
-@Composable
-private fun Label(text: String, size: Double, color: Color, tracking: Double = 2.0, modifier: Modifier = Modifier) = Text(
-    text,
-    modifier = modifier,
-    maxLines = 1,
-    overflow = TextOverflow.Ellipsis,
-    style = TextStyle(
-        fontFamily = Dcc.fonts.sans, fontWeight = FontWeight.Medium,
-        fontSize = size.sp, letterSpacing = tracking.sp, color = color,
-    ),
-)
-
-@Composable
-private fun Ui(text: String, size: Double, color: Color, weight: FontWeight = FontWeight.Normal, modifier: Modifier = Modifier, maxLines: Int = 3) = Text(
-    text,
-    modifier = modifier,
-    maxLines = maxLines,
-    overflow = TextOverflow.Ellipsis,
-    style = TextStyle(
-        fontFamily = Dcc.fonts.sans, fontWeight = weight,
-        fontSize = size.sp, lineHeight = (size * 1.5).sp, color = color,
-    ),
-)
-
 /**
  * Home, as the handoff draws it for a phone: a feature, Saturday's scores
  * across, and your board.
@@ -101,7 +46,13 @@ private fun Ui(text: String, size: Double, color: Color, weight: FontWeight = Fo
  * a fabricated one would be the only invented thing on the screen.
  */
 @Composable
-fun GoldHome(snap: SnapshotView?, state: Persisted, onOpenSettings: () -> Unit) {
+fun GoldHome(
+    snap: SnapshotView?,
+    state: Persisted,
+    onOpenGame: (SnapshotGame) -> Unit,
+    onOpenBoard: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val c = Dcc.colors
 
     if (snap == null) {
@@ -137,7 +88,9 @@ fun GoldHome(snap: SnapshotView?, state: Persisted, onOpenSettings: () -> Unit) 
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Dcc.shapes.card))
                 .border(1.dp, c.line, RoundedCornerShape(Dcc.shapes.card))
-                .background(c.surface),
+                .background(c.surface)
+                // The feature is about a game, so it opens that game.
+                .then(if (last != null) Modifier.clickable { onOpenGame(last) } else Modifier),
         ) {
             Box(
                 Modifier
@@ -191,7 +144,7 @@ fun GoldHome(snap: SnapshotView?, state: Persisted, onOpenSettings: () -> Unit) 
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 for (g in saturday.take(14)) {
-                    ScoreCard(g, mine = snap.isUserGame(g))
+                    ScoreCard(g, mine = snap.isUserGame(g)) { onOpenGame(g) }
                 }
             }
         }
@@ -206,14 +159,21 @@ fun GoldHome(snap: SnapshotView?, state: Persisted, onOpenSettings: () -> Unit) 
                     .background(c.surface)
                     .padding(horizontal = 16.dp, vertical = 13.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.clickable(onClick = onOpenBoard),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Label("THE BOARD", 10.0, c.ink3, 2.0)
                     Spacer(Modifier.weight(1f))
                     Label("ALL →", 10.0, c.accent, 1.5)
                 }
                 Spacer(Modifier.height(11.dp))
                 for (r in board) {
-                    BoardRow(r, scouted = state.revealAllRecruits || state.revealedRecruits.contains(r.playerId))
+                    BoardRow(
+                        r,
+                        scouted = state.revealAllRecruits || state.revealedRecruits.contains(r.playerId),
+                        onOpen = onOpenBoard,
+                    )
                     Spacer(Modifier.height(10.dp))
                 }
             }
@@ -245,7 +205,7 @@ private fun featureStandfirst(g: SnapshotGame?, wins: Int?, losses: Int?): Strin
 
 /** One Saturday result, sized for a thumb to scroll past. */
 @Composable
-private fun ScoreCard(g: SnapshotGame, mine: Boolean) {
+private fun ScoreCard(g: SnapshotGame, mine: Boolean, onOpen: () -> Unit) {
     val c = Dcc.colors
     val homeWon = g.homeScore > g.awayScore
     Column(
@@ -254,6 +214,7 @@ private fun ScoreCard(g: SnapshotGame, mine: Boolean) {
             .clip(RoundedCornerShape(Dcc.shapes.button))
             .border(1.dp, if (mine) c.accent else c.line, RoundedCornerShape(Dcc.shapes.button))
             .background(if (mine) c.surfaceStrong else c.surface)
+            .clickable(onClick = onOpen)
             .padding(horizontal = 11.dp, vertical = 9.dp),
     ) {
         ScoreLine(g.away ?: "", g.awayScore, dim = homeWon)
@@ -299,10 +260,13 @@ fun GoldScoreRow(away: String, awayScore: Int, home: String, homeScore: Int, mod
  * scouted him, and the invitation to scout when you have not.
  */
 @Composable
-private fun BoardRow(r: SnapshotRecruit, scouted: Boolean) {
+private fun BoardRow(r: SnapshotRecruit, scouted: Boolean, onOpen: () -> Unit) {
     val c = Dcc.colors
     val name = "${r.first} ${r.last}"
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.clickable(onClick = onOpen),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
             Modifier
                 .size(30.dp)

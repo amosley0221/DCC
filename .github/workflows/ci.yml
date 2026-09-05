@@ -196,4 +196,7 @@ jobs:
             logcat.txt
             launch.png
             ui.xml
+            ops.xml
+            launch-ops.png
+            logcat-ops.txt
           if-no-files-found: ignore
