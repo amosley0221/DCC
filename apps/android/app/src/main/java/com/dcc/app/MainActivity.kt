@@ -22,6 +22,7 @@ import com.dcc.app.ui.components.*
 import com.dcc.app.ui.sections.*
 import com.dcc.app.ui.theme.Dcc
 import com.dcc.app.ui.theme.DccTheme
+import com.dcc.app.ui.gold.GoldShell
 
 private val SECTIONS = listOf("WIRE", "NATIONAL", "RECRUIT", "TEAM", "TAMPER", "COACH", "QUEUE", "SETTINGS")
 
@@ -45,7 +46,19 @@ class MainActivity : ComponentActivity() {
                 val dy = dynasty
                 val snap = snapshot
 
-                Box(Modifier.fillMaxSize().background(c.bg0)) {
+                if (state.theme == "gold") {
+                    // Gold Standard is a different shape, not a recolour: a
+                    // masthead, five bottom tabs, editorial names, and nothing
+                    // operational on the surface. The working themes below keep
+                    // the rail they were built with.
+                    if (loading) {
+                        Box(Modifier.fillMaxSize().background(c.bg0), contentAlignment = Alignment.Center) {
+                            MonoLabel("LOADING…", c.ink4, 11)
+                        }
+                    } else {
+                        GoldShell(vm, state, dy, d, snap, busy, importError)
+                    }
+                } else Box(Modifier.fillMaxSize().background(c.bg0)) {
                     if (loading) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             MonoLabel("LOADING…", c.ink4, 11)
