@@ -1,16 +1,27 @@
 package com.dcc.app.ui.sections
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dcc.app.data.Rules
 import com.dcc.app.data.SaveLabels
 import com.dcc.app.data.SnapshotGame
@@ -22,7 +33,19 @@ import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.*
 import com.dcc.app.ui.theme.Dcc
 
-private val TABS = listOf("ROSTER", "SCHEDULE", "LEAGUE", "TEAMS")
+private val TABS = listOf("ROSTER", "CARDS", "SCHEDULE", "LEAGUE", "TEAMS")
+
+/** A hex colour from the snapshot, or null when the PC had no logo to read. */
+private fun parseHex(hex: String?): Color? {
+    val h = hex?.removePrefix("#") ?: return null
+    if (h.length != 6) return null
+    return runCatching { Color(0xFF000000L.toInt() or h.toInt(16)) }.getOrNull()
+}
+
+/** White or black, whichever can be read on top of a school's own colour. */
+private fun inkOn(bg: Color): Color =
+    if (bg.red * 0.299f + bg.green * 0.587f + bg.blue * 0.114f > 0.62f) Color(0xFF10131A)
+    else Color.White
 
 /**
  * Team, driven by the imported snapshot rather than the sample dynasty.
@@ -83,6 +106,26 @@ fun TeamSnapshotSection(view: SnapshotView) {
         }
 
         when (tab) {
+            "CARDS" -> {
+                val teamName = team?.name
+                val color = parseHex(view.snapshot.schoolColors[teamName])
+                    ?: Dcc.colors.surfaceStrong
+                val champion = teamName != null && view.snapshot.champions.contains(teamName)
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(150.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (roster.isEmpty()) item { DccCard { EmptyState("the snapshot has no roster for this team") } }
+                    items(roster, key = { it.index }) { p ->
+                        PlayerCard(p, color, champion, team?.monogram ?: "") {
+                            openPlayer = p.index
+                            tab = "ROSTER"
+                        }
+                    }
+                }
+            }
+
             "ROSTER" -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (roster.isEmpty()) item { DccCard { EmptyState("the snapshot has no roster for this team") } }
                 items(roster, key = { it.index }) { p ->
@@ -382,5 +425,97 @@ private fun ScoreLine(name: String?, quarters: List<Int>, ot: Int, final: Int, o
         for (i in 0 until 4) NumText("${quarters.getOrElse(i) { 0 }}", c.ink2, 12, modifier = Modifier.width(26.dp))
         if (overtime) NumText("$ot", c.ink2, 12, modifier = Modifier.width(26.dp))
         NumText("$final", c.ink, 13, FontWeight.SemiBold, Modifier.width(32.dp))
+    }
+}
+
+/**
+ * A player card: his school's own colour, its mark, and what a card has room
+ * for.
+ *
+ * The colour is read off the school's logo on the PC and travels in the
+ * snapshot, because the save carries no team colours and a hand-written table
+ * of 138 would be wrong the moment a dynasty renamed one. A champion gets the
+ * gold ring, which is the whole reason the game ships a gold mark.
+ *
+ * There is no portrait here yet. The phone has no art folder — the faces are
+ * gigabytes on the PC — so a card shows initials until the portrait pack is
+ * built and carried across.
+ */
+@Composable
+private fun PlayerCard(
+    p: SnapshotPlayer,
+    color: Color,
+    champion: Boolean,
+    monogram: String,
+    onClick: () -> Unit,
+) {
+    val ink = inkOn(color)
+    val gold = Color(0xFFC9A227)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(0.75f)
+            .clip(RoundedCornerShape(Dcc.shapes.card))
+            .background(color)
+            .border(
+                if (champion) 2.dp else 1.dp,
+                if (champion) gold else Dcc.colors.surfaceLine,
+                RoundedCornerShape(Dcc.shapes.card),
+            )
+            .clickable { onClick() },
+    ) {
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            // The mark, low and large, the way a crest sits on a shirt.
+            Text(
+                monogram,
+                modifier = Modifier.align(Alignment.Center),
+                style = androidx.compose.ui.text.TextStyle(
+                    fontFamily = Dcc.fonts.serif,
+                    fontSize = 64.sp,
+                    color = (if (champion) gold else ink).copy(alpha = 0.20f),
+                ),
+            )
+            NumText(
+                p.overall.toString(),
+                size = 24,
+                color = ink,
+                weight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 10.dp, top = 8.dp),
+            )
+            if (p.redshirt) {
+                MetaText(
+                    "RS",
+                    ink.copy(alpha = 0.8f),
+                    9,
+                    Modifier.align(Alignment.TopEnd).padding(end = 10.dp, top = 10.dp),
+                )
+            }
+        }
+        // A shade at the foot, so the writing reads on any school's colour.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                    ),
+                )
+                .padding(horizontal = 10.dp, vertical = 9.dp),
+        ) {
+            RowTitle(p.name, Color.White, 14)
+            Spacer(Modifier.height(2.dp))
+            MetaText(
+                listOfNotNull(p.position, SaveLabels.year(p.year), SaveLabels.height(p.heightIn).ifEmpty { null })
+                    .joinToString(" · ").uppercase(),
+                Color.White.copy(alpha = 0.72f),
+                9,
+            )
+            Spacer(Modifier.height(2.dp))
+            MetaText(
+                "SPEED ${p.ratings?.get("Speed") ?: "—"}",
+                Color.White.copy(alpha = 0.86f),
+                9,
+            )
+        }
     }
 }

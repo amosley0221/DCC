@@ -72,7 +72,7 @@ export default function ArtFolder() {
           {busy || save.facesBusy ? 'Reading…' : faces ? 'Change the art folder' : 'Choose the art folder'}
         </Btn>
         {state.artPath && faces ? (
-          <Btn onClick={() => { dispatch({ type: 'artPath', path: null }); patch({ faces: null, facePaths: {}, schoolArt: {} }) }}>
+          <Btn onClick={() => { dispatch({ type: 'artPath', path: null }); patch({ faces: null, facePaths: {}, schoolArt: {}, schoolColors: {} }) }}>
             Forget it
           </Btn>
         ) : null}

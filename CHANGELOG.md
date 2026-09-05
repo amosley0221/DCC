@@ -10,6 +10,42 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.35.0] - 2026-09-05
+
+### Fixed
+
+- **Class year was right after all, and I removed it in 0.34.0. It is back.**
+  The field is Freshman / Sophomore / Junior / Senior; only the labels were
+  wrong. The schema names its values `HighSchool`,
+  `JuniorCollege_Sophomore`, `JuniorCollege_Junior` and has no name at all for
+  the fourth, which is why rosters read as junior college and every senior read
+  as blank. Verified against the game's own screen twice over: Penn State's 85
+  come out 54 Freshman, 13 Sophomore, 12 Junior, 6 Senior, exactly as the game
+  has it, and ten players named on that screen all agree. It is back on the
+  roster, the cards, the player sheet and the filters, on both apps — and an
+  older snapshot's mislabelled values are mapped to the class they meant.
+
+### Added
+
+- **Player cards worth looking at.** The portrait is the card now: full bleed,
+  cropped to the head, on **the school's own colour**. That colour is read out
+  of the school's own logo rather than typed into a table — the save carries no
+  team colours, and a hand-written list of 138 would be wrong the day a dynasty
+  renamed one. The crest sits behind the player the way it sits on a shirt, and
+  everything written on the card is over a shade so it reads whatever colour a
+  school plays in.
+- **The gold mark for a champion.** Mark a school as a national champion on its
+  roster and it keeps the game's gold logo on every card, with a gold edge. The
+  save cannot say — last season's bracket is not in this season's file — so you
+  say it once.
+- **Speed on every card**, with the class beside it. It used to show whichever
+  rating suited the position, which meant some cards showed nothing at all when
+  that rating was one DCC cannot place, and no two cards compared. The text is
+  larger throughout.
+- **Cards on the phone too**, with the same colour and the same gold mark. No
+  portraits there yet — the faces are gigabytes on the PC and the portrait pack
+  is not built — so a card shows initials until it is.
+
 ## [0.34.0] - 2026-09-05
 
 ### Added

@@ -1095,22 +1095,23 @@ export const WEIGHT_BIT = 365        // pounds, 8 bits, plus 160
 export const STARS_BIT = 1241        // 3 bits, plus 1
 export const NIL_BIT = 171           // $K, 9 bits, minus 255
 /**
- * Not the class year, whatever the enum is called.
+ * The class year: Freshman, Sophomore, Junior, Senior. Two bits.
  *
- * The schema's `ClassYear` enum is HighSchool, JuniorCollege_Sophomore,
- * JuniorCollege_Junior, and this two-bit field takes those values — so it reads
- * as where a recruit is coming in from, and for a recruit it is exactly that.
- * It is not what year a rostered player is in, and two measurements say so.
+ * The schema's enum for this field is named `HighSchool`,
+ * `JuniorCollege_Sophomore`, `JuniorCollege_Junior`, and taking those labels at
+ * face value made rosters read as though half a team had come from a junior
+ * college. They are the wrong names for the values, and there is a fourth the
+ * enum has no name for at all, which is why every senior read as blank.
  *
- * It moves. Across one offseason, of 8,412 players on a roster in both saves,
- * 70.4% of this field advanced by exactly one and the rest held; none went
- * down. An origin does not do that.
+ * Verified twice against the game's own screen. The counts match to the
+ * player: Penn State's 85 come out 54 Freshman, 13 Sophomore, 12 Junior, 6
+ * Senior, and so does the game. And ten players named on that screen — Vernon,
+ * Falzone, Priester, Vildor, Masterson, Ferrell, Felton, Boyett, Howard,
+ * Samuel — all agree, freshman through senior.
  *
- * And it does not partition a roster. Penn State's 85 come out 54 / 13 / 12 /
- * 6, and no team has fifty-four freshmen.
- *
- * So DCC no longer shows it as a class on a roster. Class year is on the
- * undecoded list until something is found that survives both tests.
+ * It also behaves like a class. Across one offseason it advanced by exactly one
+ * for 70.4% of the players rostered in both saves and never went down: a class
+ * that advances unless the player redshirted or has run out of years.
  */
 export const CLASS_YEAR_BIT = 1189   // 2 bits
 export const DEV_TRAIT_BIT = 322     // 2 bits
@@ -1131,7 +1132,7 @@ export const ARCHETYPE_BIT = 511     // 3 bits, read against the position
  */
 export const PLAYER_ID_BIT = 191     // 14 bits
 
-export const CLASS_YEARS: (string | null)[] = ["HighSchool", "JuniorCollege_Sophomore", "JuniorCollege_Junior"]
+export const CLASS_YEARS: (string | null)[] = ["Freshman", "Sophomore", "Junior", "Senior"]
 export const DEV_TRAITS: (string | null)[] = ["Normal", "Impact", "Star", "Elite"]
 export const HOME_STATES: (string | null)[] = ["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "NewHampshire", "NewJersey", "NewMexico", "NewYork", "NorthCarolina", "NorthDakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "RhodeIsland", "SouthCarolina", null, "Tennessee", "Texas", "Utah", null, "Virginia", "Washington", "WestVirginia", "Wisconsin", "Wyoming"]
 export const PIPELINES: (string | null)[] = ["Alabama", "Arizona", "Arkansas", "Big Apple", "Big Sky", "Central Florida", "Colorado", "East Texas", "Hawaii", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Metro Atlanta", "Michigan", "Minnesota", "Mississippi", "Missouri", "Nebraska", "Nevada", "New England", "New Mexico", "North Carolina", "North Florida", "North Texas", "Northern California", "Ohio", "Oklahoma", "Pacific Northwest", "Pennsylvania", "South Carolina", "South Florida", "South Georgia", "Southern California", "Southwest Texas", "Tennessee", "Tidewater", "Utah", "West Virginia", "Wisconsin"]

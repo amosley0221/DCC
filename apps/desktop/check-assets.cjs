@@ -120,5 +120,95 @@ for (const len of [17, 257]) {
   fs.rmSync(dir, { recursive: true, force: true })
 }
 
+/* --------------------------------------------- a school's colour, from a PNG */
+// The card behind a player is his school's own colour, read out of its logo.
+// That means a PNG decoder, and a decoder that only handles the None filter
+// reads as noise rather than failing — so every filter a real PNG uses is
+// checked, on a mark shaped the way a logo is: colour on a hole, with white in
+// the middle.
+{
+  const fs = require('fs'), os = require('os'), path = require('path'), zlib = require('node:zlib')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dcc-png-'))
+
+  const CRC = (() => {
+    const t = []
+    for (let n = 0; n < 256; n++) {
+      let c = n
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+      t[n] = c >>> 0
+    }
+    return (b) => {
+      let c = 0xffffffff
+      for (const x of b) c = t[(c ^ x) & 0xff] ^ (c >>> 8)
+      return (c ^ 0xffffffff) >>> 0
+    }
+  })()
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length)
+    const td = Buffer.concat([Buffer.from(type, 'latin1'), data])
+    const c = Buffer.alloc(4); c.writeUInt32BE(CRC(td))
+    return Buffer.concat([len, td, c])
+  }
+  const png = (w, h, colorType, pixels, filter) => {
+    const ch = colorType === 6 ? 4 : 3
+    const ihdr = Buffer.alloc(13)
+    ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4)
+    ihdr[8] = 8; ihdr[9] = colorType
+    const stride = w * ch
+    const raw = Buffer.alloc((stride + 1) * h)
+    for (let y = 0; y < h; y++) {
+      raw[y * (stride + 1)] = filter
+      for (let i = 0; i < stride; i++) {
+        const v = pixels[y * stride + i]
+        const a = i >= ch ? pixels[y * stride + i - ch] : 0
+        const b = y > 0 ? pixels[(y - 1) * stride + i] : 0
+        raw[y * (stride + 1) + 1 + i] = (filter === 1 ? v - a : filter === 2 ? v - b : v) & 0xff
+      }
+    }
+    return Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0)),
+    ])
+  }
+
+  const W = 24, H = 24, NAVY = [0x04, 0x1e, 0x42]
+  const rgba = Buffer.alloc(W * H * 4)
+  const rgb = Buffer.alloc(W * H * 3)
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const mark = x > 3 && x < 20 && y > 3 && y < 20
+      const white = x > 9 && x < 14 && y > 9 && y < 14
+      const o = (y * W + x) * 4
+      rgba[o] = white ? 255 : NAVY[0]
+      rgba[o + 1] = white ? 255 : NAVY[1]
+      rgba[o + 2] = white ? 255 : NAVY[2]
+      rgba[o + 3] = mark ? 255 : 0
+      const q = (y * W + x) * 3
+      rgb[q] = mark ? NAVY[0] : 255
+      rgb[q + 1] = mark ? NAVY[1] : 255
+      rgb[q + 2] = mark ? NAVY[2] : 255
+    }
+  }
+
+  for (const [label, filter] of [['none', 0], ['sub', 1], ['up', 2]]) {
+    const p = path.join(dir, `rgba-${filter}.png`)
+    fs.writeFileSync(p, png(W, H, 6, rgba, filter))
+    check(`school colour: transparent logo, ${label} filter`,
+      G.dominantColor(p) === '#041e42', G.dominantColor(p))
+  }
+  const solid = path.join(dir, 'rgb.png')
+  fs.writeFileSync(solid, png(W, H, 2, rgb, 0))
+  check('school colour: the paper it is drawn on is not the colour',
+    G.dominantColor(solid) === '#041e42', G.dominantColor(solid))
+
+  fs.writeFileSync(path.join(dir, 'junk.png'), Buffer.from('not a png at all'))
+  check('school colour: a file that is not a PNG is no colour rather than a wrong one',
+    G.dominantColor(path.join(dir, 'junk.png')) === null)
+  check('school colour: a file that is not there is no colour',
+    G.dominantColor(path.join(dir, 'missing.png')) === null)
+
+  fs.rmSync(dir, { recursive: true, force: true })
+}
+
 console.log(failed ? 'ASSET CHECK FAILED' : 'ASSET CHECK OK')
 process.exit(failed ? 1 : 0)

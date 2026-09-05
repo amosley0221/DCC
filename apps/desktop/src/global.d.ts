@@ -85,6 +85,8 @@ declare global {
               missing: string[]
               categories: { name: string; files: number }[]
             }
+            /** School name -> the colour read out of its own logo. */
+            schoolColors: Record<string, string>
           }
       >
       findInstall(): Promise<{ found: true; path: string } | { found: false; searched: number; message: string }>

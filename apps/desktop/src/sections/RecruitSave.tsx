@@ -303,7 +303,7 @@ function RecruitRow(
         <div className="col" style={{ gap: 8, padding: '6px 8px 10px 44px' }}>
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
             {([
-              ['FROM', p.classYear],
+              ['CLASS', p.classYear],
               ['DEV', p.devTrait],
               ['HEIGHT', `${Math.floor(p.heightIn / 12)}'${p.heightIn % 12}"`],
               ['WEIGHT', `${p.weightLb} lb`],

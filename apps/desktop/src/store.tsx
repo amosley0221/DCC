@@ -16,6 +16,7 @@ export const blankPersisted = (): Persisted => ({
   artPath: null,
   teamId: null,
   teamNames: {},
+  champions: [],
   anthropicKey: '',
   revealedRecruits: [],
   revealAllRecruits: false,
@@ -95,6 +96,7 @@ export type Action =
   | { type: 'relay'; url: string; token: string }
   | { type: 'savePath'; path: string | null }
   | { type: 'artPath'; path: string | null }
+  | { type: 'champion'; team: string; on: boolean }
   | { type: 'teamId'; id: number | null }
   | { type: 'teamName'; id: number; name: string | null }
   | { type: 'anthropicKey'; key: string }
@@ -204,17 +206,24 @@ export function reducer(state: Persisted, action: Action): Persisted {
     case 'log':
       return { ...state, log: log(state, action.line.text, action.line.kind) }
     case 'reset':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'loadSample':
-      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...emptyPersisted(action.dynasty), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'clearDynasty':
-      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, relayUrl: state.relayUrl, relayToken: state.relayToken }
+      return { ...blankPersisted(), theme: state.theme, savePath: state.savePath, artPath: state.artPath, teamId: state.teamId, teamNames: state.teamNames, champions: state.champions, relayUrl: state.relayUrl, relayToken: state.relayToken }
     case 'relay':
       return { ...state, relayUrl: action.url, relayToken: action.token }
     case 'savePath':
       return { ...state, savePath: action.path }
     case 'artPath':
       return { ...state, artPath: action.path }
+    case 'champion':
+      return {
+        ...state,
+        champions: action.on
+          ? [...new Set([...state.champions, action.team])]
+          : state.champions.filter((t) => t !== action.team),
+      }
     case 'teamId':
       return { ...state, teamId: action.id }
     case 'anthropicKey':

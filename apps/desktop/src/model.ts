@@ -143,6 +143,12 @@ export interface Persisted {
    */
   teamNames: Record<number, string>
   /**
+   * Schools that have won a national title, by name. The save does not say —
+   * last season's bracket is not in this season's file — so the user marks it
+   * once and the school keeps its gold mark afterwards.
+   */
+  champions: string[]
+  /**
    * The user's own Anthropic API key, used only to write press coverage. It is
    * kept with the rest of the settings on this machine and sent nowhere else.
    */

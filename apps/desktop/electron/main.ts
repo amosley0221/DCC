@@ -11,13 +11,14 @@ import {
 } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
-  readLedger, readThreads, snapshotExtras, writeLedger, writeThreads,
+  readLedger, readSettings, readThreads, rememberSchoolColors, snapshotExtras,
+  writeLedger, writeSettings, writeThreads,
 } from './sidecar'
 import type { TamperThread } from './sidecar'
 import { TEAM_ID_NAMES } from './teamIds'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
-  indexFaces, matchFaces, matchSchools,
+  indexFaces, matchFaces, matchSchools, dominantColor,
 } from './gameAssets'
 import { writeStory } from './press'
 import type { PressRequest } from './press'
@@ -40,21 +41,6 @@ let win: BrowserWindow | null = null
  */
 let faceRoot: string | null = null
 
-/** Settings live in userData so they survive every in-place upgrade. */
-const settingsFile = () => join(app.getPath('userData'), 'settings.json')
-
-function readSettings(): Record<string, unknown> {
-  try {
-    return JSON.parse(readFileSync(settingsFile(), 'utf8'))
-  } catch {
-    return {}
-  }
-}
-
-function writeSettings(next: Record<string, unknown>) {
-  mkdirSync(app.getPath('userData'), { recursive: true })
-  writeFileSync(settingsFile(), JSON.stringify(next, null, 2))
-}
 
 /**
  * The seed dynasty ships as an extraResource in the packaged app and sits in
@@ -468,6 +454,36 @@ ipcMain.handle('assets:pickFaces', async () => {
   return r.canceled ? null : r.filePaths[0]
 })
 
+/**
+ * Each school's own colour, read out of its logo.
+ *
+ * The gold mark is skipped on purpose: every school's is the same gold, so a
+ * card backed by it would tell you nothing. The flat icon set is preferred
+ * because it is the full-colour mark, and the dark variant is a last resort
+ * since it is often the white one.
+ */
+const COLOR_SOURCES = ['icon', 'logoLight', 'logoDark']
+
+const remember = (c: Record<string, string>) => { rememberSchoolColors(c); return c }
+
+function schoolColors(root: string, art: Record<string, string>): Record<string, string> {
+  const best = new Map<string, { rank: number; file: string }>()
+  for (const [key, file] of Object.entries(art)) {
+    const sep = key.lastIndexOf('|')
+    const rank = COLOR_SOURCES.indexOf(key.slice(sep + 1))
+    if (rank < 0) continue
+    const school = key.slice(0, sep)
+    const cur = best.get(school)
+    if (!cur || rank < cur.rank) best.set(school, { rank, file })
+  }
+  const out: Record<string, string> = {}
+  for (const [school, { file }] of best) {
+    const hex = dominantColor(join(root, file))
+    if (hex) out[school] = hex
+  }
+  return out
+}
+
 ipcMain.handle('assets:indexFaces', (
   _e, { dir, assetIds, schools }: {
     dir: string; assetIds: string[]
@@ -477,12 +493,14 @@ ipcMain.handle('assets:indexFaces', (
   try {
     const index = indexFaces(dir)
     faceRoot = dir
+    const schoolArt = matchSchools(index, schools ?? [])
     return {
       ok: true as const,
       files: index.files, bytes: index.bytes, byExtension: index.byExtension,
       sample: index.sample, truncated: index.truncated, dirs: index.dirs,
       match: matchFaces(index, assetIds),
-      schoolArt: matchSchools(index, schools ?? []),
+      schoolArt,
+      schoolColors: remember(schoolColors(dir, schoolArt.art)),
       // Only the ids that actually resolved cross to the renderer, which keeps
       // this to the players present rather than the whole folder.
       paths: Object.fromEntries(

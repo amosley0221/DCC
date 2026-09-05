@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter
  * so a snapshot written by a newer desktop build still opens on an older phone
  * build — it simply shows the parts this version knows about.
  */
-const val SNAPSHOT_VERSION = 3
+const val SNAPSHOT_VERSION = 4
 
 @Serializable
 data class DynastySnapshot(
@@ -36,6 +36,14 @@ data class DynastySnapshot(
      */
     val transfers: List<SnapshotMove> = emptyList(),
     val threads: List<SnapshotThread> = emptyList(),
+    /**
+     * School name to the colour read out of its own logo, and the schools
+     * marked as national champions. Neither is in the save — team colours are
+     * not decoded and last season's bracket is not in this season's file — so
+     * both are worked out on the PC and travel with the snapshot.
+     */
+    val schoolColors: Map<String, String> = emptyMap(),
+    val champions: List<String> = emptyList(),
 )
 
 /** One transfer, already resolved to school names by the desktop. */
@@ -226,10 +234,20 @@ object SaveLabels {
      * Where a player came from, as a schema name. Only transfers carry one — a
      * player recruited out of the roster's own class leaves the field unset.
      */
+    /**
+     * The class, shortened the way a roster writes it. The long names are what
+     * the desktop sends; older snapshots carry the mislabelled ones, which are
+     * mapped to the class they actually meant rather than shown as junior
+     * college.
+     */
     private val CLASS_YEARS = mapOf(
-        "HighSchool" to "HS",
-        "JuniorCollege_Sophomore" to "JUCO SO",
-        "JuniorCollege_Junior" to "JUCO JR",
+        "Freshman" to "FR",
+        "Sophomore" to "SO",
+        "Junior" to "JR",
+        "Senior" to "SR",
+        "HighSchool" to "FR",
+        "JuniorCollege_Sophomore" to "SO",
+        "JuniorCollege_Junior" to "JR",
     )
 
     fun weather(v: Int): String? = WEATHER.getOrNull(v)

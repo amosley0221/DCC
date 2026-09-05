@@ -122,6 +122,14 @@ export interface DynastySnapshot {
    */
   transfers: SnapshotMove[]
   threads: SnapshotThread[]
+  /**
+   * School name to the colour read out of its own logo, and the schools the
+   * user has marked as national champions. Neither is in the save — team
+   * colours are not decoded and last season's bracket is not in this season's
+   * file — so both are worked out on the PC and travel with the snapshot.
+   */
+  schoolColors: Record<string, string>
+  champions: string[]
 }
 
 const UNASSIGNED = 255
@@ -146,11 +154,7 @@ function slim(p: RosterPlayer): SnapshotPlayer {
   return {
     index: p.index, playerId: p.playerId, first: p.first, last: p.last,
     team: p.team, position: p.position, overall: p.overall,
-    // The save's class field says where a player came in from — high school or
-    // a junior college — not what year they are now. It reads as an origin on a
-    // recruit and as nonsense on a senior, so rosters leave it empty rather than
-    // labelling a fourth-year starter "JUCO SO".
-    year: p.team === UNASSIGNED ? (p.classYear ?? null) : null,
+    year: p.classYear ?? null,
     dev: p.devTrait ?? null, archetype: p.archetype ?? null,
     heightIn: p.heightIn ?? null, weightLb: p.weightLb ?? null,
     redshirt: p.redshirt, hometown: p.hometown, state: p.homeState ?? null,
@@ -165,7 +169,10 @@ function slim(p: RosterPlayer): SnapshotPlayer {
 export function buildSnapshot(
   payload: Buffer,
   userTeamId: number | null,
-  extra?: { transfers?: SnapshotMove[]; threads?: SnapshotThread[] },
+  extra?: {
+    transfers?: SnapshotMove[]; threads?: SnapshotThread[]
+    schoolColors?: Record<string, string>; champions?: string[]
+  },
 ): DynastySnapshot {
   const schools = readTeamNames(payload)
   const order: TeamRecord[] = teamTableOrder(schools)
@@ -244,5 +251,7 @@ export function buildSnapshot(
     teams, games, players: roster, recruits,
     transfers: extra?.transfers ?? [],
     threads: extra?.threads ?? [],
+    schoolColors: extra?.schoolColors ?? {},
+    champions: extra?.champions ?? [],
   }
 }

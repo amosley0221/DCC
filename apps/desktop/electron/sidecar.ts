@@ -40,6 +40,32 @@ export interface TamperThread {
 
 export interface TamperFile { version: number; threads: Record<string, TamperThread> }
 
+/** Settings live in userData so they survive every in-place upgrade. */
+const settingsFile = () => join(app.getPath('userData'), 'settings.json')
+
+export function readSettings(): Record<string, unknown> {
+  try {
+    return JSON.parse(readFileSync(settingsFile(), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+export function writeSettings(next: Record<string, unknown>) {
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  writeFileSync(settingsFile(), JSON.stringify(next, null, 2))
+}
+
+/**
+ * The colours last read out of the school logos.
+ *
+ * Held rather than recomputed: they come from decoding a hundred and forty
+ * PNGs, the renderer already asks for them when it indexes the art folder, and
+ * the snapshot needs the same answer.
+ */
+let schoolColorCache: Record<string, string> = {}
+export const rememberSchoolColors = (c: Record<string, string>) => { schoolColorCache = c }
+
 const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
 const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
 
@@ -80,7 +106,12 @@ export function writeThreads(next: TamperFile) {
  * table but not the id-to-name mapping, and a screen that says "team 74" is
  * worse than no screen.
  */
-export function snapshotExtras(): { transfers: SnapshotMove[]; threads: SnapshotThread[] } {
+export function snapshotExtras(): {
+  transfers: SnapshotMove[]
+  threads: SnapshotThread[]
+  schoolColors: Record<string, string>
+  champions: string[]
+} {
   const nameOf = (id: number) => TEAM_ID_NAMES[id] ?? `Team ${id}`
   const transfers: SnapshotMove[] = moves(readLedger()).map((m) => ({
     key: m.key, first: m.first, last: m.last, position: m.position,
@@ -97,5 +128,11 @@ export function snapshotExtras(): { transfers: SnapshotMove[]; threads: Snapshot
       turns: t.turns,
     }))
     .sort((a, b) => b.interest - a.interest)
-  return { transfers, threads }
+  const champions = readSettings().champions
+  return {
+    transfers,
+    threads,
+    schoolColors: schoolColorCache,
+    champions: Array.isArray(champions) ? champions.filter((x): x is string => typeof x === 'string') : [],
+  }
 }

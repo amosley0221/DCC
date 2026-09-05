@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSave } from '../saveStore'
+import { useStore } from '../store'
 import { Card, Chip, Input, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
 import { POSITION_RANK, UNITS } from '../../electron/positions'
 import type { RosterPlayer } from '../../electron/saveAnalysis'
@@ -14,14 +15,8 @@ const ovrColour = (o: number) =>
 const height = (inches: number) => (inches ? `${Math.floor(inches / 12)}' ${inches % 12}"` : '—')
 const nil = (k: number) => (k > 0 ? `$${k >= 1000 ? `${(k / 1000).toFixed(1)}M` : `${k}K`}` : '—')
 
-/** The rating a position is judged on, for the one number a card has room for. */
-const KEY_RATING: Record<string, string> = {
-  QB: 'ThrowPower', HB: 'Speed', FB: 'RunBlocking', WR: 'Catching', TE: 'Catching',
-  LT: 'PassBlocking', LG: 'RunBlocking', C: 'RunBlocking', RG: 'RunBlocking', RT: 'PassBlocking',
-  LE: 'PowerMoves', RE: 'FinesseMoves', DT: 'BlockShedding',
-  LOLB: 'Pursuit', MLB: 'Tackling', ROLB: 'Pursuit',
-  CB: 'ManCoverage', FS: 'ZoneCoverage', SS: 'Tackling', K: 'KickPower', P: 'KickPower',
-}
+/** Class order, which is the order a roster reads them in. */
+const CLASSES = ['Freshman', 'Sophomore', 'Junior', 'Senior']
 
 /** A redshirt, marked the way the game marks it. */
 function Redshirt({ on }: { on: boolean }) {
@@ -52,22 +47,41 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
   onSaved?: () => void
 }) {
   const { save } = useSave()
+  const { state, dispatch } = useStore()
   const [view, setView] = useState<View>('LIST')
   const [query, setQuery] = useState('')
   const [unit, setUnit] = useState<string | null>(null)
   const [pos, setPos] = useState<string | null>(null)
+  const [year, setYear] = useState<string | null>(null)
   /** The player whose sheet is open, by roster row. */
   const [sheet, setSheet] = useState<number | null>(null)
 
   const faceOf = (p: RosterPlayer) => save.facePaths[p.assetId]
+  const champion = !!teamName && state.champions.includes(teamName)
   const logo = teamName
     ? save.schoolArt[`${teamName}|logoLight`] ?? save.schoolArt[`${teamName}|icon`]
     : undefined
+  // A champion keeps the gold mark, which is the whole reason the game ships one.
+  const cardMark = teamName && champion
+    ? save.schoolArt[`${teamName}|logoGold`] ?? logo
+    : logo
+  /**
+   * The school's own colour, read out of its logo when the art folder is
+   * pointed at. Without one the card falls back to the theme's own panel, which
+   * is the right failure — a made-up colour on the wrong school is worse.
+   */
+  const teamColor = teamName ? save.schoolColors[teamName] : undefined
 
   const counts = useMemo(() => {
     const m = new Map<string, number>()
     for (const p of players) m.set(p.position, (m.get(p.position) ?? 0) + 1)
     return m
+  }, [players])
+
+  const years = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const p of players) if (p.classYear) m.set(p.classYear, (m.get(p.classYear) ?? 0) + 1)
+    return CLASSES.filter((c) => m.has(c)).map((c) => [c, m.get(c)!] as const)
   }, [players])
 
   const shown = useMemo(() => {
@@ -77,9 +91,10 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
       .filter((p) =>
         (!q || (p.first + ' ' + p.last).toLowerCase().includes(q)) &&
         (!pos || p.position === pos) &&
+        (!year || p.classYear === year) &&
         (!inUnit || inUnit.has(p.position)))
       .sort((a, b) => b.overall - a.overall)
-  }, [players, query, pos, unit])
+  }, [players, query, pos, year, unit])
 
   // Averages by unit, and what the roster costs — the four numbers a coach
   // looks at before any individual player.
@@ -134,6 +149,17 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
               <Meta size={9} color="var(--accent)">CHANGE TEAM</Meta>
             </button>
           ) : null}
+          {teamName ? (
+            <button
+              onClick={() => dispatch({ type: 'champion', team: teamName, on: !champion })}
+              title="Mark this school as a national champion, which gives it the gold mark"
+              style={{ all: 'unset', cursor: 'pointer' }}
+            >
+              <Meta size={9} color={champion ? 'var(--accent2, var(--accent))' : 'var(--ink4)'}>
+                {champion ? '★ NATIONAL CHAMPION' : 'MARK AS CHAMPION'}
+              </Meta>
+            </button>
+          ) : null}
           <div className="subtabs" style={{ marginLeft: 'auto' }}>
             {VIEWS.map((v) => <Tab key={v} on={view === v} onClick={() => setView(v)}>{v}</Tab>)}
           </div>
@@ -145,6 +171,9 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
         <div className="row" style={{ gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
           {UNITS.map(([u]) => (
             <Chip key={u} on={unit === u} onClick={() => { setUnit(unit === u ? null : u); setPos(null) }}>{u}</Chip>
+          ))}
+          {years.map(([y, n]) => (
+            <Chip key={y} on={year === y} onClick={() => setYear(year === y ? null : y)}>{y} {n}</Chip>
           ))}
         </div>
         <div className="row" style={{ gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
@@ -162,7 +191,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
             <thead>
               <tr>
                 <th />
-                <th>Name</th><th>Pos</th>
+                <th>Name</th><th>Pos</th><th>Class</th>
                 <th style={{ textAlign: 'right' }}>Ht</th>
                 <th style={{ textAlign: 'right' }}>Wt</th>
                 <th style={{ textAlign: 'right' }}>Ovr</th>
@@ -186,6 +215,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
                     </button>
                   </td>
                   <td><Meta size={9}>{p.position}</Meta></td>
+                  <td><Meta size={9}>{p.classYear ?? '—'}</Meta></td>
                   <td className="num">{height(p.heightIn)}</td>
                   <td className="num">{p.weightLb || '—'}</td>
                   <td className="num" style={{ color: ovrColour(p.overall) }}>{p.overall}</td>
@@ -210,7 +240,7 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
                   </div>
                   <div style={{ marginTop: 3 }}>
                     <Meta size={10}>
-                      {[p.position, height(p.heightIn), p.weightLb ? `${p.weightLb} lbs` : null,
+                      {[p.position, p.classYear, height(p.heightIn), p.weightLb ? `${p.weightLb} lbs` : null,
                         p.hometown, p.archetype].filter(Boolean).join(' · ')}
                     </Meta>
                   </div>
@@ -228,51 +258,45 @@ export default function Roster({ players, teamName, mine, onChangeTeam, onSaved 
           ))}
         </div>
       ) : (
-        <div className="gs-tiles" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(232px, 1fr))', marginTop: 0 }}>
-          {shown.map((p) => {
-            const key = KEY_RATING[p.position]
-            return (
-              <Card key={p.index} className="card-pad"
-                style={{ padding: 0, overflow: 'hidden', cursor: 'pointer' }}
-                onClick={() => setSheet(p.index)}>
-                <div style={{ position: 'relative', background: 'var(--bg0)' }}>
-                  {/* The school's own mark behind the face, quietly. */}
-                  <span style={{ position: 'absolute', right: 8, bottom: 8, opacity: 0.16 }}>
-                    <SchoolArt size={64} file={logo} />
+        <div className="gs-tiles" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 12, marginTop: 0 }}>
+          {shown.map((p) => (
+              <button
+                key={p.index}
+                className="playercard"
+                onClick={() => setSheet(p.index)}
+                style={{ background: teamColor ?? 'var(--bg0)' }}
+              >
+                {/* The school's mark, gold once they have won it. */}
+                <span className="playercard-mark"><SchoolArt size={86} file={cardMark} /></span>
+                <span className="playercard-shade" />
+                {faceOf(p) ? (
+                  <img className="playercard-face" alt="" loading="lazy"
+                    src={'dccart://art/' + faceOf(p)!.split(/[\\/]/).map(encodeURIComponent).join('/')} />
+                ) : (
+                  <span className="playercard-initials">{(p.first[0] ?? '') + (p.last[0] ?? '')}</span>
+                )}
+
+                <span className="playercard-ovr num">{p.overall}</span>
+                {p.redshirt ? <span className="playercard-rs">RS</span> : null}
+
+                <span className="playercard-foot">
+                  <span className="playercard-name">{p.first} <b>{p.last}</b></span>
+                  <span className="playercard-line">
+                    {[p.position, p.classYear, height(p.heightIn), p.weightLb ? `${p.weightLb} lb` : null]
+                      .filter(Boolean).join(' · ')}
                   </span>
-                  <div style={{ display: 'grid', placeItems: 'center', padding: '10px 0 6px' }}>
-                    <PlayerFace file={faceOf(p)} first={p.first} last={p.last} size={168} />
-                  </div>
-                  <span style={{ position: 'absolute', top: 8, right: 10 }}>
-                    <span className="num" style={{ fontSize: 21, color: ovrColour(p.overall) }}>{p.overall}</span>
+                  {/* Speed for everyone rather than a rating that suits the
+                      position: a card is read across a grid, and a column of
+                      the same number compares while a column of different ones
+                      does not. It is also the one rating every position has. */}
+                  <span className="playercard-stats">
+                    <span><em>Speed</em> {p.ratings.Speed ?? '—'}</span>
+                    {p.devTrait && p.devTrait !== 'Normal' ? <span>{p.devTrait}</span> : null}
+                    {mine && p.nilK > 0 ? <span>{nil(p.nilK)}</span> : null}
                   </span>
-                  <span style={{ position: 'absolute', top: 10, left: 10 }}><Redshirt on={p.redshirt} /></span>
-                </div>
-                <div style={{ padding: '10px 12px 12px' }}>
-                  <div className="row" style={{ gap: 6, alignItems: 'baseline' }}>
-                    <strong style={{ color: 'var(--ink)', fontSize: 14 }}>{p.first} {p.last}</strong>
-                  </div>
-                  <div style={{ marginTop: 3 }}>
-                    <Meta size={9}>{[p.position, height(p.heightIn), p.weightLb ? `${p.weightLb} lbs` : null].filter(Boolean).join(' · ')}</Meta>
-                  </div>
-                  <div className="row" style={{ gap: 10, marginTop: 8, alignItems: 'baseline' }}>
-                    {key && p.ratings[key] !== undefined ? (
-                      <span><Meta size={9} color="var(--ink4)">{key.replace(/([A-Z])/g, ' $1').trim().toUpperCase()}</Meta>{' '}
-                        <span className="num" style={{ color: 'var(--ink)' }}>{p.ratings[key]}</span></span>
-                    ) : null}
-                    {mine && p.nilK > 0 ? (
-                      <span style={{ marginLeft: 'auto' }}><Meta size={9}>{nil(p.nilK)}</Meta></span>
-                    ) : null}
-                  </div>
-                  {p.devTrait ? (
-                    <div style={{ marginTop: 6 }}>
-                      <Meta size={9} color="var(--accent)">{p.devTrait.toUpperCase()}</Meta>
-                    </div>
-                  ) : null}
-                </div>
-              </Card>
-            )
-          })}
+                </span>
+              </button>
+          ))}
         </div>
       )}
     </div>
