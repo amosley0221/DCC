@@ -10,6 +10,17 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.30.1] - 2026-09-05
+
+### Fixed
+
+- **The update prompt is legible.** It was see-through — its background was a
+  three per cent wash meant for a card on the page, not a panel over it — the
+  version was set at page-title size, and the notes were the whole release
+  body, headings and all. It is opaque now, sized for itself, and each note is
+  reduced to its point. The full notes are still one click away.
+
+
 ## [0.30.0] - 2026-09-05
 
 ### Added
