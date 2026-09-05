@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -108,7 +110,7 @@ fun TeamSnapshotSection(view: SnapshotView) {
         when (tab) {
             "CARDS" -> {
                 val teamName = team?.name
-                val color = parseHex(view.snapshot.schoolColors[teamName])
+                val color = parseHex(teamName?.let { view.snapshot.schoolColors[it] })
                     ?: Dcc.colors.surfaceStrong
                 val champion = teamName != null && view.snapshot.champions.contains(teamName)
                 LazyVerticalGrid(
@@ -469,7 +471,7 @@ private fun PlayerCard(
             Text(
                 monogram,
                 modifier = Modifier.align(Alignment.Center),
-                style = androidx.compose.ui.text.TextStyle(
+                style = TextStyle(
                     fontFamily = Dcc.fonts.serif,
                     fontSize = 64.sp,
                     color = (if (champion) gold else ink).copy(alpha = 0.20f),
