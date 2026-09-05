@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
-import { THEMES, type ThemeName } from '../theme'
+import { ACCENT_LIST, THEMES, type ThemeName } from '../theme'
 import { Btn, Card, Chip, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
 import type { UpdateStatus } from '../updates'
 
@@ -65,8 +65,51 @@ export default function Settings({ update, version }: { update: UpdateStatus | n
             ))}
           </div>
           <div style={{ marginTop: 9 }}>
-            <Meta size={10}>Press Box is the default and the one built to read as a sports site. Night Wire and Field Office are the working themes: same screens, plus what has been decoded, which file is open and how each number was arrived at.</Meta>
+            <Meta size={10}>
+              Gold Standard is the default and the one built to read as a broadcast. Night Wire and
+              Field Office are the working themes: the same screens, plus what has been decoded,
+              which file is open and how each number was arrived at.
+            </Meta>
           </div>
+
+          {state.theme === 'gold' ? (
+            <>
+              <div className="rule" style={{ margin: '16px 0 14px' }} />
+              <Kicker>Mode</Kicker>
+              <div className="row" style={{ gap: 8, marginTop: 10 }}>
+                {(['dark', 'light'] as const).map((m) => (
+                  <Chip key={m} accent on={state.mode === m} onClick={() => dispatch({ type: 'mode', mode: m })}>
+                    {m === 'dark' ? 'Dark' : 'Light'}
+                  </Chip>
+                ))}
+              </div>
+
+              <div className="rule" style={{ margin: '16px 0 14px' }} />
+              <Kicker>Accent</Kicker>
+              <div className="gs-swatches" style={{ marginTop: 11 }}>
+                {ACCENT_LIST.map((a) => (
+                  <button
+                    key={a.id}
+                    className="gs-swatch"
+                    title={a.label}
+                    aria-pressed={state.accent.toLowerCase() === a.dark.toLowerCase()}
+                    style={{ background: a.dark }}
+                    onClick={() => dispatch({ type: 'accent', accent: a.dark })}
+                  />
+                ))}
+                {/* One hex is stored; the light-mode value is derived from it,
+                    which is what makes an arbitrary pick off the wheel safe. */}
+                <input
+                  className="gs-wheel"
+                  type="color"
+                  value={state.accent}
+                  onChange={(e) => dispatch({ type: 'accent', accent: e.target.value })}
+                  title="Any colour"
+                />
+                <Meta size={10}>{state.accent.toUpperCase()}</Meta>
+              </div>
+            </>
+          ) : null}
         </Card>
 
         <Card className="card-pad">

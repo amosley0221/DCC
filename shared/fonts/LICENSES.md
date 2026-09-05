@@ -10,8 +10,8 @@ design offline. Fetched with `node scripts/fetch-fonts.mjs`.
 | Public Sans | SIL Open Font License 1.1 | Body prose and chat, both themes |
 | Zilla Slab | SIL Open Font License 1.1 | Field Office serif |
 | Courier Prime | SIL Open Font License 1.1 | Field Office mono |
-| Archivo | SIL Open Font License 1.1 | Press Box — headlines, prose, numbers (variable weight) |
-| Archivo Narrow | SIL Open Font License 1.1 | Press Box — labels and scores (variable weight) |
+| Bodoni Moda | SIL Open Font License 1.1 | Gold Standard display — headlines, names, every numeral (variable weight) |
+| Manrope | SIL Open Font License 1.1 | Gold Standard UI — body, labels, buttons, metadata (variable weight) |
 
 Full licence text for each family: <https://fonts.google.com/>. The OFL permits
 bundling and redistribution as part of an application.

@@ -4,7 +4,7 @@ import React, {
 import type {
   Convo, Dynasty, LogLine, Persisted, Player, Prospect, QueueItem, Stage, Story,
 } from './model'
-import { applyTheme, type ThemeName } from './theme'
+import { applyTheme, type ThemeMode, type ThemeName } from './theme'
 import { SEMANTICS, THEMES } from './theme'
 
 // ── initial state ─────────────────────────────────────────────────────────────
@@ -22,7 +22,9 @@ export const blankPersisted = (): Persisted => ({
   publishRepo: '',
   relayUrl: '',
   relayToken: '',
-  theme: 'press',
+  theme: 'gold',
+  mode: 'dark',
+  accent: '#D4AF5A',
   themeChosen: false,
   week: 1,
   heat: 0,
@@ -44,7 +46,9 @@ export const blankPersisted = (): Persisted => ({
 export const emptyPersisted = (d: Dynasty): Persisted => ({
   ...blankPersisted(),
   dynastySource: 'sample',
-  theme: 'press',
+  theme: 'gold',
+  mode: 'dark',
+  accent: '#D4AF5A',
   week: d.meta.currentWeek,
   heat: 62,
   gameRunning: true,
@@ -66,6 +70,8 @@ export const emptyPersisted = (d: Dynasty): Persisted => ({
 export type Action =
   | { type: 'hydrate'; state: Persisted }
   | { type: 'theme'; theme: ThemeName }
+  | { type: 'mode'; mode: ThemeMode }
+  | { type: 'accent'; accent: string }
   | { type: 'week'; week: number }
   | { type: 'heat'; delta: number }
   | { type: 'story'; id: string; status: Story['status'] }
@@ -108,6 +114,10 @@ export function reducer(state: Persisted, action: Action): Persisted {
       return action.state
     case 'theme':
       return { ...state, theme: action.theme, themeChosen: true }
+    case 'mode':
+      return { ...state, mode: action.mode }
+    case 'accent':
+      return { ...state, accent: action.accent }
     case 'week':
       return { ...state, week: Math.max(1, Math.min(15, action.week)) }
     case 'heat':
@@ -319,13 +329,13 @@ export function useStore(): Ctx {
 }
 
 /**
- * True when the running theme is one of the working ones. The press theme
+ * True when the running theme is one of the working ones. Gold Standard
  * is meant to read as a sports site, so screens use this to leave out the
  * notes about what has been decoded, which file is open and how a number was
  * arrived at — everything is still editable, it just does not announce itself.
  */
 export function useOps(): boolean {
-  return useStore().state.theme !== 'press'
+  return useStore().state.theme !== 'gold'
 }
 
 /**
@@ -347,7 +357,7 @@ export function StoreProvider({ dynasty, initial, children }: {
   const [state, dispatch] = useReducer(reducer, initial)
   const first = useRef(true)
 
-  useEffect(() => { applyTheme(state.theme) }, [state.theme])
+  useEffect(() => { applyTheme(state.theme, state.mode, state.accent) }, [state.theme, state.mode, state.accent])
 
   // Persist to userData so nothing is lost across an in-place upgrade.
   useEffect(() => {

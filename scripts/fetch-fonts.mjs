@@ -27,11 +27,11 @@ const FAMILIES = [
   { css: 'Public+Sans:wght@400;600;700;800', file: 'PublicSans', weights: [400, 600, 700, 800] },
   { css: 'Zilla+Slab:wght@400;500;600', file: 'ZillaSlab', weights: [400, 500, 600] },
   { css: 'Courier+Prime:wght@400;700', file: 'CourierPrime', weights: [400, 700] },
-  // Press Box uses one variable file per family rather than a file per weight:
-  // the theme leans on weight for its whole hierarchy, from 400 prose to 800
-  // headlines, and five static cuts would cost more than the axis does.
-  { css: 'Archivo:wght@400..800', file: 'Archivo', variable: true },
-  { css: 'Archivo+Narrow:wght@400..700', file: 'ArchivoNarrow', variable: true },
+  // Gold Standard uses one variable file per family rather than a file per
+  // weight: the theme leans on weight for its whole hierarchy, and several
+  // static cuts would cost more than the axis does.
+  { css: 'Bodoni+Moda:opsz,wght@6..96,500..700', file: 'BodoniModa', variable: true },
+  { css: 'Manrope:wght@400..700', file: 'Manrope', variable: true },
 ]
 
 /** A TTF/OTF starts with an sfnt version tag; anything else is the wrong format. */
@@ -86,8 +86,8 @@ async function fetchTtf(fam) {
   // The v1 endpoint collapses a variable family to weight 400 when several
   // weights are asked for at once, so each weight is requested on its own.
   const out = []
-  // Android has its own theme colours and its own type; Press Box is a desktop
-  // theme, so its families are not pulled as TTF.
+  // Android downloads these two through Google Fonts rather than bundling
+  // them, so the desktop woff2 is all that is fetched here.
   if (fam.variable) return out
   for (const w of fam.weights) {
     const css = await (await get(`https://fonts.googleapis.com/css?family=${fam.css.split(':')[0]}:${w}`, TTF_UA)).text()

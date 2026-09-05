@@ -15,8 +15,8 @@
 @font-face { font-family: 'Courier Prime'; src: url('./fonts/CourierPrime-400.woff2') format('woff2'); font-weight: 400; font-display: block; }
 @font-face { font-family: 'Courier Prime'; src: url('./fonts/CourierPrime-700.woff2') format('woff2'); font-weight: 700; font-display: block; }
 /* Variable weight axes, so one file covers regular through black. */
-@font-face { font-family: 'Archivo'; src: url('./fonts/Archivo.woff2') format('woff2-variations'); font-weight: 100 900; font-display: block; }
-@font-face { font-family: 'Archivo Narrow'; src: url('./fonts/ArchivoNarrow.woff2') format('woff2-variations'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Bodoni Moda'; src: url('./fonts/BodoniModa.woff2') format('woff2-variations'); font-weight: 400 900; font-display: block; }
+@font-face { font-family: 'Manrope'; src: url('./fonts/Manrope.woff2') format('woff2-variations'); font-weight: 200 800; font-display: block; }
 
 * { box-sizing: border-box; }
 
@@ -302,249 +302,317 @@ input::placeholder, textarea::placeholder { color: var(--ink4); }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .card-head .kicker { color: var(--accent2); }
 
+/* ── Gold Standard ───────────────────────────────────────────────────────────
+   A premium sports-media surface: warm cream ink on near-black, Bodoni Moda for
+   anything editorial or numeric, Manrope for everything functional.
+
+   Only one colour is user-controlled. Every border, wash and rule below is
+   mixed from --accent, which is what makes an arbitrary pick off the wheel
+   safe: choose any hue and the whole surface follows it without a second
+   token to keep in sync. The light mode uses --accent-light, the same hue
+   dropped in luminance so it still holds contrast on the paper ground. */
+
+body[data-theme='gold'] {
+  --accent-ui: var(--accent);
+  --on-accent-ui: var(--onAccent);
+  --line: color-mix(in srgb, var(--accent) 22%, transparent);
+  --line-strong: color-mix(in srgb, var(--accent) 50%, transparent);
+  --haze: color-mix(in srgb, var(--accent) 14%, transparent);
+  --haze2: color-mix(in srgb, var(--accent) 8%, transparent);
+  --surfaceLine: var(--line);
+  --rule: var(--line);
+  --btnBg: var(--accent-ui);
+  --btnInk: var(--on-accent-ui);
+  --btn2Line: var(--line-strong);
+  --btn2Ink: var(--ink);
+  --accentSoft: var(--accent-ui);
+  --accent2: var(--accent-ui);
+  --heroBg: var(--surfaceStrong);
+  --heroInk: var(--ink);
+  --heroInk2: var(--ink2);
+  --heroMeta: var(--ink3);
+  --effectBg: var(--surface);
+  --effectInk: var(--ink2);
+  --good: #6FBF87;
+  --warn: #D8B25E;
+}
+body[data-theme='gold'][data-mode='light'] {
+  --accent-ui: var(--accent-light);
+  --line: color-mix(in srgb, var(--accent-light) 25%, transparent);
+  --line-strong: color-mix(in srgb, var(--accent-light) 60%, transparent);
+  --haze: color-mix(in srgb, var(--accent-light) 12%, transparent);
+  --haze2: color-mix(in srgb, var(--accent-light) 7%, transparent);
+  --good: #1F6B3A;
+  --warn: #8A6B1F;
+}
+
+body[data-theme='gold'] ::-webkit-scrollbar-thumb { background: var(--line-strong); border-color: transparent; }
+body[data-theme='gold'] ::selection { background: var(--accent-ui); color: var(--on-accent-ui); }
+
+/* Type: the serif slot carries every headline and every number the user reads
+   as data; Manrope numerals only appear inside sentences. */
+body[data-theme='gold'] .screen-title { font-family: var(--serif); font-weight: 600; font-size: 42px; line-height: 1; letter-spacing: 0; }
+body[data-theme='gold'] .hero-headline { font-family: var(--serif); font-weight: 600; font-size: 36px; line-height: 1.05; }
+body[data-theme='gold'] .headline { font-family: var(--serif); font-weight: 600; font-size: 28px; line-height: 1.05; }
+body[data-theme='gold'] .row-title { font-family: var(--sans); font-weight: 600; font-size: 14px; letter-spacing: 0; }
+body[data-theme='gold'] .body-serif { font-family: var(--sans); font-weight: 400; font-size: 14px; line-height: 1.6; }
+body[data-theme='gold'] .score-num,
+body[data-theme='gold'] .num { font-family: var(--serif); font-weight: 600; }
+
+body[data-theme='gold'] .kicker {
+  font-family: var(--sans); font-weight: 500; font-size: 10px;
+  letter-spacing: 0.25em; text-transform: uppercase; color: var(--accent-ui);
+}
+body[data-theme='gold'] .meta {
+  font-family: var(--sans); font-weight: 500; font-size: 11px;
+  letter-spacing: 0.08em; text-transform: none; color: var(--ink3);
+}
+
+body[data-theme='gold'] .section-rule { height: 1px; background: var(--line); margin-bottom: 20px; }
+body[data-theme='gold'] .rule { height: 1px; background: var(--line); }
+
+body[data-theme='gold'] .card { background: var(--surface); border-color: var(--line); box-shadow: none; }
+body[data-theme='gold'] .card-pad { padding: 16px 18px; }
+
+/* Near-square buttons: prestige, not friendly. */
+body[data-theme='gold'] .btn {
+  font-family: var(--sans); font-weight: 600; font-size: 12px;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  min-height: 40px; padding: 0 22px; border-radius: 2px;
+}
+body[data-theme='gold'] .btn-sm { min-height: 30px; font-size: 11px; padding: 0 13px; letter-spacing: 0.12em; }
+body[data-theme='gold'] .btn-primary { background: var(--accent-ui); color: var(--on-accent-ui); }
+body[data-theme='gold'] .btn-primary:hover:not(:disabled) { filter: brightness(1.08); opacity: 1; }
+body[data-theme='gold'] .btn-secondary { border-color: var(--line-strong); color: var(--ink); }
+body[data-theme='gold'] .btn-secondary:hover:not(:disabled) { border-color: var(--accent-ui); background: transparent; color: var(--ink); }
+
+body[data-theme='gold'] .chip {
+  height: 26px; padding: 0 11px; border-radius: 99px;
+  font-family: var(--sans); font-weight: 600; font-size: 10px; letter-spacing: 0.08em;
+  background: transparent; border-color: var(--line); color: var(--ink3);
+}
+body[data-theme='gold'] .chip:hover { color: var(--accent-ui); border-color: var(--line-strong); background: transparent; }
+body[data-theme='gold'] .chip[aria-pressed='true'] { background: transparent; color: var(--accent-ui); border-color: var(--accent-ui); }
+
+body[data-theme='gold'] .tab {
+  font-family: var(--sans); font-weight: 500; font-size: 12px;
+  letter-spacing: 0.16em; color: var(--ink3);
+}
+body[data-theme='gold'] .tab[aria-selected='true'] { font-weight: 600; color: var(--ink); border-bottom-color: var(--accent-ui); }
+
+body[data-theme='gold'] .input {
+  height: 38px; padding: 0 13px; border-radius: 2px;
+  font-family: var(--sans); font-size: 13px; letter-spacing: 0;
+  background: var(--surface); border-color: var(--line);
+}
+body[data-theme='gold'] .input:focus { border-color: var(--accent-ui); background: var(--surface); }
+
+body[data-theme='gold'] .tbl th {
+  font-family: var(--sans); font-weight: 500; font-size: 10px;
+  letter-spacing: 0.25em; color: var(--ink3); background: transparent;
+}
+body[data-theme='gold'] .tbl td { border-bottom-color: var(--line); }
+body[data-theme='gold'] .tbl tbody tr:hover td { background: var(--surfaceStrong); }
+
+body[data-theme='gold'] .monogram {
+  background: transparent; border-color: var(--line);
+  font-family: var(--serif); font-weight: 600; color: var(--ink);
+}
+body[data-theme='gold'] .track { background: var(--track); border-radius: 2px; height: 3px; }
+body[data-theme='gold'] .track-fill { border-radius: 2px; }
+body[data-theme='gold'] .pill { font-family: var(--sans); font-weight: 600; font-size: 10px; letter-spacing: 0.08em; }
+body[data-theme='gold'] .effect { border-left-color: var(--accent-ui); font-family: var(--sans); font-size: 12px; letter-spacing: 0; }
+
 /* ── The shell ───────────────────────────────────────────────────────────────
-   DCC is a place for several games at once, so the chrome is stacked the way a
-   sports network stacks it: which sport, then what is happening in it, then
-   where you are inside it.
+   One bar. The wordmark names the game and opens the switcher; the nav is
+   editorial rather than functional; the search and the gear sit opposite. */
 
-     ps-bar      which game — the only bar that is never about one dynasty
-     ps-scores   the week's results, the first thing a sports site ever shows
-     ps-nav      who you are, and the sections of the game you are in
+.gs { display: flex; flex-direction: column; height: 100%; background: var(--bg0); position: relative; }
 
-   All three sit on the chrome colours rather than the page colours, so the
-   page can be light while the chrome stays black. */
+/* Stadium haze: two soft washes in the accent, behind everything. */
+.gs::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 70% 12%, var(--haze), transparent 70%),
+    radial-gradient(ellipse 40% 40% at 12% 92%, var(--haze2), transparent 70%);
+}
+.gs > * { position: relative; z-index: 1; }
 
-.ps { display: flex; flex-direction: column; height: 100%; background: var(--bg0); }
-.ps-bar-in, .ps-nav-in, .ps-page-in, .ps-foot { max-width: 1400px; margin: 0 auto; width: 100%; }
-
-.ps-bar { background: var(--chrome); flex: none; }
-.ps-bar-in { display: flex; align-items: center; gap: 22px; height: 44px; padding: 0 24px; }
-.ps-mark {
-  font-family: var(--sans); font-weight: 800; font-size: 17px; letter-spacing: -0.03em;
-  color: var(--chromeInk); border-left: 3px solid var(--accent); padding-left: 8px; flex: none;
-}
-.ps-games { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
-.ps-game {
-  padding: 5px 11px; border-radius: 999px; white-space: nowrap;
-  font-family: var(--mono); font-weight: 600; font-size: 11.5px;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--chromeInk2);
-}
-.ps-game:hover { color: var(--chromeInk); background: var(--chromeRaised); }
-.ps-game[aria-current='true'] { color: var(--chromeInk); background: var(--chromeRaised); }
-.ps-bar-right { display: flex; align-items: center; gap: 10px; flex: none; }
-.ps-pill {
-  display: inline-flex; align-items: center; height: 22px; padding: 0 10px; border-radius: 999px;
-  background: var(--chromeRaised); color: var(--chromeInk2);
-  font-family: var(--mono); font-weight: 600; font-size: 10.5px; letter-spacing: 0.06em;
-}
-.ps-pill-live { background: var(--accent); color: var(--onAccent); }
-.ps-cog {
-  font-family: var(--mono); font-weight: 600; font-size: 11px; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--chromeInk3);
-}
-.ps-cog:hover, .ps-cog[aria-current='true'] { color: var(--chromeInk); }
-
-.ps-scores {
-  display: flex; flex: none; overflow-x: auto;
-  background: var(--chrome); border-top: 1px solid var(--chromeLine);
-}
-.ps-score {
-  flex: none; min-width: 158px; padding: 9px 16px 8px; text-align: left;
-  border-right: 1px solid var(--chromeLine);
-}
-.ps-score:hover { background: var(--chromeRaised); }
-.ps-score-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
-.ps-score-row.is-lost { opacity: 0.5; }
-.ps-score-team {
-  font-family: var(--mono); font-weight: 600; font-size: 12.5px; color: var(--chromeInk);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 108px;
-}
-.ps-score-num {
-  font-family: var(--mono); font-weight: 700; font-size: 13.5px; color: var(--chromeInk);
-  font-variant-numeric: tabular-nums;
-}
-.ps-score-meta {
-  margin-top: 4px; font-family: var(--mono); font-weight: 600; font-size: 9px;
-  letter-spacing: 0.09em; color: var(--chromeInk3);
+.gs-topbar {
+  display: flex; align-items: center; gap: 30px; padding: 0 34px; height: 66px;
+  border-bottom: 1px solid var(--line); flex: none;
 }
 
-.ps-nav {
-  flex: none; background: var(--bg1);
-  border-bottom: 1px solid var(--line); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+.gs-mark { all: unset; cursor: pointer; display: flex; align-items: center; gap: 9px; flex: none; }
+.gs-mark-name {
+  font-family: var(--serif); font-weight: 600; font-size: 22px;
+  letter-spacing: 0.09em; color: var(--ink);
 }
-.ps-nav-in { display: flex; align-items: center; gap: 24px; height: 54px; padding: 0 24px; }
-.ps-id { display: flex; align-items: baseline; gap: 9px; flex: none; min-width: 0; }
-.ps-crest { width: 26px; height: 26px; object-fit: contain; align-self: center; flex: none; }
-.ps-crest-flat {
-  display: grid; place-items: center; border-radius: 6px; background: var(--ink);
-  color: var(--bg1); font-family: var(--mono); font-weight: 700; font-size: 10px;
-  letter-spacing: 0.04em;
+.gs-mark-name em { color: var(--accent-ui); font-style: normal; }
+.gs-mark-caret { color: var(--ink3); display: flex; transition: transform 0.2s var(--e-out, ease); }
+.gs-mark[aria-expanded='true'] .gs-mark-caret { transform: rotate(180deg); }
+
+.gs-games {
+  position: absolute; top: 60px; left: 34px; z-index: 40; min-width: 260px;
+  background: var(--sheet); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
 }
-.ps-id-name {
-  font-family: var(--sans); font-weight: 700; font-size: 16px; letter-spacing: -0.015em;
-  color: var(--ink); white-space: nowrap;
+.gs-game {
+  all: unset; display: flex; align-items: baseline; gap: 10px; width: 100%;
+  padding: 10px 12px; border-radius: 4px; cursor: pointer; box-sizing: border-box;
 }
-.ps-id-rec {
-  font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--ink2);
-  font-variant-numeric: tabular-nums;
+.gs-game:hover { background: var(--surfaceStrong); }
+.gs-game[aria-current='true'] { background: var(--surfaceStrong); }
+.gs-game[aria-current='true'] .gs-game-name { color: var(--accent-ui); }
+.gs-game-name {
+  font-family: var(--sans); font-weight: 600; font-size: 13px;
+  letter-spacing: 0.06em; color: var(--ink);
 }
-.ps-id-week {
-  font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 0.09em;
-  text-transform: uppercase; color: var(--ink4);
+.gs-game-soon {
+  margin-left: auto; font-family: var(--sans); font-weight: 500; font-size: 10px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink4);
+}
+.gs-game[disabled] { cursor: default; }
+.gs-game[disabled] .gs-game-name { color: var(--ink4); }
+.gs-game[disabled]:hover { background: transparent; }
+
+.gs-nav { display: flex; align-items: center; gap: 26px; flex: 1; min-width: 0; overflow-x: auto; }
+.gs-nav-item {
+  all: unset; cursor: pointer; white-space: nowrap; padding-bottom: 4px;
+  border-bottom: 1px solid transparent;
+  font-family: var(--sans); font-weight: 500; font-size: 12px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink3);
+}
+.gs-nav-item:hover { color: var(--ink2); }
+.gs-nav-item[aria-current='true'] { font-weight: 600; color: var(--ink); border-bottom-color: var(--accent-ui); }
+.gs-nav-badge {
+  display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px;
+  margin-left: 7px; border-radius: 99px; background: var(--accent-ui); color: var(--on-accent-ui);
+  font-family: var(--sans); font-weight: 700; font-size: 9.5px; letter-spacing: 0;
 }
 
-.ps-sections { display: flex; align-items: stretch; gap: 2px; height: 54px; flex: 1; min-width: 0; overflow-x: auto; justify-content: flex-end; }
-.ps-section {
-  position: relative; display: flex; align-items: center; gap: 6px; padding: 0 13px;
-  white-space: nowrap; font-family: var(--sans); font-weight: 600; font-size: 13.5px;
-  letter-spacing: -0.006em; color: var(--ink3);
+.gs-topbar-right { display: flex; align-items: center; gap: 16px; flex: none; }
+
+/* The search: one field that reaches every team, player and recruit in the save. */
+.gs-search { position: relative; width: 244px; }
+.gs-search-field {
+  display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 2px; color: var(--ink3);
+  transition: border-color 0.2s;
 }
-.ps-section:hover { color: var(--ink); }
-.ps-section[aria-current='true'] { color: var(--ink); font-weight: 700; }
-.ps-section[aria-current='true']::after {
-  content: ''; position: absolute; left: 11px; right: 11px; bottom: 0;
-  height: 3px; background: var(--accent);
+.gs-search-field:focus-within { border-color: var(--accent-ui); }
+.gs-search-field input {
+  flex: 1; min-width: 0; font-family: var(--sans); font-size: 12.5px; color: var(--ink);
 }
-.ps-dot {
-  display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px;
-  border-radius: 999px; background: var(--accent); color: var(--onAccent);
-  font-family: var(--mono); font-weight: 700; font-size: 10px;
+.gs-search-field input::placeholder { color: var(--ink4); }
+.gs-search-results {
+  position: absolute; top: 42px; right: 0; width: 380px; max-height: 460px; overflow-y: auto;
+  z-index: 40; background: var(--sheet); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+}
+.gs-result {
+  all: unset; display: flex; align-items: center; gap: 11px; width: 100%; box-sizing: border-box;
+  padding: 9px 11px; border-radius: 4px; cursor: pointer;
+}
+.gs-result:hover { background: var(--surfaceStrong); }
+.gs-result:hover .gs-result-name { color: var(--accent-ui); }
+.gs-result-num {
+  font-family: var(--serif); font-weight: 600; font-size: 16px; color: var(--ink);
+  min-width: 30px; font-variant-numeric: tabular-nums;
+}
+.gs-result-name { font-family: var(--sans); font-weight: 600; font-size: 13.5px; color: var(--ink); }
+.gs-result-sub {
+  font-family: var(--sans); font-weight: 500; font-size: 11px;
+  letter-spacing: 0.08em; color: var(--ink3); margin-top: 2px;
+}
+.gs-result-kind {
+  margin-left: auto; font-family: var(--sans); font-weight: 500; font-size: 10px;
+  letter-spacing: 0.25em; text-transform: uppercase; color: var(--ink4);
+}
+.gs-search-empty {
+  padding: 14px 12px; font-family: var(--sans); font-size: 12.5px; color: var(--ink3);
 }
 
-.ps-page { flex: 1; overflow-y: auto; }
-.ps-page-in { padding: 22px 24px 32px; }
-.ps-foot {
+.gs-week {
+  font-family: var(--sans); font-weight: 500; font-size: 11px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink3); white-space: nowrap;
+}
+.gs-gear {
+  all: unset; cursor: pointer; width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink3);
+  transition: border-color 0.2s, color 0.2s;
+}
+.gs-gear:hover, .gs-gear[aria-current='true'] { border-color: var(--accent-ui); color: var(--accent-ui); }
+
+.gs-page { flex: 1; overflow-y: auto; }
+.gs-page-in { padding: 26px 34px 40px; }
+
+.gs-soon { padding: 80px 0 0; max-width: 560px; }
+.gs-soon-title { font-family: var(--serif); font-weight: 600; font-size: 42px; line-height: 1; margin: 0 0 14px; color: var(--ink); }
+.gs-soon-body { font-family: var(--sans); font-size: 14px; line-height: 1.6; color: var(--ink2); margin: 0; }
+
+/* Appearance controls, Settings only. */
+.gs-swatches { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+.gs-swatch {
+  all: unset; cursor: pointer; width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid transparent; box-sizing: border-box;
+}
+.gs-swatch[aria-pressed='true'] { border-color: var(--ink); }
+.gs-wheel {
+  width: 38px; height: 30px; padding: 2px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 4px; background: transparent;
+}
+
+.gs-foot {
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
-  padding: 16px 24px 26px; border-top: 1px solid var(--line);
+  padding: 14px 34px 20px; border-top: 1px solid var(--line); flex: none;
 }
-.ps-foot-mark {
-  font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 0.11em;
-  text-transform: uppercase; color: var(--ink4);
-}
-
-.ps-soon { padding: 64px 0 0; max-width: 560px; }
-.ps-soon-title { font-family: var(--sans); font-weight: 800; font-size: 40px; letter-spacing: -0.03em; margin: 0 0 12px; }
-.ps-soon-body { font-family: var(--sans); font-size: 15px; line-height: 1.62; color: var(--ink2); margin: 0; }
-
-/* ── Press Box ───────────────────────────────────────────────────────────────
-   The sports-site theme. Everything here is an override on the shared
-   components, so no screen knows which theme is running.
-
-   Three things do the work. The page is light and the chrome is black, which is
-   how every sports site on the web is built and nothing like a tool. Labels are
-   set in a condensed face, which is what a scoreboard uses and a settings
-   screen never does. And weight carries the hierarchy — 800 for a headline, 600
-   for a row, 400 for prose — instead of a serif doing it. */
-
-body[data-theme='press'] ::-webkit-scrollbar-thumb { background: #C9CDD3; border-color: var(--bg0); }
-body[data-theme='press'] ::-webkit-scrollbar-thumb:hover { background: #AEB4BC; }
-
-body[data-theme='press'] .screen-title { font-weight: 800; font-size: 36px; letter-spacing: -0.03em; }
-body[data-theme='press'] .hero-headline { font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
-body[data-theme='press'] .headline { font-weight: 700; font-size: 17px; letter-spacing: -0.014em; }
-body[data-theme='press'] .row-title { font-weight: 600; font-size: 15px; letter-spacing: -0.008em; }
-body[data-theme='press'] .body-serif { font-weight: 400; font-size: 14px; line-height: 1.6; }
-
-/* Condensed, tight, uppercase: a scoreboard label rather than a code comment. */
-body[data-theme='press'] .kicker,
-body[data-theme='press'] .meta {
-  font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
-}
-body[data-theme='press'] .kicker { font-size: 11px; color: var(--ink3); }
-body[data-theme='press'] .meta { font-size: 11px; }
-
-body[data-theme='press'] .section-rule { height: 1px; background: var(--line); margin-bottom: 18px; }
-body[data-theme='press'] .rule { height: 1px; background: var(--line); }
-
-body[data-theme='press'] .card {
-  border-color: var(--surfaceLine);
-  box-shadow: 0 1px 2px rgba(11, 12, 14, 0.04), 0 6px 18px rgba(11, 12, 14, 0.05);
-}
-body[data-theme='press'] .card-pad { padding: 16px 18px; }
-
-body[data-theme='press'] .btn {
-  font-family: var(--sans); font-weight: 700; font-size: 13px;
-  letter-spacing: -0.006em; text-transform: none; min-height: 34px; padding: 0 15px;
-}
-body[data-theme='press'] .btn-sm { min-height: 27px; font-size: 12px; padding: 0 11px; }
-body[data-theme='press'] .btn-secondary:hover:not(:disabled) { background: rgba(11, 12, 14, 0.05); color: var(--ink); }
-
-body[data-theme='press'] .chip {
-  height: 26px; padding: 0 11px; font-size: 11px; letter-spacing: 0.04em;
-  background: #EDEFF2; border-color: transparent; color: var(--ink2);
-}
-body[data-theme='press'] .chip:hover { background: #E3E6EB; color: var(--ink); }
-
-body[data-theme='press'] .tab {
-  font-size: 12px; letter-spacing: 0.07em; padding: 5px 9px;
-}
-body[data-theme='press'] .input {
-  height: 36px; padding: 0 12px; font-size: 12.5px; letter-spacing: 0.01em;
-  background: #F5F6F8; border-color: transparent;
-}
-body[data-theme='press'] .input:focus { background: var(--surface); border-color: var(--ink4); }
-
-body[data-theme='press'] .tbl th { background: var(--surface); font-size: 10px; letter-spacing: 0.08em; }
-body[data-theme='press'] .tbl tbody tr:hover td { background: #F5F6F8; }
-body[data-theme='press'] .tbl tbody tr[aria-selected='true'] td { background: #EDF2FB; }
-
-body[data-theme='press'] .effect { background: var(--effectBg); font-size: 11.5px; letter-spacing: 0.02em; }
-body[data-theme='press'] .monogram { background: #EDEFF2; border-color: transparent; font-family: var(--mono); font-weight: 700; }
-body[data-theme='press'] .pill { font-size: 10.5px; letter-spacing: 0.06em; }
-
-/* The one dark surface on a light page: the game that matters this week. A
-   sports site gives its lead result the full contrast of a broadcast graphic
-   and lets everything else sit quietly under it. */
-.hero-game .scoreboard { max-width: 720px; margin: 0 auto; }
-
-body[data-theme='press'] .hero-game {
-  background: var(--heroBg); border-color: var(--heroBg);
-  padding: 26px 24px 22px;
-  box-shadow: 0 2px 4px rgba(11, 12, 14, 0.10), 0 14px 34px rgba(11, 12, 14, 0.16);
-}
-body[data-theme='press'] .hero-game .scoreboard-name { color: var(--heroInk); font-size: 19px; }
-body[data-theme='press'] .hero-game .scoreboard-sub { color: var(--heroMeta); }
-body[data-theme='press'] .hero-game .score-num { color: var(--heroInk); }
-body[data-theme='press'] .hero-game .scoreboard-dim .scoreboard-name,
-body[data-theme='press'] .hero-game .scoreboard-dim .score-num { color: var(--heroMeta); }
-body[data-theme='press'] .hero-game .meta { color: var(--heroMeta); }
-body[data-theme='press'] .hero-game .scoreboard-mark { background: rgba(255, 255, 255, 0.08); }
 
 /* ── The front page ──────────────────────────────────────────────────────────
    A lead story, the rest of the week under it, and a rail of the things you
-   would otherwise have to open a section to see. */
+   would otherwise open a section to see. */
 .wire-lead-head {
-  font-family: var(--sans); font-weight: 800; font-size: 30px; line-height: 1.1;
-  letter-spacing: -0.03em; color: var(--ink); margin: 8px 0 8px;
+  font-family: var(--serif); font-weight: 600; font-size: 36px; line-height: 1.05;
+  color: var(--ink); margin: 10px 0 10px; text-wrap: balance;
 }
-.wire-lead-stand {
-  font-family: var(--sans); font-size: 16px; line-height: 1.5; color: var(--ink2);
-  margin: 0 0 12px;
-}
+.wire-lead-stand { font-family: var(--sans); font-size: 15px; line-height: 1.6; color: var(--ink2); margin: 0 0 14px; }
 
-.wire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1px; background: var(--line); }
-.wire-box { background: var(--surface); padding: 11px 13px 9px; }
+.wire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 1px; background: var(--line); }
+.wire-box { background: var(--bg0); padding: 12px 14px 10px; }
 .wire-box-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .wire-box-row.is-lost { opacity: 0.45; }
 .wire-box-team {
-  font-family: var(--mono); font-weight: 600; font-size: 13.5px; color: var(--ink);
+  font-family: var(--sans); font-weight: 600; font-size: 13.5px; color: var(--ink);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.wire-box-score { font-family: var(--mono); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.wire-box-score { font-family: var(--serif); font-weight: 600; font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .wire-box-meta {
-  margin-top: 5px; font-family: var(--mono); font-weight: 600; font-size: 9px;
-  letter-spacing: 0.1em; color: var(--ink4);
+  margin-top: 6px; font-family: var(--sans); font-weight: 500; font-size: 10px;
+  letter-spacing: 0.25em; text-transform: uppercase; color: var(--ink4);
 }
 
-.wire-next-team { font-family: var(--sans); font-weight: 800; font-size: 22px; letter-spacing: -0.02em; margin-bottom: 4px; }
+.wire-next-team { font-family: var(--serif); font-weight: 600; font-size: 28px; line-height: 1.05; color: var(--ink); margin-bottom: 6px; }
 
-.wire-line { display: flex; align-items: baseline; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.wire-line { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .wire-line:last-child { border-bottom: none; }
-.wire-line-ovr { font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--ink); min-width: 24px; font-variant-numeric: tabular-nums; }
-.wire-line-stars { color: var(--accent); font-size: 10px; letter-spacing: -1px; min-width: 44px; }
-.wire-line-pos { font-family: var(--mono); font-weight: 600; font-size: 10px; letter-spacing: 0.06em; color: var(--ink4); min-width: 30px; }
+.wire-line-ovr {
+  font-family: var(--serif); font-weight: 600; font-size: 18px; color: var(--ink);
+  min-width: 28px; font-variant-numeric: tabular-nums;
+}
+.wire-line-stars { color: var(--accent-ui, var(--accent)); font-size: 10px; letter-spacing: -0.5px; min-width: 48px; }
+.wire-line-pos {
+  font-family: var(--sans); font-weight: 500; font-size: 10px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink4); min-width: 34px;
+}
 .wire-line-name { font-family: var(--sans); font-weight: 600; font-size: 14px; color: var(--ink); flex: 1; min-width: 0; }
 .wire-line-tail {
-  font-family: var(--mono); font-size: 11px; color: var(--ink3);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;
+  font-family: var(--sans); font-weight: 500; font-size: 11px; letter-spacing: 0.08em; color: var(--ink3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;
 }
+
+/* The lead result: the one card that carries the week. */
+.wire-lead { background: var(--surfaceStrong); }
+.hero-game .scoreboard { max-width: 720px; margin: 0 auto; }
+body[data-theme='gold'] .hero-game { background: var(--surfaceStrong); border-color: var(--line-strong); }
+body[data-theme='gold'] .hero-game .scoreboard-name { font-family: var(--serif); font-weight: 600; font-size: 22px; }
+body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; border: 1px solid var(--line); }

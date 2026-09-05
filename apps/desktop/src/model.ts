@@ -160,7 +160,10 @@ export interface Persisted {
   /** Relay base URL, empty until paired. */
   relayUrl: string
   relayToken: string
-  theme: 'night' | 'field' | 'press'
+  theme: 'night' | 'field' | 'gold'
+  /** Gold Standard only: which of its two modes, and the accent it derives from. */
+  mode: 'dark' | 'light'
+  accent: string
   /**
    * Whether the user has ever picked a theme themselves. Without this there is
    * no way to tell "chose Night Wire" from "has simply never touched it", and a

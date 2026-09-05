@@ -191,7 +191,7 @@ function Lead({ g, team, apiKey, log }: {
         {us > them ? 'WON' : 'LOST'} · WEEK {g.week} · {dateLabel(g.month, g.day)}
       </Meta>
       <h2 className="wire-lead-head">
-        {story ? story.headline : `${us}–${them} ${home ? 'over' : 'at'} ${other}`}
+        {story ? story.headline : `${us}-${them} ${home ? 'over' : 'at'} ${other}`}
       </h2>
       {story ? (
         <>

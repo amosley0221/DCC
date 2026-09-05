@@ -49,7 +49,7 @@ function Hero({ g, team, icon }: {
           {g.played ? (
             <div className="row" style={{ gap: 14, alignItems: 'center' }}>
               <span className="score-num" style={{ fontSize: 46 }}>{g.awayScore}</span>
-              <span style={{ color: 'var(--ink4)', fontSize: 20 }}>–</span>
+              <span style={{ color: 'var(--ink4)', fontSize: 20 }}>-</span>
               <span className="score-num" style={{ fontSize: 46 }}>{g.homeScore}</span>
             </div>
           ) : (
