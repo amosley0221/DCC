@@ -8,7 +8,27 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **The ••• control on the phone no longer crashes the app.** Settings brings
+  its own scrolling and the panel behind that control was putting it inside
+  another one, which Compose refuses to measure. It threw on every tap.
+
+### Added
+
+- **Tap a score, or the feature, to open the game.** The final, the
+  quarter-by-quarter line as a table and as bars on a shared scale, and the
+  conditions it was played in — kickoff, attendance, temperature, weather,
+  wind. Per-player and team statistics are not in the save's game table, so
+  the sheet shows the only per-team series it gives up rather than box-score
+  rows with nothing behind them.
+- The board's rows and its **ALL →** reach the Board tab.
+
+### Changed
+
+- The launch check taps the ••• and fails if the app dies or the settings
+  screen does not appear. Launching proves nothing about a screen nobody
+  opened, which is how the crash shipped.
 
 ## [0.29.0] - 2026-09-05
 
