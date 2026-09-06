@@ -1,73 +1,81 @@
-# The Madden 27 draft class format
+# The Madden 27 draft class file
 
-A draft class exported from College Football 27 and loaded into Madden 27 is
-far easier to read than a dynasty save. This records what it is, from one real
-class file, so building an exporter is a matter of filling in a mapping rather
-than starting from nothing.
+Notes on `CAREERDRAFTCFBCLASS*`, the file a CFB class becomes on its way into
+Madden. Written down as it is found, so it is not lost the way the first
+Cooper Barkate screenshot was.
+
+Everything here is measured from two real files. Nothing is assumed.
 
 ## The container
 
-The same `FBCHUNKS` header the College Football save uses, and the same fields
-in the same places — a data offset at byte 10, a payload length at 14, a save
-time, and a build string, here `Madden-27-RL1-9081279` rather than
-`College-27-RL3-...`.
+The same `FBCHUNKS` header as a CFB dynasty save, and then — unlike the dynasty
+save — **no compression at all**. No zlib stream, no `SPBF` stores, no
+bit-packing. The whole file is plain records.
 
-The difference that matters: **the payload is not compressed**. There is no
-zlib stream and no zstd frame anywhere in the file. The records sit in the
-open, which means writing one needs no repacking at all.
+```
+70 bytes   header, title string "Madden-27-RL1-9081279"
+then       455 records of 5876 bytes
+```
 
-## Records
+`455 × 5876 = 2,673,580`, and the header's length word at byte 14 reads
+`0x28cbac`, which is that number exactly. So the length field is consistent and
+a file that keeps the record count keeps it valid. 389 of the 455 records are
+filled; the rest are empty slots.
 
-Player records are **5,876 bytes** on a fixed stride. In the class examined,
-389 of the 455 slots are filled and the rest are zeroed. The first record
-begins such that its first name lands at `0x1646`.
+## One record
 
-Offsets are given relative to the start of a record's first name.
-
-| Offset | Contents |
+| Offset | What |
 | --- | --- |
-| +0 | First name, null-padded |
-| +21 | Last name, null-padded |
-| +43 | The literal string `PLACEHOLDER` |
-| +78 | Position |
-| +85 … +142 | Ratings, **one byte each**, values 0–99 |
-| +244 | Appearance, as JSON |
+| 0 | Gear and appearance, as **plain-text JSON** — helmet, facemask, gloves, cleats, body type |
+| 5632 | First name |
+| 5653 | Last name |
+| 5674 | Portrait id (`PLACEHOLDER` throughout the classes seen) |
+| 5710 | **Position** |
+| 5711–5789 | The ratings, **one byte each, unpacked** |
+| 5834–5842 | A few 16-bit fields, not yet identified |
 
-**Positions are a plain enumeration at +78**, and the distribution identifies it
-without needing any outside data. Across 389 players: value 3 has 78 players and
-16 has 53 — wide receiver and cornerback, the two most common positions in any
-draft class — while 2 has exactly one player, which is the lone fullback, and 19
-and 20 have five each, which are the kickers and punters. That gives the
-familiar Madden ordering: QB 0, HB 1, FB 2, WR 3, TE 4, LT 5, LG 6, C 7, RG 8,
-RT 9, LE 10, RE 11, DT 12, LOLB 13, MLB 14, ROLB 15, CB 16, FS 17, SS 18, K 19,
-P 20, with 21 for the long snapper. The first record in the file is Jeremiah
-Smith, whose position byte reads 3, and who is a wide receiver.
+## Position, byte 5710
 
-**Ratings are single bytes, not bit-packed.** Roughly fifty-five of them run
-from +85 to +142, each holding 0–99 with the spread of values a rating has.
-Bytes that looked like obfuscated text in a hex dump — `N`TDN%.KDVUT` and the
-like — are simply ratings whose values fall in the printable ASCII range.
+22 distinct values across the 389 filled records, and the rating profiles split
+by it exactly as football would:
 
-**Appearance is JSON**, one object per record starting at +244: a `bodyType`
-from Muscular, Standard, Heavy, Freshman or Thin, a `genericHeadName` like
-`gen_2_B_S_001`, and a `loadouts` array naming every piece of gear by asset —
-face mask, visor, sleeves, socks, shoes, back plate, elbow wear, gloves and
-shoulder pads.
+- Six values (5, 6, 7, 8, 9, 21) are high in *both* byte 5712 and byte 5738,
+  mean 62–71 and 64–70. Two blocking ratings and the offensive line.
+- One value, 0, with 27 players, reads **75** at byte 5766 where every other
+  group reads 11–21. A throwing rating, and those 27 are the quarterbacks.
+- Value 3 is the largest group, 78 players, fast (byte 5718 mean 92) and no
+  blocking at all. Cooper Barkate is in it, and he is a receiver.
+
+Which value is which position still needs one player named on screen.
 
 ## What is still needed
 
-Which rating is which. There are about fifty-five bytes and Madden has about
-fifty-five ratings, so the mapping is one screenshot away: the ratings page of a
-single player from a class already loaded in Madden pins nearly every byte at
-once, because fifty-five numbers matching fifty-five bytes has essentially one
-solution.
+**One screenshot of a single player's card in Madden**, showing his position and
+his ratings. That is all. With the numbers beside the bytes below, most of the
+block labels itself in one pass, because the values are distinctive enough to
+line up unambiguously.
 
-Name matching against the user's own dynasty does not help. Only nine of the 389
-names also appear in their College Football save, and those are coincidences of
-common names — the class was pulled from a different roster, and its Jeremiah
-Smith is a receiver while theirs is an outside linebacker.
+Cooper Barkate is **record 72**, position value 3. His bytes:
 
-The Madden career save is a different shape: it holds no `PLACEHOLDER` markers
-and is compressed, with 308 zlib streams and 2,827 zstd frames. Reading it is a
-separate problem from writing a draft class, and writing a class is the part
-that matters here.
+```
+5717: 63   5718: 91   5719: 88   5720: 69   5721: 69   5722: 36   5723: 27
+5724: 68   5725: 67   5726: 79   5727: 78   5728: 88   5729: 30   5730: 56
+5731: 39   5732: 90   5733: 69   5734: 89   5735: 27   5736: 31   5737: 59
+5738: 22   5739: 127  5740: 28   5744: 75   5750: 73   5751: 77   5752: 76
+5753: 72   5758: 76   5759: 89   5760: 67   5761: 92   5762: 59   5763: 53
+5772: 88   5773: 61   5788: 66
+```
+
+The 127 at 5739 is almost certainly a cap or sentinel rather than a rating.
+
+The second thing needed cannot be done here at all: **whether Madden accepts a
+file DCC has written**. There is no Madden in this environment, so the loop has
+to be write, import, report back. Nothing found so far suggests a checksum, but
+absence of evidence is not evidence here.
+
+## What these files are not
+
+`CAREERBUCS` is a Madden career save — 5.6 MB, zlib from byte 82, inflating to
+20 MB, and structured like the dynasty save rather than like a draft class. It
+does **not** contain the class in `CAREERDRAFTCFBCLASS1`: Barkate, Mateer and
+Uiagalelei are all absent from it. It is a career from before the import.
