@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { rosterPatch, useSave } from '../saveStore'
 import type { SaveState } from '../saveStore'
@@ -816,10 +816,31 @@ function Stores({ stores, path }: {
 }) {
   const [q, setQ] = useState('')
   const [note, setNote] = useState<string | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
+  const [members, setMembers] = useState<Record<string, string>>({})
   const query = q.trim().toLowerCase()
   const shown = query
     ? stores.filter((s) => s.name.toLowerCase().includes(query))
     : stores.slice(0, 20)
+
+  /** What the schema says this store holds — names, ranges and enums. */
+  const explain = async (name: string, count: number) => {
+    if (open === name) { setOpen(null); return }
+    setOpen(name)
+    if (members[name]) return
+    const res = await window.dcc.schemaStore(name, count)
+    setMembers((m) => ({
+      ...m,
+      [name]: res.ok
+        ? `${res.type}\n` + res.members
+            .map((x) => `  ${String(x.i).padStart(3)}  ${x.n}  ·  ` +
+              (x.e ? `enum(${x.e.length}) ${x.e.slice(0, 6).join(' ')}`
+                : x.lo !== undefined ? `${x.lo}..${x.hi}${x.w ? ` (${x.w} bits)` : ''}`
+                : x.t))
+            .join('\n')
+        : res.message,
+    }))
+  }
 
   const dump = async (name: string) => {
     if (!path) return
@@ -837,9 +858,10 @@ function Stores({ stores, path }: {
         <Meta size={10}>{stores.length} STORES</Meta>
       </div>
       <p className="body-serif" style={{ marginTop: 7 }}>
-        Every table the save announces, with its row and member counts. Click one to write its
-        first sixty rows to a file — that is how a column is identified: put the rows beside a
-        number you already know and find the one that agrees.
+        Every table the save announces, with its row and member counts. Click a name and the
+        game's own schema says what it holds — the members, their ranges, their enum values.
+        Click Dump to write its first sixty rows to a file. Between the two, a column stops being
+        anonymous: the schema says what is in the row, and the rows say which is which.
       </p>
       <Input placeholder="search the tables — poll, rank, award, stat…" value={q}
         onChange={(e) => setQ(e.target.value)} />
@@ -849,14 +871,32 @@ function Stores({ stores, path }: {
         </thead>
         <tbody>
           {shown.map((st) => (
-            <tr key={st.name}>
-              <td className="name">{st.name}</td>
-              <td className="num">{st.rows.toLocaleString()}</td>
-              <td className="num" style={{ color: 'var(--ink3)' }}>{st.members}</td>
-              <td style={{ textAlign: 'right' }}>
-                <button className="gs-close" disabled={!path} onClick={() => void dump(st.name)}>Dump</button>
-              </td>
-            </tr>
+            <Fragment key={st.name}>
+              <tr>
+                <td className="name">
+                  <button onClick={() => void explain(st.name, st.members)}
+                    style={{ all: 'unset', cursor: 'pointer', color: open === st.name ? 'var(--accent)' : 'var(--ink)' }}>
+                    {st.name}
+                  </button>
+                </td>
+                <td className="num">{st.rows.toLocaleString()}</td>
+                <td className="num" style={{ color: 'var(--ink3)' }}>{st.members}</td>
+                <td style={{ textAlign: 'right' }}>
+                  <button className="gs-close" disabled={!path} onClick={() => void dump(st.name)}>Dump</button>
+                </td>
+              </tr>
+              {open === st.name ? (
+                <tr>
+                  <td colSpan={4} style={{ paddingTop: 0 }}>
+                    <pre style={{
+                      margin: 0, maxHeight: 260, overflow: 'auto', fontSize: 11,
+                      color: 'var(--ink2)', background: 'var(--surface)',
+                      border: '1px solid var(--line)', borderRadius: 6, padding: 10,
+                    }}>{members[st.name] ?? 'reading the schema…'}</pre>
+                  </td>
+                </tr>
+              ) : null}
+            </Fragment>
           ))}
         </tbody>
       </table>
@@ -1001,7 +1041,17 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState<SavedPollView[]>([])
 
+  const [rankFields, setRankFields] = useState<string[]>([])
+
   useEffect(() => { void window.dcc.savedPolls().then((r) => setSaved(r.polls)) }, [])
+
+  // What the game's own schema says a team carries, so the number of orderings
+  // a search turns up can be recognised rather than wondered at.
+  useEffect(() => {
+    void window.dcc.schemaStore('TeamStore', 424).then((r) => {
+      if (r.ok) setRankFields(r.members.filter((m) => /Rank$/.test(m.n) && /Poll/.test(m.n)).map((m) => m.n))
+    })
+  }, [])
 
   const look = async () => {
     if (!path || !me || !rank.trim()) return
@@ -1035,10 +1085,19 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
       <Kicker>Point at a rank you know</Kicker>
       <p className="body-serif" style={{ marginTop: 7 }}>
         Open the game and read where it ranks you. Put that number in and DCC finds the fields
-        holding it. Your save keeps three polls that disagree with each other — CFP, media and
-        coaches — so the answer is several orderings, not one. Compare each against the game's own
-        screen and say which is which; all three are kept.
+        holding it. Compare each against the game's own screen and say which is which; all three
+        are kept, and League switches between them the way the game does.
       </p>
+      {/* The schema settles what to expect. Nine rank fields on a team, so a
+          search turning up nine orderings is the right answer rather than
+          noise — and three of them are the ones the game's screen shows. */}
+      {rankFields.length ? (
+        <div style={{ marginTop: 8 }}>
+          <Meta size={9} color="var(--ink4)">
+            THE SCHEMA SAYS A TEAM CARRIES {rankFields.length}: {rankFields.join(' · ')}
+          </Meta>
+        </div>
+      ) : null}
       <div className="row" style={{ gap: 8, marginTop: 9, alignItems: 'center', flexWrap: 'wrap' }}>
         <Meta size={9}>{me.toUpperCase()} IS NO.</Meta>
         <span style={{ width: 70 }}>

@@ -13,6 +13,10 @@ files:
 extraResources:
   - from: ../../shared/data/dcc-data.json
     to: dcc-data.json
+  # The game's own type schema, boiled down. It names what every store holds,
+  # which is what makes a dump of one readable.
+  - from: ../../shared/data/schema-index.json.gz
+    to: schema-index.json.gz
 
 # Published so electron-updater knows where to look for latest.yml.
 publish:

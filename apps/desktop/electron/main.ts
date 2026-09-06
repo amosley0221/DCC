@@ -36,6 +36,7 @@ import type { TamperCoach, TamperTarget } from './tamper'
 import { sendText } from './tamperTalk'
 import { buildSnapshot } from './snapshot'
 import { publishArt, publishSnapshot } from './publish'
+import { loadSchema, typeForStore } from './schema'
 import { packManifest, zipChunk, zipDirectory } from './artPack'
 import type { ZipRecord } from './artPack'
 import { rememberHeisman, rememberPack, rememberRanks } from './sidecar'
@@ -80,6 +81,13 @@ function loadDynasty(): unknown {
   }
   throw new Error(`dcc-data.json not found. Looked in:\n${candidates.join('\n')}`)
 }
+
+/** Where the slim schema index lives, packaged or in the repo. */
+const schemaPaths = () => [
+  join(process.resourcesPath ?? '', 'schema-index.json.gz'),
+  join(app.getAppPath(), '../../../shared/data/schema-index.json.gz'),
+  join(app.getAppPath(), '../../shared/data/schema-index.json.gz'),
+]
 
 function createWindow() {
   win = new BrowserWindow({
@@ -234,6 +242,22 @@ ipcMain.handle('save:analyze', (_e, path: string) => {
  * beside a value already known, and this is what makes that possible without
  * a hex editor: pick a store by name, get its rows.
  */
+/**
+ * What the game's own schema says a store holds.
+ *
+ * Names, not offsets: the schema gives no bit positions and the layout rule
+ * that would derive them is not cracked. But a store reporting four members
+ * stops being four anonymous columns the moment they are called `CurrentRank`,
+ * `LastWeekRank`, `Player` and `Team`.
+ */
+ipcMain.handle('schema:store', (_e, { name, members }: { name: string; members: number }) => {
+  const schema = loadSchema(schemaPaths())
+  if (!schema) return { ok: false as const, message: 'no schema index — run scripts/schema-index.mjs' }
+  const hit = typeForStore(schema, name, members)
+  if (!hit) return { ok: false as const, message: `nothing in the schema holds ${members} members under that name` }
+  return { ok: true as const, type: hit.type, members: hit.members }
+})
+
 ipcMain.handle('save:dumpStore', async (_e, { path, name, rows }: {
   path: string; name: string; rows?: number
 }) => {

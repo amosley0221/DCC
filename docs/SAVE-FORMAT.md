@@ -1034,17 +1034,48 @@ at a narrower one whenever its own top bit is spare, so which offset is the
 field's own is not decidable from the data — and does not matter, since only
 values landing between one and the number of teams are ever used.
 
-### What is not here: the schema
+### The schema is in the repository now
 
-An earlier session read the game's type schema — 3,526 types with member names,
-widths and enum tables — but **it was never committed to this repository**, so
-none of the work above could use it. The schema would not have given offsets
-(see *The layout rule is not cracked*), but it would have named the fields:
-knowing that `Team` carries `CoachesPollRank`, `MediaPollRank` and a CFP rank of
-a stated width turns "here are five orderings, tell me which is which" into
-"here are the three the schema names".
+`shared/schema/C27_486_1.gz` — 3,526 types with member names, declared ranges
+and full enum tables, matching the `major 486` the saves themselves declare.
+`scripts/schema-index.mjs` boils it down to the part the app reads (names,
+widths, ranges, enum members) and `shared/data/schema-index.json.gz` is the
+result, 356 KB, shipped with the installer.
 
-If the dump is put in the repository, that labelling becomes mechanical.
+It settles the polls outright. `Team` carries nine rank fields:
+
+```
+ 21  CFPPoll_CurrentRank            0..255
+ 22  CFPPoll_LastWeeksRank          0..255
+ 26  CoachesPoll_CurrentRank        0..255
+ 28  CoachesPoll_HiddenCurrentRank  0..255
+ 29  CoachesPoll_LastWeeksRank      0..255
+161  MediaPoll_CurrentRank          0..255
+163  MediaPoll_HiddenCurrentRank    0..255
+164  MediaPoll_LastWeeksRank        0..255
+166  MediaPoll_StartOfSeasonRank    0..255
+```
+
+Which is exactly what the value search turns up: the three the game's screen
+shows, each with a last-week twin, a hidden copy, and a preseason poll. Nine
+orderings is the right answer rather than noise.
+
+It also names `HeismanAwardRanking` as `CurrentRank (0..5)`, `LastWeekRank
+(-1..5)`, `Player`, `Team` — four members, five rows, at most six names, which
+is why the fifth row is spare.
+
+**It still gives no offsets, and the layout rule is still not cracked.** Three
+orderings were tested against the 38 rating positions already known: the
+schema's own index order (which is alphabetical), its declaration order
+(`originalAttributesOrder`), and declaration order with byte alignment. None
+reproduces them — declaration order agrees on 6 of 37 gaps, which is chance.
+The ratings run in neither order: `AgilityRating`, `PlayActionRating`,
+`AccelerationRating` are consecutive in the record and nowhere near consecutive
+in either list.
+
+So the schema names fields; finding them is still a value search. What it
+changes is that a search now has an answer key to check against, and a store
+dump is read against a member list rather than guessed at.
 
 What is still not decoded is the *case* for each name — the season statistics
 behind them — and which of several ranking columns is the AP and which the

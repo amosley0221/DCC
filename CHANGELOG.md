@@ -10,6 +10,36 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.49.0] - 2026-09-06
+
+### Added
+
+- **The game's own type schema is in the repository.** 3,526 types with member
+  names, declared ranges and full enum tables, matching the version the saves
+  themselves announce. It should have been here all along; it was read once in
+  an earlier session and never committed, and everything since has been done
+  without it.
+
+  Click any table on the Save screen and it now says what the game calls the
+  thing it holds, member by member, with each one's range and enum values. A
+  store that reported "four members" is now `CurrentRank (0..5)`,
+  `LastWeekRank (-1..5)`, `Player`, `Team`.
+
+- **The poll finder knows what it is looking for.** The schema says a team
+  carries nine rank fields — a CFP, media and coaches rank, each with a
+  last-week twin, plus two hidden copies and a preseason poll — so a search
+  turning up nine orderings is the right answer rather than noise. The screen
+  lists them.
+
+### Changed
+
+- **The docs say plainly what the schema does not settle.** It gives no offsets,
+  and three orderings were tested against the 38 rating positions already known
+  — index order, declaration order, and declaration order with byte alignment.
+  None reproduces them; declaration order agrees on 6 of 37 gaps, which is
+  chance. Fields are still found by their values. What the schema changes is
+  that the search now has an answer key.
+
 ## [0.48.1] - 2026-09-06
 
 ### Added

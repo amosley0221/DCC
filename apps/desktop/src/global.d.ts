@@ -4,6 +4,7 @@ import type {
   RankColumnView, HeismanView, PollCandidate, SavedPollView,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
+import type { SchemaMember } from '../electron/schema'
 import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
 import type { RelayState } from '../electron/relay'
@@ -96,6 +97,11 @@ declare global {
       usePoll(poll: SavedPollView | null): Promise<{ ok: true; polls: SavedPollView[] }>
       forgetPoll(name: string): Promise<{ ok: true; polls: SavedPollView[] }>
       savedPolls(): Promise<{ ok: true; polls: SavedPollView[] }>
+      /** What the game's own schema says a store holds: names, ranges, enums. */
+      schemaStore(name: string, members: number): Promise<
+        | { ok: true; type: string; members: SchemaMember[] }
+        | { ok: false; message: string }
+      >
       /** One store's rows, written to a file — the instrument the remaining decodes need. */
       dumpStore(path: string, name: string, rows?: number): Promise<
         { ok: true; file: string; rows: number; rowBytes: number } | { ok: false; message: string }

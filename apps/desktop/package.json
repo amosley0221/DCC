@@ -1,7 +1,7 @@
 {
   "name": "@dcc/desktop",
   "productName": "Dynasty Command Center",
-  "version": "0.48.1",
+  "version": "0.49.0",
   "private": true,
   "description": "Dynasty Command Center — Windows workspace and save agent.",
   "author": {
@@ -22,6 +22,7 @@
     "check:depth": "esbuild electron/saveAnalysis.ts --bundle --platform=node --format=cjs --outfile=.tmp-depth.cjs --log-level=error && esbuild electron/saveWrite.ts --bundle --platform=node --format=cjs --outfile=.tmp-depthw.cjs --log-level=error && node check-depth.cjs ./.tmp-depth.cjs ./.tmp-depthw.cjs",
     "check:transfers": "esbuild electron/transfers.ts --bundle --platform=node --format=cjs --outfile=.tmp-transfers.cjs --log-level=error && node check-transfers.cjs ./.tmp-transfers.cjs",
     "check:tamper": "esbuild electron/tamper.ts --bundle --platform=node --format=cjs --outfile=.tmp-tamper.cjs --external:electron --log-level=error && node check-tamper.cjs ./.tmp-tamper.cjs",
+    "check:schema": "esbuild electron/schema.ts --bundle --platform=node --format=cjs --outfile=.tmp-schema.cjs --log-level=error && node check-schema.cjs ./.tmp-schema.cjs ../../shared/data/schema-index.json.gz",
     "check:league": "esbuild electron/league.ts --bundle --platform=node --format=cjs --outfile=.tmp-league.cjs --log-level=error && node check-league.cjs ./.tmp-league.cjs",
     "check:pack": "esbuild electron/artPack.ts --bundle --platform=node --format=cjs --outfile=.tmp-pack.cjs --log-level=error && node check-pack.cjs ./.tmp-pack.cjs"
   },
