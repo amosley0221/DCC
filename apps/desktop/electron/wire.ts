@@ -22,19 +22,23 @@
  *    decoded — the record-book stores hold all-time marks, not this season's
  *    per-player totals. Until they are, any leaderboard would be ratings
  *    wearing a stat line's clothes.
- *  - "Recent" commits and decommits. A commitment becomes news by *changing*,
- *    and one save is one moment: there is no previous state in the file to
- *    compare against. What is here is where the class stands right now, which
- *    is true. Remembering the last read is the way to make it recent.
+ * "Recent" commitments used to be on that list. They are not any more: DCC now
+ * remembers what the board looked like the last time it read a save, so a
+ * prospect who has picked somebody since, or left, or gone somewhere else, is
+ * reported as the thing that changed and dated to the week it changed in. See
+ * recruitLedger.ts. Where nothing has moved yet — a first read, or a week with
+ * no news — the wire falls back to where the class stands, which is still true.
  */
 
 import type { LeagueGame, LeagueRow } from './league'
+import type { RecruitEvent } from './recruitLedger'
 
 /** One item on the wire. */
 export interface WireItem {
   /** Stable across re-reads of the same save, so a list can key on it. */
   key: string
   kind: 'upset' | 'thriller' | 'statement' | 'unbeaten' | 'commit' | 'battle' | 'poll'
+    | 'decommit' | 'flip'
   /** "UPSET · WEEK 11" — small caps above the line. */
   kicker: string
   headline: string
@@ -97,11 +101,17 @@ export function buildWire(opts: {
   table: Map<string, LeagueRow>
   ranks: Map<string, number>
   recruits: WireRecruit[]
+  /**
+   * What has actually changed on the board since the last read, newest first.
+   * These are the real recruiting news; `recruits` is the standing of the class
+   * behind them, for the weeks when nothing has moved.
+   */
+  events?: RecruitEvent[]
   /** Your own program, which never leads the wire — the wire is the country. */
   me?: string | null
   limit?: number
 }): WireItem[] {
-  const { games, week, table, ranks, recruits, me = null } = opts
+  const { games, week, table, ranks, recruits, events = [], me = null } = opts
   const rank = (n: string | null) => (n ? ranks.get(n) : undefined)
   const out: WireItem[] = []
 
@@ -205,10 +215,51 @@ export function buildWire(opts: {
     })
   }
 
-  // The class. Where the best prospects in the country have landed, and which
-  // of them are still a fight. `topSchools` is ordered by interest, so the
-  // leader is the school at the front of their list.
-  const ranked = recruits
+  // The board, as news: who picked somebody since the last read, who left, who
+  // went somewhere else. Dated to the week it happened in rather than to the
+  // week you are reading it.
+  let moved = 0
+  for (const e of events) {
+    if (moved >= 4) break
+    const who = `${e.first} ${e.last}`
+    const rank = e.nationalRank && e.nationalRank > 0
+      ? `the ${ordinal(e.nationalRank)} prospect in the country`
+      : `a ${'★'.repeat(e.stars)} ${e.position}`
+    const when = week !== null && e.week < week ? ` · week ${e.week}` : ''
+    if (e.kind === 'decommit') {
+      out.push({
+        key: e.key, kind: 'decommit', playerIndex: e.playerIndex,
+        kicker: `Decommitted${when}`,
+        headline: `${who} reopens his recruitment`,
+        line: `${'★'.repeat(e.stars)} ${e.position}, ${rank}. He is off ${e.from ?? 'his school'}'s board` +
+          `${e.from === me ? ' — yours' : ''} and taking calls again.`,
+        team: e.from, other: null,
+      })
+    } else if (e.kind === 'flip') {
+      out.push({
+        key: e.key, kind: 'flip', playerIndex: e.playerIndex,
+        kicker: `Flipped${when}`,
+        headline: `${who} flips from ${e.from} to ${e.to}`,
+        line: `${'★'.repeat(e.stars)} ${e.position}, ${rank}.` +
+          (e.to === me ? ' Yours now.' : e.from === me ? ' He was yours.' : ''),
+        team: e.to, other: e.from,
+      })
+    } else {
+      out.push({
+        key: e.key, kind: 'commit', playerIndex: e.playerIndex,
+        kicker: `${e.kind === 'signed' ? 'Signed' : 'Committed'}${when}`,
+        headline: `${e.to} land ${who}`,
+        line: `${'★'.repeat(e.stars)} ${e.position}, ${rank}.` + (e.to === me ? ' Yours.' : ''),
+        team: e.to, other: null,
+      })
+    }
+    moved++
+  }
+
+  // Where the class stands, for the weeks nothing has moved in. Never alongside
+  // the news above: a standing dressed as a headline beside a real commitment
+  // is the thing that makes both of them untrustworthy.
+  const ranked = moved > 0 ? [] : recruits
     .filter((r) => r.nationalRank && r.nationalRank > 0)
     .sort((a, b) => (a.nationalRank ?? 9999) - (b.nationalRank ?? 9999))
   for (const r of ranked.slice(0, 60)) {
@@ -247,7 +298,8 @@ export function buildWire(opts: {
   // the wire. Anything of yours drops below the country's.
   const mine = (i: WireItem) => (i.team === me || i.other === me ? 1 : 0)
   const weight: Record<WireItem['kind'], number> = {
-    upset: 0, thriller: 1, commit: 2, statement: 3, battle: 4, unbeaten: 5, poll: 6,
+    upset: 0, flip: 1, decommit: 2, thriller: 3, commit: 4,
+    statement: 5, battle: 6, unbeaten: 7, poll: 8,
   }
   out.sort((x, y) => mine(x) - mine(y) || weight[x.kind] - weight[y.kind])
   return out.slice(0, opts.limit ?? 12)

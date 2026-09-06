@@ -215,6 +215,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
   const wire = useMemo(() => buildWire({
     games: visibleGames(games, me, holdFrom).filter((g) => g.played || !g.postseason),
     week, table, ranks: rankOf, me,
+    events: roster?.recruitEvents ?? [],
     recruits: (roster?.recruitBoard ?? []).map((r) => {
       const p = (roster?.players ?? []).find((x) => x.index === r.playerIndex)
       return {
@@ -631,7 +632,11 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
  * at, so this is the honest version of a photograph — the right colour and the
  * right shape, with nothing invented in it.
  */
-function FeatureGround({ bg, tint }: { bg?: string; tint?: string | null }) {
+function FeatureGround({ bg, tint, field }: {
+  bg?: string; tint?: string | null
+  /** Draw the ground as a field rather than as a plain colour. */
+  field?: boolean
+}) {
   return (
     <>
       {bg ? (
@@ -645,6 +650,7 @@ function FeatureGround({ bg, tint }: { bg?: string; tint?: string | null }) {
           : 'linear-gradient(160deg, var(--surfaceStrong), var(--surface))',
         opacity: bg ? 0.82 : 1,
       }} />
+      {field ? <div className="gs-figure-field" aria-hidden /> : null}
     </>
   )
 }
@@ -719,21 +725,16 @@ function MatchupSide({ name, art, rank, record, score, won }: {
   won: boolean
 }) {
   return (
-    <div className="col" style={{ alignItems: 'center', minWidth: 0, flex: 1 }}>
-      <SchoolArt size={168} file={art} />
-      <div className="row" style={{ gap: 5, alignItems: 'baseline', marginTop: 8 }}>
-        {rank && rank <= 25 ? <Meta size={11} color="var(--ink4)">#{rank}</Meta> : null}
-        <span style={{
-          fontSize: 15, letterSpacing: '0.04em', fontWeight: 700,
-          color: won ? 'var(--ink)' : 'var(--ink3)', whiteSpace: 'nowrap',
-        }}>
+    <div className="col gs-matchup-side">
+      <SchoolArt className="gs-matchup-helmet" file={art} />
+      <div className="row gs-matchup-name">
+        {rank && rank <= 25 ? <span className="gs-matchup-rank">#{rank}</span> : null}
+        <span className={`gs-matchup-team${won ? '' : ' is-lost'}`}>
           {(name ?? 'TBD').toUpperCase()}
         </span>
       </div>
-      {record ? <Meta size={10} color="var(--ink4)">{record.wins}-{record.losses}</Meta> : null}
-      <span className="gs-figure-score" style={{ marginTop: 2 }}>
-        <span className={won ? '' : 'is-lost'}>{score}</span>
-      </span>
+      {record ? <span className="gs-matchup-rec">{record.wins}-{record.losses}</span> : null}
+      <span className={`gs-matchup-score${won ? '' : ' is-lost'}`}>{score}</span>
     </div>
   )
 }
@@ -799,7 +800,7 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
         onClick={openGame}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGame() } }}
       >
-        <FeatureGround bg={bg} tint={tint} />
+        <FeatureGround bg={bg} tint={tint} field />
         <div className="gs-figure-kicker" style={{ zIndex: 1 }}><Kicker>{won ? 'Won' : 'Lost'} · week {g.week}</Kicker></div>
         {/*
           A matchup, not a bare scoreline. Each side stands under its own
@@ -810,22 +811,15 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
           it looks: the game's lt art belongs on the left and so faces right.
           Reading them as directions is what pointed them outward, twice.
         */}
-        <div
-          className="row"
-          style={{
-            position: 'relative', zIndex: 1, alignItems: 'center',
-            justifyContent: 'center', gap: 4, width: '100%',
-          }}
-        >
+        <div className="row gs-matchup">
           <MatchupSide
             name={g.away} art={artOf(g.away, 'helmet')}
             rank={rankOf(g.away)} record={recordOf(g.away)}
             score={g.awayScore} won={g.awayScore >= g.homeScore}
           />
-          <div className="col" style={{ alignItems: 'center', padding: '0 10px' }}>
-            <Meta size={10} color="var(--ink4)">AT</Meta>
-            <div style={{ height: 46 }} />
-            <Meta size={9} color="var(--accent-ui)">{g.played ? 'FINAL' : 'UPCOMING'}</Meta>
+          <div className="col gs-matchup-mid">
+            <span className="gs-matchup-at">AT</span>
+            <span className="gs-matchup-state">{g.played ? 'FINAL' : 'UPCOMING'}</span>
           </div>
           <MatchupSide
             name={g.home} art={artOf(g.home, 'helmetRight') ?? artOf(g.home, 'helmet')}

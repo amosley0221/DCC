@@ -126,4 +126,40 @@ const by = (kind) => wire.filter((i) => i.kind === kind)
   assert.ok(!noRanks.some((i) => i.kind === 'thriller'), 'and no ranked thriller either')
 }
 
-console.log('check-wire: upsets, one-possession games, statements, the unbeaten, commitments, battles and the order')
+/* ------------------------------------- the board's news beats the board's state */
+{
+  const events = [
+    {
+      key: 'k1', season: 2027, week: 2, playerIndex: 11,
+      first: 'Grant', last: 'Lawless', position: 'QB', stars: 5, nationalRank: 2,
+      kind: 'decommit', from: 'Iowa', to: null,
+    },
+    {
+      key: 'k2', season: 2027, week: 2, playerIndex: 10,
+      first: 'Cooper', last: 'Barkate', position: 'WR', stars: 5, nationalRank: 1,
+      kind: 'flip', from: 'Penn State', to: 'Alabama',
+    },
+  ]
+  const w = W.buildWire({ games, week: 2, table, ranks, recruits, events, me: 'Penn State' })
+  const decommit = w.find((i) => i.kind === 'decommit')
+  assert.ok(decommit, 'a decommitment is on the wire')
+  assert.equal(decommit.team, 'Iowa', 'headed by the school that lost him')
+  assert.ok(/reopens his recruitment/.test(decommit.headline), decommit.headline)
+
+  const flip = w.find((i) => i.kind === 'flip')
+  assert.ok(flip)
+  assert.ok(/flips from Penn State to Alabama/.test(flip.headline), flip.headline)
+  assert.equal(flip.other, 'Penn State', 'both schools, so both helmets')
+  assert.ok(/He was yours/.test(flip.line), flip.line)
+
+  // What the class *stands* at is not printed beside what actually moved: a
+  // standing dressed as a headline next to a real commitment devalues both.
+  assert.ok(!w.some((i) => i.key.startsWith('commit:')), 'no standing-of-the-class items')
+  assert.ok(!w.some((i) => i.kind === 'battle'), 'and no battles either')
+
+  // With nothing moved, the standing comes back — an empty board is worse.
+  const quiet = W.buildWire({ games, week: 2, table, ranks, recruits, events: [], me: 'Penn State' })
+  assert.ok(quiet.some((i) => i.kind === 'commit'), 'a quiet week still says where the class stands')
+}
+
+console.log('check-wire: upsets, one-possession games, statements, the unbeaten, commitments, decommitments, flips, battles and the order')

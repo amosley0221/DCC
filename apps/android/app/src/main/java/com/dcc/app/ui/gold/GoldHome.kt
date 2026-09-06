@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +39,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dcc.app.data.ArtPack
@@ -394,16 +396,34 @@ private fun FeatureWell(
                 },
             ),
     ) {
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .height(if (slideGame != null) 236.dp else 128.dp)
                 .background(Brush.linearGradient(listOf(c.surfaceStrong, c.surface))),
             contentAlignment = Alignment.Center,
         ) {
+            // Everything in the well is a proportion of the well, not a number
+            // written here: a fixed helmet is right in one window and lost in
+            // another. The clamps are the honest limits — under the floor the
+            // type stops being readable, over the ceiling a helmet crowds the
+            // footer. This is the Compose spelling of the desktop's container
+            // queries, and the two are kept to the same fractions.
+            val w = maxWidth
+            val scale = { frac: Float, lo: Float, hi: Float ->
+                (w.value * frac).coerceIn(lo, hi)
+            }
+            val helmet = scale(0.21f, 64f, 200f).dp
+            val teamSize = scale(0.020f, 12f, 26f).toDouble()
+            val scoreSize = scale(0.090f, 34f, 108f).toInt()
+            val gap = scale(0.070f, 26f, 96f).dp
             // The background is the schools' own marks, dimmed almost out.
             // The save carries no photographs, and inventing one would be
             // the only made-up thing on the screen.
+            Spacer(
+                Modifier.fillMaxWidth().height(
+                    if (slideGame != null) scale(0.62f, 190f, 460f).dp else 128.dp,
+                ),
+            )
             val wash = when (slide) {
                 FEATURE_HEISMAN -> listOfNotNull(heisman?.team)
                 FEATURE_CLASS -> listOfNotNull(topCommit?.topSchools?.maxByOrNull { it.interest }?.school)
@@ -434,6 +454,7 @@ private fun FeatureWell(
                             away, mono(away), rankOf[slideGame.awayIndex],
                             recordOf[slideGame.awayIndex], a, won = a >= h,
                             isUser = away == meName, helmet = "helmet",
+                            helmetSize = helmet, teamSize = teamSize, scoreSize = scoreSize,
                             modifier = Modifier.weight(1f),
                         )
                         Column(
@@ -441,7 +462,7 @@ private fun FeatureWell(
                             modifier = Modifier.padding(horizontal = 6.dp),
                         ) {
                             Label("AT", 10.0, c.ink4, 3.0)
-                            Spacer(Modifier.height(38.dp))
+                            Spacer(Modifier.height(gap))
                             Label(
                                 if (slideGame.played) "FINAL" else "UPCOMING",
                                 9.0, c.accent, 2.5,
@@ -451,6 +472,7 @@ private fun FeatureWell(
                             home, mono(home), rankOf[slideGame.homeIndex],
                             recordOf[slideGame.homeIndex], h, won = h > a,
                             isUser = home == meName, helmet = "helmetRight",
+                            helmetSize = helmet, teamSize = teamSize, scoreSize = scoreSize,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -575,11 +597,15 @@ private fun MatchupSide(
     won: Boolean,
     isUser: Boolean,
     helmet: String,
+    /** All three come from the well's own width — see FeatureWell. */
+    helmetSize: Dp = 104.dp,
+    teamSize: Double = 14.0,
+    scoreSize: Int = 44,
     modifier: Modifier = Modifier,
 ) {
     val c = Dcc.colors
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        SchoolBadge(monogram, team ?: "", isUser, 104.dp, helmet)
+        SchoolBadge(monogram, team ?: "", isUser, helmetSize, helmet)
         Spacer(Modifier.height(7.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             if (rank != null && rank <= 25) {
@@ -588,7 +614,7 @@ private fun MatchupSide(
             }
             Ui(
                 (team ?: "TBD").uppercase(),
-                14.0, if (won) c.ink else c.ink3, FontWeight.Bold, maxLines = 1,
+                teamSize, if (won) c.ink else c.ink3, FontWeight.Bold, maxLines = 1,
             )
         }
         if (record != null) {
@@ -596,7 +622,7 @@ private fun MatchupSide(
             MetaText("${record.first}-${record.second}", c.ink4, 10)
         }
         Spacer(Modifier.height(3.dp))
-        GoldNum("$score", 44, if (won) c.ink else c.ink3)
+        GoldNum("$score", scoreSize, if (won) c.ink else c.ink3)
     }
 }
 

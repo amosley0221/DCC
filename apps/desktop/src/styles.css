@@ -776,6 +776,12 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
   position: relative; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 10px;
   overflow: hidden; background: linear-gradient(160deg, var(--surfaceStrong), var(--surface));
   display: grid; place-items: center;
+  /* Everything inside is measured against this box rather than against the
+     window or a number in a component. Full screen the well is nearly twice as
+     wide as it is in a small window, and at a fixed 168px the helmets were
+     correct in one of those and lost in the other. */
+  container-type: inline-size;
+  container-name: figure;
 }
 .gs-figure-kicker { position: absolute; left: 22px; top: 20px; }
 .gs-figure-score {
@@ -1145,4 +1151,91 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
 .gs-poll-rec {
   font-family: var(--serif); font-weight: 600; font-size: 14px; color: var(--ink3);
   font-variant-numeric: tabular-nums; display: inline-flex; align-items: center;
+}
+
+/* ── the matchup, sized by its own box ───────────────────────────────────────
+   `cqi` is one per cent of the container's inline size, so every part of the
+   headline — helmet, name, record, score, the AT down the middle — grows and
+   shrinks together with the well. The clamps are the honest limits: below the
+   floor the type stops being readable, above the ceiling a helmet starts
+   crowding the caption. Between them it is pure proportion, which is why it
+   holds at any window size and on an unfolded panel. */
+.gs-matchup {
+  position: relative; z-index: 1; width: 100%;
+  align-items: center; justify-content: center; gap: 1cqi;
+}
+.gs-matchup-side {
+  align-items: center; min-width: 0; flex: 1;
+}
+.gs-matchup-helmet {
+  width: clamp(84px, 21cqi, 340px); height: auto;
+}
+.gs-matchup-name {
+  gap: 0.5cqi; align-items: baseline; margin-top: clamp(6px, 1.4cqi, 20px);
+  min-width: 0;
+}
+.gs-matchup-rank {
+  font-family: var(--sans); font-weight: 500;
+  font-size: clamp(10px, 1.5cqi, 20px); letter-spacing: 0.08em; color: var(--ink4);
+}
+.gs-matchup-team {
+  font-family: var(--sans); font-weight: 700;
+  font-size: clamp(13px, 2cqi, 30px); letter-spacing: 0.04em;
+  color: var(--ink); white-space: nowrap;
+}
+.gs-matchup-team.is-lost { color: var(--ink3); }
+.gs-matchup-rec {
+  margin-top: clamp(2px, 0.5cqi, 8px);
+  font-family: var(--sans); font-weight: 500;
+  font-size: clamp(9px, 1.3cqi, 17px); letter-spacing: 0.08em; color: var(--ink4);
+}
+.gs-matchup-score {
+  margin-top: clamp(2px, 0.6cqi, 12px);
+  font-family: var(--serif); font-weight: 600; line-height: 1;
+  font-size: clamp(40px, 9cqi, 150px); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.gs-matchup-score.is-lost { color: var(--ink3); }
+.gs-matchup-mid {
+  align-items: center; padding: 0 1.5cqi; gap: clamp(30px, 7cqi, 110px);
+}
+.gs-matchup-at {
+  font-family: var(--sans); font-weight: 500;
+  font-size: clamp(10px, 1.4cqi, 19px); letter-spacing: 0.16em; color: var(--ink4);
+}
+.gs-matchup-state {
+  font-family: var(--sans); font-weight: 600;
+  font-size: clamp(9px, 1.2cqi, 16px); letter-spacing: 0.18em; color: var(--accent-ui);
+}
+
+/* The kicker and the caption belong to the same picture and scale with it. */
+@container figure (min-width: 700px) {
+  .gs-figure-kicker { left: 3cqi; top: 2.6cqi; }
+  .gs-figure-caption {
+    left: 3cqi; right: 3cqi; bottom: 2.4cqi;
+    font-size: clamp(11px, 1.3cqi, 17px);
+  }
+}
+
+/* ── the ground under a matchup ──────────────────────────────────────────────
+   Not a photograph. The save has none, the art dump has none, and a stock
+   picture of somebody else's stadium would be the only untrue thing on the
+   page. This is a drawn field: the yard lines across the lower two thirds, a
+   sideline, and a vignette to sit the helmets on something. It is deliberately
+   faint — it should read as a surface, not as a graphic — and it costs nothing
+   to draw at any size, which a bitmap would not. */
+.gs-figure-field {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    /* the vignette, so the middle of the picture is where the eye goes */
+    radial-gradient(120% 90% at 50% 40%, transparent 36%, rgb(0 0 0 / 0.18) 100%),
+    /* the sideline, which is what lets the yard lines stop where they do */
+    linear-gradient(to bottom, rgb(255 255 255 / 0.10), rgb(255 255 255 / 0.10)),
+    /* the yard lines, across the near half of the field only */
+    repeating-linear-gradient(to right, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 8.3333%),
+    /* the turf, darker at the foot */
+    linear-gradient(to bottom, transparent, rgb(0 0 0 / 0.12));
+  background-size: 100% 100%, 100% 1px, 100% 42%, 100% 46%;
+  background-position: 0 0, 0 58%, 0 100%, 0 100%;
+  background-repeat: no-repeat, no-repeat, repeat-x, no-repeat;
 }

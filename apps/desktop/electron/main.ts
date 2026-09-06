@@ -23,6 +23,9 @@ import {
   writeSettings, writeThreads,
 } from './sidecar'
 import type { TamperThread } from './sidecar'
+import { readRecruitLedger, writeRecruitLedger } from './sidecar'
+import { fileRecruiting, recruitingNews } from './recruitLedger'
+import type { RecruitEvent } from './recruitLedger'
 import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
 import type { WeekGame } from './season'
@@ -399,6 +402,36 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
         team: h.team === null ? null : TEAM_ID_NAMES[h.team] ?? null,
       })))
 
+    // File the board while the save is open, so what changes between reads can
+    // be reported as what changed. A commitment is news by changing, and one
+    // save is one moment — see electron/recruitLedger.ts.
+    const board = readRecruitBoard(payload, players)
+    let recruitEvents: RecruitEvent[] = []
+    // No season or no week means the change cannot be dated, and an undated
+    // commitment is the thing this whole ledger exists to avoid printing.
+    const boardWeek = weekOf(games, teamId ?? null)
+    if (season && boardWeek !== null) {
+      try {
+        const week = boardWeek
+        const byIndex = new Map(players.map((p) => [p.index, p]))
+        const filed = fileRecruiting(readRecruitLedger(), board.map((b) => {
+          const p = byIndex.get(b.playerIndex)
+          return {
+            playerIndex: b.playerIndex,
+            first: p?.first ?? '', last: p?.last ?? '',
+            position: p?.position ?? '', stars: p?.stars ?? 0,
+            nationalRank: b.nationalRank,
+            stage: b.stage,
+            school: b.topSchools[0]?.school ?? null,
+          }
+        }), season, week)
+        writeRecruitLedger(filed.ledger)
+        recruitEvents = recruitingNews(filed.ledger, season, week)
+      } catch {
+        // A ledger that cannot be written must not cost the user their roster.
+      }
+    }
+
     // File the roster in the transfer ledger while the save is already open.
     // Doing it here rather than on demand is the whole point: a season the user
     // never opened DCC in is a season that can never be diffed, and the moment
@@ -433,7 +466,11 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       // The game's own board — national, position and state rank, commit score,
       // offers and stage. Read out of the save's own recruit records, so the
       // pool can be ordered the way the game orders it rather than by overall.
-      recruitBoard: readRecruitBoard(payload, players),
+      recruitBoard: board,
+      // What has moved on the board since the last read, newest first. Empty on
+      // a first read: DCC did not watch anybody commit, it arrived to find them
+      // committed, and dating that to this week would be a guess.
+      recruitEvents,
       // The game's own recruiting class ranking, school name to place.
       classRanks: readClassRankByName(payload),
     }

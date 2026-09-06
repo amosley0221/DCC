@@ -249,6 +249,22 @@ fun SettingsSection(
                 )
                 Spacer(Modifier.height(7.dp))
                 MetaText("BUILT ${SaveLabels.generated(m.built)}", c.ink3, 10, maxLines = 2)
+                // A pack from before the helmets were split holds one helmet per
+                // school and no record of which way it faces, so a matchup here
+                // cannot turn the two to face each other. This is the one thing
+                // the phone cannot fix on its own, so it says so plainly rather
+                // than guessing and getting it wrong half the time.
+                if (m.version < 2) {
+                    Spacer(Modifier.height(9.dp))
+                    MonoLabel("ONE HELMET PER SCHOOL — BUILD THE PACK AGAIN ON THE PC", c.warn, 10)
+                    Spacer(Modifier.height(5.dp))
+                    BodySerif(
+                        "This pack was built before DCC took both helmets, so it holds one per " +
+                            "school and nothing here can tell which way it looks. Rebuild it on " +
+                            "Windows — Devices, then Build the art pack — and the two sides of a " +
+                            "matchup will face each other.",
+                    )
+                }
             } else {
                 MetaText("NO PICTURES YET", c.ink3, 10)
                 Spacer(Modifier.height(7.dp))

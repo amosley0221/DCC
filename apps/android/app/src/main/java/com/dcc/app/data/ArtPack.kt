@@ -139,6 +139,25 @@ object ArtPack {
         school(context, name, "helmetRight") != null
 
     /**
+     * Whether a lone `helmet` in this pack can be trusted to face right.
+     *
+     * From pack version 2 on, `helmet` is always the game's `lt` art — the left
+     * helmet of the pair, which faces right. Version 1 packs were built when one
+     * pattern matched both `lthelmets` and `rthelmets` and whichever the scan
+     * reached last won, so a version 1 pack's single helmet may face either way
+     * and nothing here can tell which.
+     *
+     * That matters because the alternative to knowing is guessing, and a guess
+     * is what put both sides of a matchup facing outward: the phone mirrored a
+     * helmet it could not identify. When the answer is unknown the caller draws
+     * the same art on both sides instead — a pair facing the same way reads as
+     * a choice, a pair facing apart reads as a bug — and rebuilding the pack on
+     * the PC replaces it with the real thing.
+     */
+    fun helmetFacesRight(context: Context): Boolean =
+        (manifest(context)?.version ?: 0) >= 2
+
+    /**
      * A trophy, bowl crest, playoff mark or conference championship.
      *
      * Keyed "kind:name" the way the PC keys it — the colon becomes a double

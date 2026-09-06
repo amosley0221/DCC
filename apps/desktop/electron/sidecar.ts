@@ -16,6 +16,8 @@ import { join } from 'node:path'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { emptyLedger, moves, LEDGER_VERSION } from './transfers'
 import type { Ledger } from './transfers'
+import { emptyRecruitLedger, RECRUIT_LEDGER_VERSION } from './recruitLedger'
+import type { RecruitEvent, RecruitLedger } from './recruitLedger'
 import { standing } from './tamper'
 import type { TamperTurn } from './tamper'
 import { TEAM_ID_NAMES } from './teamIds'
@@ -139,6 +141,7 @@ export const rememberHeisman = (h: SnapshotHeisman[]) => { heismanCache = h }
 const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
 const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
 const pressFile = () => join(app.getPath('userData'), 'press.json')
+const recruitFile = () => join(app.getPath('userData'), 'recruiting.json')
 
 export function readLedger(): Ledger {
   try {
@@ -193,6 +196,27 @@ export function forgetStory(key: string): PressFile {
   return f
 }
 
+/**
+ * What the board looked like the last time DCC read a save.
+ *
+ * Kept for the same reason the transfer ledger is: a commitment is news by
+ * changing, and one save cannot tell you what changed. See recruitLedger.ts.
+ */
+export function readRecruitLedger(): RecruitLedger {
+  try {
+    const f = JSON.parse(readFileSync(recruitFile(), 'utf8')) as RecruitLedger
+    if (!f || typeof f !== 'object' || !f.seen || !Array.isArray(f.events)) return emptyRecruitLedger()
+    return { version: RECRUIT_LEDGER_VERSION, seen: f.seen, events: f.events }
+  } catch {
+    return emptyRecruitLedger()
+  }
+}
+
+export function writeRecruitLedger(next: RecruitLedger) {
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  writeFileSync(recruitFile(), JSON.stringify(next, null, 2))
+}
+
 export function readThreads(): TamperFile {
   try {
     const f = JSON.parse(readFileSync(tamperFile(), 'utf8')) as TamperFile
@@ -222,6 +246,7 @@ export function snapshotExtras(): {
   champions: string[]
   ranks: Record<string, number>
   heisman: SnapshotHeisman[]
+  recruitEvents: RecruitEvent[]
 } {
   const nameOf = (id: number) => TEAM_ID_NAMES[id] ?? `Team ${id}`
   const transfers: SnapshotMove[] = moves(readLedger()).map((m) => ({
@@ -247,6 +272,10 @@ export function snapshotExtras(): {
   return {
     transfers,
     threads,
+    // The board's own news, so the phone reports what changed rather than what
+    // stands. It cannot work this out itself: only the PC reads saves, so only
+    // the PC has a previous read to compare against.
+    recruitEvents: readRecruitLedger().events,
     schoolColors: schoolColorCache,
     champions: [...champions],
     ranks: rankCache,

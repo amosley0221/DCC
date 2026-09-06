@@ -8,6 +8,7 @@ import type { SchemaMember } from '../electron/schema'
 import type { GameEdit, PlayerEdit, PlayerWriteResult, RecruitEdit, RecruitWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
 import type { StoredStory } from '../electron/sidecar'
+import type { RecruitEvent } from '../electron/recruitLedger'
 import type { RelayState } from '../electron/relay'
 import type { TamperThreadView, TransferView } from '../electron/preload'
 import type { TamperCoach, TamperTarget } from '../electron/tamper'
@@ -34,6 +35,8 @@ declare global {
             heisman: HeismanView[]
             /** The game's own recruiting board, one record per prospect. */
             recruitBoard: RecruitBoard[]
+            /** What has changed on that board since the last read, newest first. */
+            recruitEvents: RecruitEvent[]
             /** The game's own recruiting class ranking, school name to place. */
             classRanks: Record<string, number> | null }
         | { ok: false; message: string }

@@ -34,7 +34,7 @@ __export(artPack_exports, {
   zipDirectory: () => zipDirectory
 });
 module.exports = __toCommonJS(artPack_exports);
-var PACK_VERSION = 1;
+var PACK_VERSION = 2;
 var PACK_CATEGORIES = {
   icon: "logo",
   logoLight: "logo",

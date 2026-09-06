@@ -22,6 +22,8 @@ import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
 import { buildLeague, orderByRanks, rankings, visibleGames } from './league'
 import { buildWire, type WireItem } from './wire'
+import { recruitingNews } from './recruitLedger'
+import type { RecruitEvent } from './recruitLedger'
 
 export const SNAPSHOT_VERSION = 4
 
@@ -229,6 +231,8 @@ export function buildSnapshot(
     transfers?: SnapshotMove[]; threads?: SnapshotThread[]
     schoolColors?: Record<string, string>; champions?: string[]
     ranks?: Record<string, number>; heisman?: SnapshotHeisman[]
+    /** What has changed on the recruiting board across every read so far. */
+    recruitEvents?: RecruitEvent[]
   },
 ): DynastySnapshot {
   const schools = readTeamNames(payload)
@@ -319,6 +323,14 @@ export function buildSnapshot(
   })()
   const wire = buildWire({
     games: seen, week: wireWeek, table, ranks: rankOf, me: userTeamName,
+    // The snapshot has no season field of its own, and the events carry theirs,
+    // so the newest season recorded is the one this save belongs to.
+    events: (() => {
+      const all = extra?.recruitEvents ?? []
+      if (!all.length || wireWeek === null) return []
+      const latest = Math.max(...all.map((e) => e.season))
+      return recruitingNews({ version: 1, seen: {}, events: all }, latest, wireWeek)
+    })(),
     recruits: recruits.map((r) => ({
       index: r.index, first: r.first, last: r.last, position: r.position,
       stars: r.stars ?? 0, nationalRank: r.nationalRank, stage: r.stage,

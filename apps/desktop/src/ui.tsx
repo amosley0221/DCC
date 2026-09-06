@@ -261,16 +261,21 @@ export function Empty({ children }: { children: React.ReactNode }) {
  * than to another school's logo. Sized by the caller.
  */
 export function SchoolArt(
-  { file, size = 20 }: { file?: string; size?: number },
+  { file, size = 20, className }: { file?: string; size?: number; className?: string },
 ) {
   if (!file) return null
+  // A class wins over the inline size, which is what lets a mark scale with the
+  // box it is in rather than with the number written here. `size` stays the
+  // fallback so the hundred places that ask for a fixed one are unchanged.
   return (
     <img
       alt=""
       loading="lazy"
+      className={className}
       width={size}
       height={size}
-      style={{ width: size, height: size, objectFit: 'contain', flex: '0 0 auto' }}
+      style={className ? { objectFit: 'contain', flex: '0 0 auto' }
+        : { width: size, height: size, objectFit: 'contain', flex: '0 0 auto' }}
       src={'dccart://art/' + file.split(/[\\/]/).map(encodeURIComponent).join('/')}
     />
   )

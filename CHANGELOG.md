@@ -10,6 +10,50 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.65.0] - 2026-09-06
+
+### Added
+
+- **Commitments, decommitments and flips, by the week.** DCC now remembers what
+  the recruiting board looked like the last time it read a save, so a prospect
+  who has picked somebody since, or left, or gone somewhere else, is reported as
+  the thing that changed and dated to the week it changed in — "Alabama land
+  Cooper Barkate", "Grant Lawless reopens his recruitment", "flips from Penn
+  State to Alabama". Two rules keep it honest: a prospect's first sighting is
+  never news, because DCC arrived to find them committed rather than watching
+  them commit; and a save from earlier than what is already recorded is ignored
+  outright, so opening last month's file cannot manufacture a week of
+  decommitments. In a week where nothing has moved the wire falls back to where
+  the class stands, which is still true.
+
+### Changed
+
+- **The headline scales with its box.** Helmets, names, records, the score, the
+  AT down the middle, the kicker and the footer are now proportions of the well
+  rather than fixed numbers, so full screen they fill the space and in a small
+  window they still fit. Container queries on Windows and the same fractions
+  measured off the well's own width on Android, with floors and ceilings so type
+  never drops below readable or grows past the frame.
+- **The ground under a matchup is a field.** A drawn one — yard lines across the
+  near half, a sideline, a vignette — under the colour DCC reads out of the
+  school's mark. Not a photograph: the save has none, the game's art dump has
+  none, and a stock picture of somebody else's stadium would be the only untrue
+  thing on the page.
+
+### Fixed
+
+- **Android helmets, properly this time.** The phone was mirroring a helmet it
+  could not identify. Packs built before 0.59.0 hold one helmet per school,
+  because the builder matched the game's left and right helmet art with a single
+  pattern and kept whichever it reached last — so which one a pack holds was
+  never recorded and cannot be worked out later. Mirroring it was a coin flip,
+  and that is what put both sides of a matchup facing outward. Pack version 2
+  means the lone helmet is the left one, which faces right; on an older pack the
+  phone now draws the same art on both sides rather than guessing, and Settings
+  says so and tells you to rebuild the pack on the PC. **Rebuild the art pack on
+  Windows and send it across** — that is what makes the helmets on the phone
+  face each other.
+
 ## [0.64.0] - 2026-09-06
 
 ### Added

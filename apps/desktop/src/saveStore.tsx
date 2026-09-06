@@ -3,6 +3,7 @@ import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
   RankColumnView, HeismanView, RecruitBoard,
 } from '../electron/saveAnalysis'
+import type { RecruitEvent } from '../electron/recruitLedger'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
 
@@ -54,6 +55,12 @@ export interface SaveState {
      * save's own recruit records rather than inferred from ratings.
      */
     recruitBoard: RecruitBoard[]
+    /**
+     * What has changed on the board since the last read — commitments,
+     * decommitments and flips, each dated to the week it happened in. Built by
+     * the main process, which is where the memory of the last read lives.
+     */
+    recruitEvents: RecruitEvent[]
     /**
      * The game's own recruiting class ranking, school name to place, or null
      * when the save did not hold it in the shape the reader insists on.
@@ -241,6 +248,7 @@ export function rosterPatch(
     players: res.players, season: res.season, titles: res.titles,
     rankColumns: res.rankColumns ?? [], heisman: res.heisman ?? [],
     recruitBoard: res.recruitBoard ?? [],
+    recruitEvents: res.recruitEvents ?? [],
     classRanks: res.classRanks ?? null,
   }
 }

@@ -508,16 +508,23 @@ fun SchoolBadge(
 ) {
     val c = Dcc.colors
     val context = LocalContext.current
-    // A pack built before the helmets were split holds only the left one. Asking
-    // for the right one then used to hand back the left, so both sides of a
-    // matchup faced the same way and picking between them changed nothing.
-    // Mirroring the left one makes the pair meet on any pack; rebuilding on the
-    // PC replaces it with art whose logo reads the right way round.
-    val mirror = remember(name, kind) {
+    // A pack built before the helmets were split holds only one of them, and
+    // which one is not recorded anywhere: the old builder matched both
+    // `lthelmets` and `rthelmets` with a single pattern and kept whichever it
+    // reached last. So the right-facing art is drawn by mirroring the left one
+    // ONLY when the pack is new enough to say the lone helmet is the left one
+    // (version 2 and up). On an older pack nothing here knows which way that
+    // image looks, and mirroring it is a coin flip — which is exactly how both
+    // sides of a matchup ended up facing outward. Unknown means draw the same
+    // art on both sides: a pair facing the same way reads as a choice, a pair
+    // facing apart reads as a bug. Rebuilding the pack on the PC and sending it
+    // across replaces it with the real right-facing helmets.
+    val lone = remember(name, kind) {
         kind == "helmetRight" && !ArtPack.hasSplitHelmets(context, name)
     }
-    val file = remember(name, kind, mirror) {
-        ArtPack.school(context, name, if (mirror) "helmet" else kind)
+    val mirror = remember(lone) { lone && ArtPack.helmetFacesRight(context) }
+    val file = remember(name, kind, lone) {
+        ArtPack.school(context, name, if (lone) "helmet" else kind)
     }
 
     // A logo is drawn as itself, on nothing: these marks carry their own shape,

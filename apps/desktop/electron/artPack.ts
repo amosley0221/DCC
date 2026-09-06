@@ -43,7 +43,22 @@ export interface PackManifest {
   bytes: number
 }
 
-export const PACK_VERSION = 1
+/**
+ * 2 means the helmets are split.
+ *
+ * Version 1 packs were built when one pattern matched both `lthelmets` and
+ * `rthelmets`, so whichever the scan reached last won and a pack's single
+ * `helmet` could be either one — there is no way, later, to tell which. From 2
+ * on, `helmet` is always the left helmet of the pair (the game's `lt` art,
+ * which faces right) and `helmetRight` is the other, so a phone holding a
+ * version 2 pack knows which way a lone helmet looks and one holding a version
+ * 1 pack knows that it does not.
+ *
+ * That distinction is the whole reason the number moved: a phone carrying an
+ * old pack was mirroring a helmet it could not identify, and a coin flip is
+ * what put both sides of a matchup facing outward.
+ */
+export const PACK_VERSION = 2
 
 /**
  * The art categories the phone draws, and what each is called in the pack.
