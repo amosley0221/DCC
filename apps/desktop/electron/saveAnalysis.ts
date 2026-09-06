@@ -2363,3 +2363,127 @@ export interface SavedPollView {
   width: number
   base: 0 | 1
 }
+
+/* ------------------------------------------------------- the recruiting board */
+
+/**
+ * A recruit's own record: the ranks and the state of their recruitment.
+ *
+ * None of this is in the player record — that was searched exhaustively and is
+ * written up in docs/SAVE-FORMAT.md. It lives in a separate array of 24-byte
+ * records, one per prospect, outside the store directory the way player records
+ * are.
+ */
+export interface RecruitBoard {
+  /** The player this record belongs to, as a row in `readRoster`. */
+  playerIndex: number
+  nationalRank: number
+  positionRank: number
+  stateRank: number
+  /** 0..1023. How close they are to committing. */
+  commitScore: number
+  totalOffers: number
+  /** Top10 Top5 Top3 Battle SoftCommitted HardCommitted Signed */
+  stage: string
+}
+
+export const RECRUIT_STAGES = [
+  'Top10', 'Top5', 'Top3', 'Battle', 'SoftCommitted', 'HardCommitted', 'Signed',
+] as const
+
+/** A player, where one record points at another. Read off the Heisman table. */
+const PLAYER_TAG = 0x213e
+
+const RECRUIT_STRIDE = 24
+/** Byte offset of the player reference inside the record. */
+const RECRUIT_PLAYER_AT = 8
+/** Bit positions inside the 24-byte record, first bit of each field. */
+const RECRUIT_FIELDS = {
+  stage: [96, 4], nationalRank: [100, 13], positionRank: [136, 12],
+  stateRank: [148, 12], totalOffers: [176, 6], commitScore: [182, 10],
+} as const
+
+/** Reads `w` bits starting at `start`, most-significant first. */
+function bitsFrom(payload: Buffer, base: number, start: number, w: number): number {
+  const b = base + (start >> 3)
+  if (b + 4 > payload.length) return 0
+  const v = ((payload[b] << 24) | (payload[b + 1] << 16) | (payload[b + 2] << 8) | payload[b + 3]) >>> 0
+  return (v >>> (32 - (start & 7) - w)) & ((1 << w) - 1)
+}
+
+/**
+ * Every prospect's rank and recruiting state, read out of the save.
+ *
+ * How it was found, since the method is the reusable part. The records are not
+ * in the store directory — all 88 were checked and none is sized like a class —
+ * and they are not ordered by rank: a sweep for a rank-ordered array holding the
+ * commit score found nothing, and a second sweep, keyed on which of 4,100
+ * recruits changed between two saves a week apart, found nothing either. What
+ * did work was to stop looking for the fields and look for the link. The
+ * Heisman table shows the game writing a player as a two-byte tag `0x213e` and
+ * a two-byte row, so every player reference in the save can be listed; exactly
+ * 4,100 of them point at prospects, they sit together, and they are 24 bytes
+ * apart. The fields then fell out against the game's own class export.
+ *
+ * Verified on three saves — two of them a week apart, one from a different
+ * session — at the same bit positions every time: all 4,100 recruits agree on
+ * national, position and state rank, commit score, offers and stage.
+ *
+ * Located by its contents rather than by an address, so it survives the array
+ * moving: the anchor is a run of records whose player reference resolves to a
+ * prospect, which is a thing no other table in the save looks like.
+ */
+export function readRecruitBoard(
+  payload: Buffer,
+  players: { index: number; team: number; recruitFlag: boolean }[],
+): RecruitBoard[] {
+  const prospects = new Set<number>()
+  for (const p of players) if (p.recruitFlag && p.team === TEAM_UNASSIGNED) prospects.add(p.index)
+  if (prospects.size < 100) return []
+
+  const points = (at: number) =>
+    at + 4 <= payload.length &&
+    payload.readUInt16BE(at) === PLAYER_TAG &&
+    prospects.has(payload.readUInt16BE(at + 2))
+
+  // Eight in a row on one stride is the anchor: a coincidence would have to
+  // land eight prospect references 24 bytes apart.
+  let anchor = -1
+  for (let i = 0; i + RECRUIT_STRIDE * 8 <= payload.length; i += 4) {
+    if (!points(i)) continue
+    let n = 1
+    while (n < 8 && points(i + n * RECRUIT_STRIDE)) n++
+    if (n === 8) { anchor = i; break }
+  }
+  if (anchor < 0) return []
+
+  // Slots can be empty, so a gap is not the end of the array. Walk back until
+  // the run of empties is long enough to be past the start, then forward again
+  // to the first record — starting on the empties would spend the same budget
+  // before reaching anything.
+  const GAP = 400
+  let base = anchor - RECRUIT_PLAYER_AT
+  for (let miss = 0; base - RECRUIT_STRIDE >= 0 && miss < GAP;) {
+    base -= RECRUIT_STRIDE
+    miss = points(base + RECRUIT_PLAYER_AT) ? 0 : miss + 1
+  }
+  while (base < anchor && !points(base + RECRUIT_PLAYER_AT)) base += RECRUIT_STRIDE
+
+  const out: RecruitBoard[] = []
+  for (let o = base, miss = 0; o + RECRUIT_STRIDE <= payload.length && miss < GAP; o += RECRUIT_STRIDE) {
+    if (!points(o + RECRUIT_PLAYER_AT)) { miss++; continue }
+    miss = 0
+    const f = (k: keyof typeof RECRUIT_FIELDS) =>
+      bitsFrom(payload, o, RECRUIT_FIELDS[k][0], RECRUIT_FIELDS[k][1])
+    out.push({
+      playerIndex: payload.readUInt16BE(o + RECRUIT_PLAYER_AT + 2),
+      nationalRank: f('nationalRank'),
+      positionRank: f('positionRank'),
+      stateRank: f('stateRank'),
+      commitScore: f('commitScore'),
+      totalOffers: f('totalOffers'),
+      stage: RECRUIT_STAGES[f('stage')] ?? 'Top10',
+    })
+  }
+  return out
+}

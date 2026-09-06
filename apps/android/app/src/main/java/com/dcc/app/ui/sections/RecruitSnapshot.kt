@@ -20,6 +20,12 @@ import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.*
 import com.dcc.app.ui.theme.Dcc
 
+/** The game's own words for how far along a recruitment is. */
+private val STAGE_LABEL = mapOf(
+    "Top10" to "TOP 10", "Top5" to "TOP 5", "Top3" to "TOP 3", "Battle" to "BATTLE",
+    "SoftCommitted" to "SOFT COMMIT", "HardCommitted" to "COMMITTED", "Signed" to "SIGNED",
+)
+
 /**
  * The recruiting pool as the save has it — ten thousand names, so the filters
  * are the screen.
@@ -134,7 +140,9 @@ private fun RecruitRow(
                 Spacer(Modifier.height(2.dp))
                 MetaText(
                     listOfNotNull(
+                        r.nationalRank?.let { "NO. $it" },
                         r.position,
+                        r.stage?.let { STAGE_LABEL[it] ?: it },
                         listOfNotNull(r.hometown.ifEmpty { null }, r.state).joinToString(", ").ifEmpty { null },
                         r.pipeline?.let { "$it PIPELINE" },
                     ).joinToString(" · "),

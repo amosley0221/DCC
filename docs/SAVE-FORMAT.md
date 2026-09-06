@@ -1413,13 +1413,54 @@ them, all ten team-and-influence pairs match in order, and the fourteen that do
 not are recruits whose data moved between the export and the save. The team ids
 are the same ones players carry, not the team-table rows the schedule uses.
 
+### The board, solved
+
+Ranks, commit score, stage and offers are read out of the save. The records are
+a flat array of 24 bytes each, one per prospect, outside the store directory the
+way player records are:
+
+```
++8   a player, as a reference: tag 0x213e, then the row in the player pool
+bit  96   4   RecruitStage   Top10 Top5 Top3 Battle SoftCommitted HardCommitted Signed
+bit 100  13   NationalRank
+bit 136  12   PositionRank
+bit 148  12   StateRank
+bit 176   6   TotalScholarshipOffers
+bit 182  10   CommitScore
+```
+
+Verified against the game's own class export on three saves — two of them a week
+apart, one from a different session — at the same bit positions every time. All
+4,100 recruits agree on every field, on every save. One save disagrees on the
+offer count for two recruits, and that save and its export were not taken at the
+same moment.
+
+The method is the part worth keeping, because three searches failed first and
+they failed for the same reason. Sweeping for a rank-ordered array holding the
+commit score found nothing. Sweeping for one keyed on which recruits changed
+between two saves a week apart found nothing either — and that one is
+conclusive, because the two exports show 688 stage changes and 787 offer
+changes, so the signal was there to find. The records are simply **not in rank
+order**, which also disposes of the guess that the ten-schools blocks being in
+rank order implied it. What worked was to stop hunting the fields and hunt the
+link instead: the Heisman table writes a player as a two-byte tag `0x213e` and a
+two-byte row, so every player reference in the save can be listed. There are
+25,266 of them; exactly 4,100 point at prospects, they sit together, and they
+are 24 bytes apart. The fields fell out of the export in one pass after that.
+
+Two consequences worth stating. `HighSchoolProspectTopSchoolsStore` can now be
+joined to a name — a recruit's ten schools are at row `(nationalRank - 1) * 10 + 1`
+and the rank comes from their own record — which is school interest, solved end
+to end. And the array is located by its contents rather than by an address, so
+it survives the array moving between saves.
+
 ### What is not solved, and what was ruled out
 
-The schema's `Recruit` type carries exactly the fields still missing —
-`CommitScore` (0–1023), `RecruitStage` (4 bits), `NationalRank`, `PositionRank`,
-`StateRank`, `TotalScholarshipOffers`, `QualityModifier` (gem and bust) — but
-its records have not been located. What was tried, so it need not be tried
-again:
+Of the schema's `Recruit` type, `QualityModifier` (gem and bust),
+`ProductionGrade`, `RecruitStageAdvance` and the two alternate positions are
+still unread — they sit in the same 24-byte record, so they are a matter of
+naming the remaining bits rather than of finding anything. What was tried
+before the record was located, so it need not be tried again:
 
 - **Not in the player record.** All 4,100 recruits were tested against every bit
   position and plausible width in the 192-byte player record, scoring by

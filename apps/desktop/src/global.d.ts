@@ -1,7 +1,7 @@
 import type { UpdateStatus } from './updates'
 import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
-  RankColumnView, HeismanView, PollCandidate, SavedPollView,
+  RankColumnView, HeismanView, PollCandidate, SavedPollView, RecruitBoard,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { SchemaMember } from '../electron/schema'
@@ -30,7 +30,9 @@ declare global {
             /** Columns of TeamStore that hold a ranking, found by their own shape. */
             rankColumns: RankColumnView[]
             /** The save's own five-name Heisman shortlist. */
-            heisman: HeismanView[] }
+            heisman: HeismanView[]
+            /** The game's own recruiting board, one record per prospect. */
+            recruitBoard: RecruitBoard[] }
         | { ok: false; message: string }
       >
       transfers(): Promise<TransferView>

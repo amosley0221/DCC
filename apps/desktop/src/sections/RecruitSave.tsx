@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react'
 import { indexArt, rosterPatch, useSave } from '../saveStore'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SectionHeader, Tab } from '../ui'
 import { useOps, useStore } from '../store'
-import type { RosterPlayer } from '../../electron/saveAnalysis'
+import type { RecruitBoard, RosterPlayer } from '../../electron/saveAnalysis'
+
+/** The game's own words for how far along a recruitment is. */
+const STAGE_LABEL: Record<string, string> = {
+  Top10: 'Top 10', Top5: 'Top 5', Top3: 'Top 3', Battle: 'Battle',
+  SoftCommitted: 'Soft commit', HardCommitted: 'Committed', Signed: 'Signed',
+}
 
 /**
  * The recruiting pool, read from the save.
@@ -83,6 +89,13 @@ export default function RecruitSave() {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<number | null>(null)
 
+  // The board the game itself shows: rank, stage and how close they are to
+  // committing. Keyed by the player's row, which is how the record names them.
+  const board = useMemo(
+    () => new Map((save.roster?.recruitBoard ?? []).map((b) => [b.playerIndex, b])),
+    [save.roster],
+  )
+
   const unrostered = useMemo(
     () => (save.roster?.players ?? []).filter((p) => p.team === UNASSIGNED),
     [save.roster],
@@ -109,13 +122,20 @@ export default function RecruitSave() {
         (stars === null || p.stars === stars) &&
         (!q || `${p.first} ${p.last} ${p.hometown} ${p.homeState ?? ''} ${p.pipeline ?? ''} ` +
           `${p.archetype ?? ''} ${p.position}`.toLowerCase().includes(q)))
-      // Ordering by a hidden overall would give it away — the top of the list
-      // would be the best players whether or not their number is on screen. With
-      // overalls hidden the order is stars then name, which is public knowledge.
-      .sort((a, b) => (state.revealAllRecruits
-        ? b.stars - a.stars || b.overall - a.overall
-        : b.stars - a.stars || (a.last + a.first).localeCompare(b.last + b.first)))
-  }, [pool, group, query, stars, state.revealAllRecruits])
+      // National rank first, because the game puts it on its own board — it
+      // gives nothing away that the game keeps back. Where the save has no
+      // record for a prospect the old order stands: ordering by a hidden
+      // overall would give it away, so it is stars then name, which is public.
+      .sort((a, b) => {
+        const ra = board.get(a.index)?.nationalRank, rb = board.get(b.index)?.nationalRank
+        if (ra && rb) return ra - rb
+        if (ra) return -1
+        if (rb) return 1
+        return state.revealAllRecruits
+          ? b.stars - a.stars || b.overall - a.overall
+          : b.stars - a.stars || (a.last + a.first).localeCompare(b.last + b.first)
+      })
+  }, [pool, group, query, stars, state.revealAllRecruits, board])
 
   const load = async () => {
     if (!save.path) return
@@ -200,6 +220,7 @@ export default function RecruitSave() {
       <div className="col" style={{ gap: 2, marginTop: 8 }}>
         {shown.slice(0, 300).map((p) => (
           <RecruitRow key={p.index} p={p} open={open === p.index}
+            board={board.get(p.index) ?? null}
             ratingNames={save.roster!.ratingNames}
             face={save.facePaths[p.assetId]}
             shown={isShown(p)}
@@ -268,9 +289,10 @@ export default function RecruitSave() {
 }
 
 function RecruitRow(
-  { p, open, onClick, ratingNames, face, shown, onReveal }:
+  { p, board, open, onClick, ratingNames, face, shown, onReveal }:
   {
-    p: RosterPlayer; open: boolean; onClick: () => void; ratingNames: string[]; face?: string
+    p: RosterPlayer; board: RecruitBoard | null
+    open: boolean; onClick: () => void; ratingNames: string[]; face?: string
     shown: boolean; onReveal: () => void
   },
 ) {
@@ -282,6 +304,9 @@ function RecruitRow(
           background: open ? 'var(--rule)' : 'transparent',
           border: 0, borderRadius: 4, cursor: 'pointer', alignItems: 'center',
         }}>
+        <span style={{ width: 38, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
+          {board ? `#${board.nationalRank}` : ''}
+        </span>
         <PlayerFace file={face} first={p.first} last={p.last} />
         <span style={{ width: 34, color: 'var(--ink3)', fontSize: 12 }}>{p.position}</span>
         <span style={{ width: 46, color: 'var(--accent)', fontSize: 11, letterSpacing: -1 }}>
@@ -289,6 +314,11 @@ function RecruitRow(
         </span>
         <span style={{ flex: 1 }}>{p.first} {p.last}</span>
         <span style={{ color: 'var(--ink3)', fontSize: 12 }}>{p.archetype ?? ''}</span>
+        {board ? (
+          <span style={{ width: 104, textAlign: 'right', fontSize: 11, color: 'var(--ink3)' }}>
+            {STAGE_LABEL[board.stage] ?? board.stage}
+          </span>
+        ) : null}
         <span style={{ width: 150, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
           {p.hometown}{p.homeState ? `, ${p.homeState}` : ''}
         </span>
@@ -307,6 +337,13 @@ function RecruitRow(
               ['DEV', p.devTrait],
               ['HEIGHT', `${Math.floor(p.heightIn / 12)}'${p.heightIn % 12}"`],
               ['WEIGHT', `${p.weightLb} lb`],
+              ...(board ? [
+                ['NATIONAL', `#${board.nationalRank}`],
+                ['POSITION', `#${board.positionRank}`],
+                ['STATE', `#${board.stateRank}`],
+                ['COMMITMENT', `${Math.round(board.commitScore / 10.23)}%`],
+                ['OFFERS', String(board.totalOffers)],
+              ] as [string, string][] : []),
               ['PIPELINE', p.pipeline],
               ['NIL', `$${p.nilK}K`],
               ['DEALBREAKER', p.dealbreaker],

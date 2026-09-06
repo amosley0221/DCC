@@ -65,6 +65,7 @@ __export(saveAnalysis_exports, {
   RECORD_BASE: () => RECORD_BASE,
   RECORD_STRIDE: () => RECORD_STRIDE,
   RECRUIT_BIT: () => RECRUIT_BIT,
+  RECRUIT_STAGES: () => RECRUIT_STAGES,
   REDSHIRT_BIT: () => REDSHIRT_BIT,
   SEASON_GAME_ROW: () => SEASON_GAME_ROW,
   STARS_BIT: () => STARS_BIT,
@@ -87,6 +88,7 @@ __export(saveAnalysis_exports, {
   readDepthCharts: () => readDepthCharts,
   readHeisman: () => readHeisman,
   readRankField: () => readRankField,
+  readRecruitBoard: () => readRecruitBoard,
   readRoster: () => readRoster,
   readSavePayload: () => readSavePayload,
   readSeasonGames: () => readSeasonGames,
@@ -1542,6 +1544,75 @@ function findRankColumns(payload, known, limit = 12) {
   }
   return out;
 }
+var RECRUIT_STAGES = [
+  "Top10",
+  "Top5",
+  "Top3",
+  "Battle",
+  "SoftCommitted",
+  "HardCommitted",
+  "Signed"
+];
+var PLAYER_TAG = 8510;
+var RECRUIT_STRIDE = 24;
+var RECRUIT_PLAYER_AT = 8;
+var RECRUIT_FIELDS = {
+  stage: [96, 4],
+  nationalRank: [100, 13],
+  positionRank: [136, 12],
+  stateRank: [148, 12],
+  totalOffers: [176, 6],
+  commitScore: [182, 10]
+};
+function bitsFrom(payload, base, start, w) {
+  const b = base + (start >> 3);
+  if (b + 4 > payload.length) return 0;
+  const v = (payload[b] << 24 | payload[b + 1] << 16 | payload[b + 2] << 8 | payload[b + 3]) >>> 0;
+  return v >>> 32 - (start & 7) - w & (1 << w) - 1;
+}
+function readRecruitBoard(payload, players) {
+  const prospects = /* @__PURE__ */ new Set();
+  for (const p of players) if (p.recruitFlag && p.team === TEAM_UNASSIGNED) prospects.add(p.index);
+  if (prospects.size < 100) return [];
+  const points = (at) => at + 4 <= payload.length && payload.readUInt16BE(at) === PLAYER_TAG && prospects.has(payload.readUInt16BE(at + 2));
+  let anchor = -1;
+  for (let i = 0; i + RECRUIT_STRIDE * 8 <= payload.length; i += 4) {
+    if (!points(i)) continue;
+    let n = 1;
+    while (n < 8 && points(i + n * RECRUIT_STRIDE)) n++;
+    if (n === 8) {
+      anchor = i;
+      break;
+    }
+  }
+  if (anchor < 0) return [];
+  const GAP = 400;
+  let base = anchor - RECRUIT_PLAYER_AT;
+  for (let miss = 0; base - RECRUIT_STRIDE >= 0 && miss < GAP; ) {
+    base -= RECRUIT_STRIDE;
+    miss = points(base + RECRUIT_PLAYER_AT) ? 0 : miss + 1;
+  }
+  while (base < anchor && !points(base + RECRUIT_PLAYER_AT)) base += RECRUIT_STRIDE;
+  const out = [];
+  for (let o = base, miss = 0; o + RECRUIT_STRIDE <= payload.length && miss < GAP; o += RECRUIT_STRIDE) {
+    if (!points(o + RECRUIT_PLAYER_AT)) {
+      miss++;
+      continue;
+    }
+    miss = 0;
+    const f = (k) => bitsFrom(payload, o, RECRUIT_FIELDS[k][0], RECRUIT_FIELDS[k][1]);
+    out.push({
+      playerIndex: payload.readUInt16BE(o + RECRUIT_PLAYER_AT + 2),
+      nationalRank: f("nationalRank"),
+      positionRank: f("positionRank"),
+      stateRank: f("stateRank"),
+      commitScore: f("commitScore"),
+      totalOffers: f("totalOffers"),
+      stage: RECRUIT_STAGES[f("stage")] ?? "Top10"
+    });
+  }
+  return out;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ARCHETYPES,
@@ -1579,6 +1650,7 @@ function findRankColumns(payload, known, limit = 12) {
   RECORD_BASE,
   RECORD_STRIDE,
   RECRUIT_BIT,
+  RECRUIT_STAGES,
   REDSHIRT_BIT,
   SEASON_GAME_ROW,
   STARS_BIT,
@@ -1601,6 +1673,7 @@ function findRankColumns(payload, known, limit = 12) {
   readDepthCharts,
   readHeisman,
   readRankField,
+  readRecruitBoard,
   readRoster,
   readSavePayload,
   readSeasonGames,

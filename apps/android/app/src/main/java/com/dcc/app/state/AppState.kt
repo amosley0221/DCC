@@ -122,9 +122,17 @@ class SnapshotView(val snapshot: DynastySnapshot) {
      */
     val holdFrom: Int = meta.currentWeek ?: Int.MAX_VALUE
 
-    /** Strongest first, so filtering never has to re-sort while the user types. */
+    /**
+     * The game's own order where the save gives it: national rank, which the
+     * game puts on its own board. Prospects with no record fall in behind by
+     * stars, which is what this list was before the board could be read.
+     */
     val recruits: List<SnapshotRecruit> = snapshot.recruits
-        .sortedWith(compareByDescending<SnapshotRecruit> { it.stars ?: 0 }.thenByDescending { it.overall })
+        .sortedWith(
+            compareBy<SnapshotRecruit> { it.nationalRank ?: Int.MAX_VALUE }
+                .thenByDescending { it.stars ?: 0 }
+                .thenByDescending { it.overall },
+        )
 
     /**
      * The same pool by stars and then name, for while the overalls are hidden.
@@ -136,7 +144,8 @@ class SnapshotView(val snapshot: DynastySnapshot) {
      */
     val recruitsByName: List<SnapshotRecruit> = snapshot.recruits
         .sortedWith(
-            compareByDescending<SnapshotRecruit> { it.stars ?: 0 }
+            compareBy<SnapshotRecruit> { it.nationalRank ?: Int.MAX_VALUE }
+                .thenByDescending { it.stars ?: 0 }
                 .thenBy { it.last }
                 .thenBy { it.first },
         )

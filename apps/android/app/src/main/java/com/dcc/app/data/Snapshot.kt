@@ -227,6 +227,16 @@ data class SnapshotRecruit(
     val dealbreaker: String? = null,
     val idealPitch: String? = null,
     /**
+     * The game's own board. Null on a snapshot written before the desktop could
+     * read it, and on the handful of prospects the pool holds beyond the class.
+     */
+    val nationalRank: Int? = null,
+    val positionRank: Int? = null,
+    val stateRank: Int? = null,
+    val commitScore: Int? = null,
+    val totalOffers: Int? = null,
+    val stage: String? = null,
+    /**
      * The same fifty-two ratings a roster row carries, so scouting a recruit has
      * something to give up beyond the overall. Snapshots written before the
      * desktop started sending them simply have no key here, and an empty map

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
-  RankColumnView, HeismanView,
+  RankColumnView, HeismanView, RecruitBoard,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
@@ -48,6 +48,12 @@ export interface SaveState {
      */
     rankColumns: RankColumnView[]
     heisman: HeismanView[]
+    /**
+     * The game's own recruiting board: national, position and state rank,
+     * commit score, offers and stage, one record per prospect. Read out of the
+     * save's own recruit records rather than inferred from ratings.
+     */
+    recruitBoard: RecruitBoard[]
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -229,6 +235,7 @@ export function rosterPatch(
     schools: res.schools, coaches: res.coaches, stores: res.stores, games: res.games,
     players: res.players, season: res.season, titles: res.titles,
     rankColumns: res.rankColumns ?? [], heisman: res.heisman ?? [],
+    recruitBoard: res.recruitBoard ?? [],
   }
 }
 

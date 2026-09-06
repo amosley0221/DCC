@@ -10,6 +10,36 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.50.0] - 2026-09-06
+
+### Added
+
+- **The recruiting board, read out of the save.** National rank, position rank,
+  state rank, commit score, total offers and stage — the game's own numbers, for
+  all 4,100 prospects, on both apps. Recruiting now opens in the order the game
+  puts them in rather than by stars, each row shows its rank and how far along
+  the recruitment is, and opening one shows the rest.
+
+  Checked against the game's own class export on three saves — two a week apart,
+  one from a different session. Every field, every recruit, exact. (One save
+  disagrees on the offer count for two prospects; that save and its export were
+  not taken at the same moment.)
+
+  Worth saying how, because three searches failed first and failed the same way.
+  Sweeping for a rank-ordered array holding the commit score found nothing.
+  Sweeping for one keyed on which recruits changed between two saves a week
+  apart found nothing either — and that one settles it, because the exports show
+  688 stage changes to find. The records are not in rank order, which also
+  disposes of the assumption that the ten-schools blocks being in rank order
+  implied it. What worked was to stop hunting the fields and hunt the link: the
+  Heisman table writes a player as a tag and a row, so every player reference in
+  the save can be listed. There are 25,266; exactly 4,100 point at prospects,
+  they sit together, and they are 24 bytes apart.
+
+  This also finishes school interest. A recruit's ten schools were already known
+  to sit at row `(rank - 1) * 10 + 1`, but nothing said whose ten they were.
+  Their own record gives the rank, so the two join up.
+
 ## [0.49.2] - 2026-09-06
 
 ### Fixed

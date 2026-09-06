@@ -14,7 +14,7 @@
  * the fields a list view actually shows.
  */
 import {
-  RATING_BITS, readCoaches, readRoster, readSeasonGames, readTeamNames,
+  RATING_BITS, readCoaches, readRecruitBoard, readRoster, readSeasonGames, readTeamNames,
 } from './saveAnalysis'
 import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
 import { teamTableOrder } from './saveAnalysis'
@@ -66,6 +66,17 @@ export interface SnapshotRecruit extends SnapshotPlayer {
   pipeline: string | null
   dealbreaker: string | null
   idealPitch: string | null
+  /**
+   * The game's own board, read out of the save rather than guessed at from
+   * ratings. Null for a prospect with no record, which is how the eight the
+   * pool holds beyond the class of 4,100 read.
+   */
+  nationalRank: number | null
+  positionRank: number | null
+  stateRank: number | null
+  commitScore: number | null
+  totalOffers: number | null
+  stage: string | null
 }
 
 /** One transfer, as the phone reads it: names rather than team ids. */
@@ -239,6 +250,8 @@ export function buildSnapshot(
 
   const week = currentWeek(games, userTeamName)
 
+  const board = new Map(readRecruitBoard(payload, players).map((b) => [b.playerIndex, b]))
+
   const roster: SnapshotPlayer[] = []
   const recruits: SnapshotRecruit[] = []
   for (const p of players) {
@@ -251,6 +264,12 @@ export function buildSnapshot(
         ratings: p.ratings,
         pipeline: p.pipeline ?? null, dealbreaker: p.dealbreaker ?? null,
         idealPitch: p.idealPitch ?? null,
+        nationalRank: board.get(p.index)?.nationalRank ?? null,
+        positionRank: board.get(p.index)?.positionRank ?? null,
+        stateRank: board.get(p.index)?.stateRank ?? null,
+        commitScore: board.get(p.index)?.commitScore ?? null,
+        totalOffers: board.get(p.index)?.totalOffers ?? null,
+        stage: board.get(p.index)?.stage ?? null,
       })
       continue
     }

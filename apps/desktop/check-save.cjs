@@ -356,9 +356,85 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
   assert.ok(took < 5000, `the search rescanned the save: ${took}ms for one sweep`)
 }
 
+/* ------------------------------------------------- the recruiting board */
+// Ranks, commit score and stage are not in the player record — that was
+// searched exhaustively. They live in their own 24-byte records, found by the
+// one thing that marks them: a player reference, tag 0x213e, pointing at a
+// prospect. This builds an array shaped like the real one, with empty slots
+// either side, and reads it back.
+{
+  const STRIDE = 24
+  const PROSPECTS = 40
+  const LEAD = 12, TRAIL = 9        // empty slots around the class
+
+  // A pool where the prospects are unrostered and flagged, plus some rostered
+  // players whose indices must never be mistaken for the class.
+  const players = []
+  for (let i = 0; i < 500; i++) {
+    players.push({ index: i, team: i < 200 ? 12 : 255, recruitFlag: i >= 150 })
+  }
+  const pool = players.filter((p) => p.recruitFlag && p.team === 255).map((p) => p.index)
+  assert.ok(pool.length >= PROSPECTS, 'the fixture has prospects to place')
+
+  const want = []
+  const body = Buffer.alloc((LEAD + PROSPECTS + TRAIL) * STRIDE)
+  const put = (rec, start, w, v) => {
+    for (let b = 0; b < w; b++) {
+      const bit = start + b
+      const at = rec * STRIDE + (bit >> 3)
+      const mask = 1 << (7 - (bit & 7))
+      if ((v >> (w - 1 - b)) & 1) body[at] |= mask
+      else body[at] &= ~mask
+    }
+  }
+  for (let k = 0; k < PROSPECTS; k++) {
+    const rec = LEAD + k
+    const r = {
+      playerIndex: pool[k],
+      nationalRank: k + 1,
+      positionRank: 4000 - k * 7,
+      stateRank: 300 + k * 3,
+      commitScore: (k * 97) % 1024,
+      totalOffers: k % 64,
+      stage: ['Top10','Top5','Top3','Battle','SoftCommitted','HardCommitted','Signed'][k % 7],
+    }
+    want.push(r)
+    body.writeUInt16BE(0x213e, rec * STRIDE + 8)
+    body.writeUInt16BE(r.playerIndex, rec * STRIDE + 10)
+    put(rec, 96, 4, k % 7)
+    put(rec, 100, 13, r.nationalRank)
+    put(rec, 136, 12, r.positionRank)
+    put(rec, 148, 12, r.stateRank)
+    put(rec, 176, 6, r.totalOffers)
+    put(rec, 182, 10, r.commitScore)
+  }
+  const payload = Buffer.concat([Buffer.alloc(4096), body, Buffer.alloc(4096)])
+
+  const board = S.readRecruitBoard(payload, players)
+  assert.equal(board.length, PROSPECTS, `every prospect is read: got ${board.length}`)
+  const byIndex = new Map(board.map((b) => [b.playerIndex, b]))
+  for (const w of want) {
+    const got = byIndex.get(w.playerIndex)
+    assert.ok(got, `${w.playerIndex} is on the board`)
+    for (const k of Object.keys(w)) {
+      assert.equal(got[k], w[k], `${k} for prospect ${w.playerIndex}: ${got[k]} !== ${w[k]}`)
+    }
+  }
+
+  // The anchor is contents, not an address: the same array elsewhere still reads.
+  const moved = Buffer.concat([Buffer.alloc(9000), body, Buffer.alloc(64)])
+  assert.equal(S.readRecruitBoard(moved, players).length, PROSPECTS,
+    'the board is found by what it holds, not by where it sits')
+
+  // A save with no class at all must not invent one.
+  assert.deepEqual(S.readRecruitBoard(Buffer.alloc(200000), players), [],
+    'an empty save has no recruiting board')
+}
+
 console.log('check-save: game table decodes 2/2 synthetic rows, team order verified,')
 console.log('            champions read per season and unplayed seasons name nobody,')
 console.log('            rankings found in TeamStore without mistaking a counter for one,')
 console.log('            a poll is found by pointing at one rank you can read,')
 console.log('            the Heisman five resolve to real roster rows,')
-console.log('            and one poll sweep reads the store header once, not per bit')
+console.log('            one poll sweep reads the store header once, not per bit,')
+console.log('            and the recruiting board reads ranks, commit score and stage')
