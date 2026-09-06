@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { rosterPatch, useSave } from '../saveStore'
 import type { SaveState } from '../saveStore'
-import type { PollCandidate } from '../../electron/saveAnalysis'
+import type { PollCandidate, SavedPollView } from '../../electron/saveAnalysis'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { Btn, Card, Empty, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
 import ArtFolder from './ArtFolder'
@@ -999,6 +999,9 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
   const [found, setFound] = useState<PollCandidate[] | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState<SavedPollView[]>([])
+
+  useEffect(() => { void window.dcc.savedPolls().then((r) => setSaved(r.polls)) }, [])
 
   const look = async () => {
     if (!path || !me || !rank.trim()) return
@@ -1014,9 +1017,15 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
     }
   }
 
-  const use = async (c: PollCandidate) => {
-    await window.dcc.usePoll({ at: c.at, width: c.width, base: c.base })
-    setNote('remembered — read the roster again and it becomes the ranking everywhere')
+  const use = async (c: PollCandidate, name: string) => {
+    const res = await window.dcc.usePoll({ name, at: c.at, width: c.width, base: c.base })
+    setSaved(res.polls)
+    setNote(`${name} remembered — read the roster again and it appears in League`)
+  }
+
+  const forget = async (name: string) => {
+    const res = await window.dcc.forgetPoll(name)
+    setSaved(res.polls)
   }
 
   if (!me) return <Meta size={9} color="var(--ink4)">PICK YOUR TEAM FIRST</Meta>
@@ -1025,8 +1034,10 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
     <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
       <Kicker>Point at a rank you know</Kicker>
       <p className="body-serif" style={{ marginTop: 7 }}>
-        Open the game and read where it ranks you. Put that number in and DCC will find the field
-        holding it — one number is usually enough, and naming a second school makes it certain.
+        Open the game and read where it ranks you. Put that number in and DCC finds the fields
+        holding it. Your save keeps three polls that disagree with each other — CFP, media and
+        coaches — so the answer is several orderings, not one. Compare each against the game's own
+        screen and say which is which; all three are kept.
       </p>
       <div className="row" style={{ gap: 8, marginTop: 9, alignItems: 'center', flexWrap: 'wrap' }}>
         <Meta size={9}>{me.toUpperCase()} IS NO.</Meta>
@@ -1058,12 +1069,31 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
                 <Meta size={9} color="var(--ink4)">
                   BIT {c.at} · {c.width} WIDE{c.base === 0 ? ' · COUNTS FROM ZERO' : ''}
                 </Meta>
-                <button className="gs-close" onClick={() => void use(c)}>Use this one</button>
+                <span className="row" style={{ gap: 6, marginLeft: 'auto' }}>
+                  <Meta size={9} color="var(--ink4)">THIS IS THE</Meta>
+                  {['CFP', 'MEDIA', 'COACHES'].map((name) => (
+                    <button key={name} className="gs-close"
+                      style={saved.some((p) => p.name === name && p.at === c.at && p.width === c.width)
+                        ? { color: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}
+                      onClick={() => void use(c, name)}>{name}</button>
+                  ))}
+                </span>
               </div>
               <div style={{ marginTop: 5, fontSize: 12, color: 'var(--ink2)' }}>
                 {c.top.map((t) => `${t.rank}. ${t.name}`).join('  ·  ')}
               </div>
             </div>
+          ))}
+        </div>
+      ) : null}
+      {saved.length ? (
+        <div className="row" style={{ gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Meta size={9}>KEPT</Meta>
+          {saved.map((p) => (
+            <button key={p.name} className="gs-close" onClick={() => void forget(p.name)}
+              title="Forget this one">
+              {p.name} ✕
+            </button>
           ))}
         </div>
       ) : null}

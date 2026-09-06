@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Move, Path } from './transfers'
 import type { TamperCoach, TamperTarget, TamperTurn } from './tamper'
+import type { SavedPollView } from './saveAnalysis'
 
 /** What the transfer ledger looks like once it has been diffed for the screen. */
 /** One tampering conversation as the screen reads it. */
@@ -114,8 +115,11 @@ const api = {
         }[] }
       | { ok: false; message: string }
     >,
-  usePoll: (column: { at: number; width: number; base: 0 | 1 } | null) =>
-    ipcRenderer.invoke('poll:use', column) as Promise<{ ok: true }>,
+  usePoll: (poll: { name: string; at: number; width: number; base: 0 | 1 } | null) =>
+    ipcRenderer.invoke('poll:use', poll) as Promise<{ ok: true; polls: SavedPollView[] }>,
+  forgetPoll: (name: string) =>
+    ipcRenderer.invoke('poll:forget', name) as Promise<{ ok: true; polls: SavedPollView[] }>,
+  savedPolls: () => ipcRenderer.invoke('poll:saved') as Promise<{ ok: true; polls: SavedPollView[] }>,
   dumpStore: (path: string, name: string, rows?: number) =>
     ipcRenderer.invoke('save:dumpStore', { path, name, rows }),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),

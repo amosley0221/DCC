@@ -10,6 +10,28 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.48.0] - 2026-09-06
+
+### Added
+
+- **All three polls, named, the way the game keeps them.** Your save holds the
+  CFP, media and coaches rankings and they disagree with each other — which is
+  why the game's own screen switches between them. So DCC keeps all three rather
+  than making you choose one: find them once, say which is which, and League
+  switches between them by name.
+
+### Changed
+
+- **The finder stopped showing the same ranking a dozen times.** Each poll is
+  stored twice over and alongside last week's version of itself, and a field
+  reads the same at several widths, so one search turned up twelve rows holding
+  perhaps five real orderings. It now offers each distinct order once.
+
+  Which offset a given order was read at is not decidable from the data — a
+  field reads identically wherever the bits in front of it are zero — and does
+  not matter, because only values that land between one and the number of teams
+  are ever used.
+
 ## [0.47.0] - 2026-09-06
 
 ### Added

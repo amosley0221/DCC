@@ -1,7 +1,7 @@
 import type { UpdateStatus } from './updates'
 import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
-  RankColumnView, HeismanView, PollCandidate,
+  RankColumnView, HeismanView, PollCandidate, SavedPollView,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
@@ -92,8 +92,10 @@ declare global {
         | { ok: true; found: PollCandidate[] }
         | { ok: false; message: string }
       >
-      /** Remember the field you recognised, so every read uses it from now on. */
-      usePoll(column: { at: number; width: number; base: 0 | 1 } | null): Promise<{ ok: true }>
+      /** Remember a field you recognised, under the name the game gives it. */
+      usePoll(poll: SavedPollView | null): Promise<{ ok: true; polls: SavedPollView[] }>
+      forgetPoll(name: string): Promise<{ ok: true; polls: SavedPollView[] }>
+      savedPolls(): Promise<{ ok: true; polls: SavedPollView[] }>
       /** One store's rows, written to a file — the instrument the remaining decodes need. */
       dumpStore(path: string, name: string, rows?: number): Promise<
         { ok: true; file: string; rows: number; rowBytes: number } | { ok: false; message: string }

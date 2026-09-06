@@ -15,6 +15,7 @@ import {
   readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman,
   findRankColumns, readRankField,
 } from './saveAnalysis'
+import type { RankColumnView } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
   readLedger, readSettings, readThreads, rememberSchoolColors, rememberTitles,
@@ -310,25 +311,25 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
     // is the save's own five-row shortlist. Both are searched for by a property
     // only the real thing has, so a wrong answer is not one of the outcomes —
     // finding nothing is.
-    const rankColumns = findTeamRanks(payload).map((c) => ({
+    const rankColumns: RankColumnView[] = findTeamRanks(payload).map((c) => ({
       at: c.at, width: c.width, kind: c.kind,
       ranks: Object.fromEntries(
         Object.entries(c.ranks).map(([i, rank]) => [order[Number(i)]?.name ?? `Team ${i}`, rank]),
       ),
     }))
-    // A column the user found by pointing at a rank they could read off the
-    // game leads the list, because it is the one with an answer key behind it.
-    const saved = readSettings().pollColumn as { at: number; width: number; base: 0 | 1 } | undefined
-    if (saved && Number.isFinite(saved.at) && Number.isFinite(saved.width)) {
-      const vals = readRankField(payload, saved.at, saved.width)
+    // The polls the user has found and named lead the list, because each has an
+    // answer key behind it. The game keeps three — CFP, media and coaches — and
+    // they differ, so DCC keeps three rather than picking one for you.
+    for (const poll of savedPolls().slice().reverse()) {
+      const vals = readRankField(payload, poll.at, poll.width)
       const ranks: Record<string, number> = {}
       vals.forEach((v, i) => {
-        const place = v + (1 - saved.base)
-        const name = order[i]?.name
-        if (name && place >= 1 && place <= vals.length) ranks[name] = place
+        const place = v + (1 - poll.base)
+        const school = order[i]?.name
+        if (school && place >= 1 && place <= vals.length) ranks[school] = place
       })
       if (Object.keys(ranks).length >= 10) {
-        rankColumns.unshift({ at: saved.at, width: saved.width, kind: 'top25', ranks })
+        rankColumns.unshift({ at: poll.at, width: poll.width, name: poll.name, kind: 'top25', ranks })
       }
     }
 
@@ -450,14 +451,44 @@ ipcMain.handle('poll:find', (_e, { path, known }: {
   }
 })
 
-/** Remember the field the user recognised, so every read uses it from now on. */
-ipcMain.handle('poll:use', (_e, column: { at: number; width: number; base: 0 | 1 } | null) => {
+/** One poll the user has found and named: CFP, media or coaches. */
+interface SavedPoll { name: string; at: number; width: number; base: 0 | 1 }
+
+const savedPolls = (): SavedPoll[] => {
+  const raw = readSettings().polls
+  if (!Array.isArray(raw)) return []
+  return raw.filter((p): p is SavedPoll =>
+    !!p && typeof p === 'object' &&
+    typeof (p as SavedPoll).name === 'string' &&
+    Number.isFinite((p as SavedPoll).at) && Number.isFinite((p as SavedPoll).width))
+}
+
+/**
+ * Remember a field the user recognised, under the name the game gives it.
+ *
+ * Three rather than one, because the game keeps three and they disagree: its
+ * own screen switches between CFP, media and coaches, and which one a number
+ * came from is part of what the number means.
+ */
+ipcMain.handle('poll:use', (_e, poll: SavedPoll | null) => {
   const next = { ...readSettings() }
-  if (column) next.pollColumn = column
-  else delete next.pollColumn
+  const kept = savedPolls().filter((p) => !poll || p.name !== poll.name)
+  next.polls = poll ? [...kept, poll] : kept
+  // The single column this replaced is not read any more.
+  delete next.pollColumn
   writeSettings(next)
-  return { ok: true as const }
+  return { ok: true as const, polls: next.polls }
 })
+
+/** Forget one by name, when it turns out to have been the wrong field. */
+ipcMain.handle('poll:forget', (_e, name: string) => {
+  const next = { ...readSettings() }
+  next.polls = savedPolls().filter((p) => p.name !== name)
+  writeSettings(next)
+  return { ok: true as const, polls: next.polls }
+})
+
+ipcMain.handle('poll:saved', () => ({ ok: true as const, polls: savedPolls() }))
 
 ipcMain.handle('poll:choose', (_e, index: number) => {
   pollChoice = Number.isFinite(index) ? Number(index) : -1

@@ -245,20 +245,23 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
           <Card className="card-pad">
             <div className="card-head">
               <Kicker>The country, best first</Kicker>
-              <Meta size={10}>{poll.ranks ? "THE SAVE'S OWN" : "DCC'S OWN ORDER"}</Meta>
+              <Meta size={10}>
+                {poll.ranks
+                  ? poll.columns[poll.choice]?.name ?? "THE SAVE'S OWN"
+                  : "DCC'S OWN ORDER"}
+              </Meta>
             </div>
             {poll.columns.length ? (
               <>
                 <p className="body-serif" style={{ marginTop: 7 }}>
-                  Your save keeps {poll.columns.length === 1 ? 'a ranking' : `${poll.columns.length} rankings`} of
-                  its own, found by the one shape a ranking has: every place filled exactly once.
-                  Nothing in the file says which is the AP and which is the coaches', so pick the
-                  one that matches your game and it is remembered.
+                  These are your save's own rankings, read out of the field each one lives in.
+                  The game keeps three and they disagree with each other, which is why it lets you
+                  switch between them — so this does too.
                 </p>
                 <div className="row" style={{ gap: 6, marginTop: 9, flexWrap: 'wrap' }}>
                   {poll.columns.map((c, i) => (
                     <Chip key={i} on={poll.choice === i} onClick={() => poll.setChoice(i)}>
-                      {c.kind === 'top25' ? 'TOP 25' : 'FULL'} · {i + 1}
+                      {c.name ?? `${c.kind === 'top25' ? 'TOP 25' : 'FULL'} · ${i + 1}`}
                     </Chip>
                   ))}
                   <Chip on={poll.choice === -1} onClick={() => poll.setChoice(-1)}>DCC'S ORDER</Chip>

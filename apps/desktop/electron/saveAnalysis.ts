@@ -2193,6 +2193,8 @@ export function readHeisman(
 export interface RankColumnView {
   at: number
   width: number
+  /** What the game calls it — CFP, Media, Coaches — once you have said which. */
+  name?: string
   kind: 'full' | 'top25'
   /** School name to rank. */
   ranks: Record<string, number>
@@ -2268,7 +2270,17 @@ export function findRankColumns(
   const rows = t.rows
   const rowBits = t.rowBytes * 8
   const out: RankCandidate[] = []
+  // The same ranking is written more than once — this week's and last week's,
+  // and a second copy of each — so a search turns up a dozen fields holding
+  // maybe five different orders. Only the orders are worth showing.
+  const seen = new Set<string>()
 
+  // Narrowest first, and only the first reading of any one ordering is kept.
+  // A field reads identically at a wider width whenever the bits in front of it
+  // are zero, and at a narrower one whenever its own top bit is spare, so the
+  // same poll turns up at several offsets. Which of them is the field's own
+  // width cannot be told from the data — and does not matter, because only
+  // values that land between one and the number of teams are ever used.
   for (let width = 5; width <= 12 && out.length < limit; width++) {
     for (let at = 0; at + width <= rowBits && out.length < limit; at++) {
       const vals = readRankField(payload, at, width)
@@ -2280,18 +2292,22 @@ export function findRankColumns(
         if (vals.every((v, i) => v === i + base)) continue
 
         const ranks: Record<number, number> = {}
-        const seen = new Set<number>()
+        const placed = new Set<number>()
         let clash = false
         for (let i = 0; i < rows; i++) {
           const v = vals[i]
           const place = v + (1 - base)
           if (place < 1 || place > rows) continue
-          if (seen.has(place)) { clash = true; break }
-          seen.add(place)
+          if (placed.has(place)) { clash = true; break }
+          placed.add(place)
           ranks[i] = place
         }
-        if (clash || seen.size < 10) continue
-        out.push({ at, width, base, ranked: seen.size, ranks })
+        if (clash || placed.size < 10) continue
+        const signature = Object.entries(ranks)
+          .sort((x, y) => x[1] - y[1]).map(([i, r]) => `${r}:${i}`).join(',')
+        if (seen.has(signature)) break
+        seen.add(signature)
+        out.push({ at, width, base, ranked: placed.size, ranks })
         break
       }
     }
@@ -2306,4 +2322,12 @@ export interface PollCandidate {
   base: 0 | 1
   ranked: number
   top: { name: string; rank: number }[]
+}
+
+/** A poll the user has found in their save and named. */
+export interface SavedPollView {
+  name: string
+  at: number
+  width: number
+  base: 0 | 1
 }

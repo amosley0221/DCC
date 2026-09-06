@@ -1017,6 +1017,35 @@ programs hold ten different places, and no team holds its own row number. Naming
 a second school makes it certain. The field is remembered by bit offset and
 width, so every later read uses it without being asked again.
 
+### Three polls, not one
+
+The search returns several orderings because the save holds several. The game's
+own screen switches between **CFP**, **media** and **coaches**, and they
+disagree — in one week eleven, the media and coaches polls have South Carolina
+sixth and seventh respectively, and the CFP has Texas A&M eleventh where the
+other two have Boise State. Each is also stored twice over, alongside last
+week's version of itself, which is why a dozen fields come back holding perhaps
+five distinct orders.
+
+So DCC keeps three, named, and the League screen switches between them the way
+the game does. Deduplication is on the ordering rather than the offset: a field
+reads identically at a wider width whenever the bits in front of it are zero and
+at a narrower one whenever its own top bit is spare, so which offset is the
+field's own is not decidable from the data — and does not matter, since only
+values landing between one and the number of teams are ever used.
+
+### What is not here: the schema
+
+An earlier session read the game's type schema — 3,526 types with member names,
+widths and enum tables — but **it was never committed to this repository**, so
+none of the work above could use it. The schema would not have given offsets
+(see *The layout rule is not cracked*), but it would have named the fields:
+knowing that `Team` carries `CoachesPollRank`, `MediaPollRank` and a CFP rank of
+a stated width turns "here are five orderings, tell me which is which" into
+"here are the three the schema names".
+
+If the dump is put in the repository, that labelling becomes mechanical.
+
 What is still not decoded is the *case* for each name — the season statistics
 behind them — and which of several ranking columns is the AP and which the
 coaches'. Nothing in the file says, so the app shows the top of each and lets

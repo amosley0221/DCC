@@ -198,32 +198,48 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
   }
   const tpayload = Buffer.concat([Buffer.alloc(64), thead, trows, Buffer.alloc(64)])
 
+  // What is asserted is the ranking, not where it was read from. A field reads
+  // the same at a wider width when the bits in front of it are zero and at a
+  // narrower one when its own top bit is spare, so the offset that comes back
+  // is one of several equivalent readings — and only the order matters.
+  const wanted = {}
+  placed.forEach((team, i) => { wanted[team] = i + 1 })
+
   const one = S.findRankColumns(tpayload, [{ teamIndex: 7, rank: 1 }])
   assert.ok(one.length, 'one rank you can read off the screen finds the field')
-  const hit = one.find((c) => c.at === POLL_AT && c.width === POLL_W)
-  assert.ok(hit, 'and it is the field the poll was written into: ' +
+  const hit = one.find((c) => JSON.stringify(c.ranks) === JSON.stringify(wanted))
+  assert.ok(hit, 'and it reads back the poll that was written: ' +
     one.map((c) => `${c.at}/${c.width}`).join(' '))
   assert.equal(hit.base, 1)
   assert.equal(hit.ranked, placed.length, 'only the ranked teams hold a place')
   assert.equal(hit.ranks[3], 2, 'the second team is second')
 
+  // The same order is only offered once, however many readings produce it.
+  const signatures = one.map((c) => JSON.stringify(c.ranks))
+  assert.equal(new Set(signatures).size, signatures.length,
+    'a poll written once is offered once')
+
   // Naming a second school narrows it rather than breaking it.
   const two = S.findRankColumns(tpayload, [{ teamIndex: 7, rank: 1 }, { teamIndex: 3, rank: 2 }])
-  assert.ok(two.some((c) => c.at === POLL_AT && c.width === POLL_W))
+  assert.ok(two.some((c) => JSON.stringify(c.ranks) === JSON.stringify(wanted)))
   assert.ok(two.length <= one.length, 'a second key cannot widen the answer')
 
   // A rank nobody holds finds nothing, rather than the nearest thing.
-  assert.deepEqual(S.findRankColumns(tpayload, [{ teamIndex: 7, rank: 9 }])
-    .filter((c) => c.at === POLL_AT && c.width === POLL_W), [])
+  assert.ok(!S.findRankColumns(tpayload, [{ teamIndex: 7, rank: 9 }])
+    .some((c) => JSON.stringify(c.ranks) === JSON.stringify(wanted)),
+    'a key nobody holds does not return the poll anyway')
 
   // And the counter is never offered, however well it fits a lucky key.
   const counterKey = S.findRankColumns(tpayload, [{ teamIndex: 0, rank: 1 }])
   assert.ok(!counterKey.some((c) => c.at === 60 && c.width === 8),
     'a field holding every team its own row number is a counter')
 
-  // Reading the field back is what every later read does.
-  assert.deepEqual(S.readRankField(tpayload, POLL_AT, POLL_W).slice(0, 8),
-    [4, 200 + 1, 8, 2, 200 + 4, 11, 200 + 6, 1])
+  // Reading the field back at the offset that was stored is what every later
+  // read does, and it has to give the same order as when it was chosen.
+  const back = S.readRankField(tpayload, hit.at, hit.width)
+  placed.forEach((team, i) => {
+    assert.equal(back[team] + (1 - hit.base), i + 1, `team ${team} reads back at ${i + 1}`)
+  })
 }
 
 /* ---------------------------------------------------------- the Heisman five */
