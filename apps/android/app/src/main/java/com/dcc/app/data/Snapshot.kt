@@ -273,6 +273,20 @@ val SnapshotTeam.monogram: String get() = (abbr ?: name).take(2).uppercase()
  */
 object SaveLabels {
 
+    /**
+     * The save's own position order — offence through the kicking game, which is
+     * the order the game itself lists them in. Sorting these alphabetically puts
+     * the centre first and the quarterback fourteenth, which is nobody's idea of
+     * a position list.
+     */
+    val POSITION_ORDER = listOf(
+        "QB", "HB", "FB", "WR", "TE", "LT", "LG", "C", "RG", "RT",
+        "LE", "RE", "DT", "LOLB", "MLB", "ROLB", "CB", "FS", "SS", "K", "P",
+    )
+
+    /** Where a position sorts, for any list of them. */
+    val POSITION_RANK = POSITION_ORDER.withIndex().associate { (i, p) -> p to i }
+
     /** What the game will accept for each of these, so the phone offers nothing else. */
     val DEV_TRAITS = listOf("Normal", "Impact", "Star", "Elite")
 

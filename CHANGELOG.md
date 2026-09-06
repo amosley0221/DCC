@@ -10,6 +10,18 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.57.2] - 2026-09-06
+
+### Fixed
+
+- **The position filters on the phone read in football order** — QB, HB, FB,
+  WR, TE, then the line, the front, the linebackers, the secondary, and the
+  kicking game. They were sorted alphabetically, which puts the centre first
+  and the quarterback fourteenth.
+
+  The desktop has had the save's own position order since the roster screen was
+  built; the phone was sorting its own list instead of using it.
+
 ## [0.57.1] - 2026-09-06
 
 ### Fixed

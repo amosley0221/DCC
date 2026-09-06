@@ -150,7 +150,8 @@ class SnapshotView(val snapshot: DynastySnapshot) {
                 .thenBy { it.first },
         )
 
-    val recruitPositions: List<String> = snapshot.recruits.map { it.position }.distinct().sorted()
+    val recruitPositions: List<String> = snapshot.recruits.map { it.position }.distinct()
+        .sortedBy { SaveLabels.POSITION_RANK[it] ?: Int.MAX_VALUE }
 
     fun rosterOf(index: Int): List<SnapshotPlayer> =
         teamsByIndex[index]?.teamId?.let { rosters[it] }.orEmpty()
