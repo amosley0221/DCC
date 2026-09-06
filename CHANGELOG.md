@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.62.1] - 2026-09-06
+
+### Fixed
+
+- **Helmets in a matchup now face each other on any art pack.** 0.62.0 swapped
+  which side got which helmet and changed nothing on screen, and the reason is
+  worth stating: a pack built before 0.59.0 holds only one helmet, and asking
+  for the right-facing one quietly handed back the left. Both sides drew the
+  same art either way, so choosing between them was never going to matter. When
+  the pack has only the one helmet the phone now mirrors it for the right-facing
+  side, so the pair meets over the score regardless.
+
+  **Rebuild your art pack on the PC** to replace the mirror with the game's own
+  right-facing art — a mirrored helmet has a mirrored logo, which is better than
+  two helmets pointing the same way but is not the real thing.
+
 ## [0.62.0] - 2026-09-06
 
 ### Fixed

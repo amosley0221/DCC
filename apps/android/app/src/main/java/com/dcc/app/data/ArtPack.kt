@@ -122,13 +122,21 @@ object ArtPack {
     /** A school's mark: "logo", "gold", "helmet", "helmetRight" or "jersey". */
     fun school(context: Context, name: String?, kind: String): File? {
         if (name.isNullOrBlank()) return null
-        val file = File(root(context), "schools/${safe(name)}__$kind.png")
-        if (file.exists()) return file
-        // Packs built before the helmets were split carry only the one. A left
-        // helmet on both sides beats a monogram beside a real helmet.
-        if (kind == "helmetRight") return school(context, name, "helmet")
-        return null
+        return File(root(context), "schools/${safe(name)}__$kind.png").takeIf { it.exists() }
     }
+
+    /**
+     * Whether this pack actually holds the right-facing helmets.
+     *
+     * Packs built before the two were split carry only one, and the old
+     * behaviour was to hand that one back for either request — so both sides of
+     * a matchup drew the same art and faced the same way, and no amount of
+     * choosing between them made any difference. The caller mirrors the left
+     * helmet instead, which at least makes the pair meet, and rebuilding the
+     * pack on the PC replaces it with the real thing.
+     */
+    fun hasSplitHelmets(context: Context, name: String?): Boolean =
+        school(context, name, "helmetRight") != null
 
     /**
      * A trophy, bowl crest, playoff mark or conference championship.

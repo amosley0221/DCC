@@ -25,6 +25,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -507,15 +508,26 @@ fun SchoolBadge(
 ) {
     val c = Dcc.colors
     val context = LocalContext.current
-    val file = remember(name, kind) { ArtPack.school(context, name, kind) }
+    // A pack built before the helmets were split holds only the left one. Asking
+    // for the right one then used to hand back the left, so both sides of a
+    // matchup faced the same way and picking between them changed nothing.
+    // Mirroring the left one makes the pair meet on any pack; rebuilding on the
+    // PC replaces it with art whose logo reads the right way round.
+    val mirror = remember(name, kind) {
+        kind == "helmetRight" && !ArtPack.hasSplitHelmets(context, name)
+    }
+    val file = remember(name, kind, mirror) {
+        ArtPack.school(context, name, if (mirror) "helmet" else kind)
+    }
 
     // A logo is drawn as itself, on nothing: these marks carry their own shape,
     // and a coloured disc behind one only makes it harder to read.
     if (file != null) {
         Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            val art = if (mirror) Modifier.size(size).scale(scaleX = -1f, scaleY = 1f) else Modifier.size(size)
             // A `return` here would be a non-local return out of a lambda that
             // is not inline, which does not compile; the flag is the way.
-            val drawn = ArtImage(file, Modifier.size(size))
+            val drawn = ArtImage(file, art)
             if (!drawn) MonoLabel(monogram, c.ink3, (size.value * 0.34f).toInt().coerceAtLeast(7))
         }
         return
