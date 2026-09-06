@@ -10,6 +10,20 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.55.0] - 2026-09-06
+
+### Changed
+
+- **Home lays itself out for an unfolded phone.** On the inner panel the feature
+  and your board sit side by side and Saturday's scores run the full width
+  beneath them. Folded, it is the single column it always was.
+
+  A Fold's cover screen is about 340dp across and its inner panel about 690, so
+  the switch is at the standard 600 — closed is one column, open is two, and a
+  tablet lands on the same side as the open fold. Nothing is hidden either way;
+  the wide arrangement uses the room rather than stretching a phone column
+  across it.
+
 ## [0.54.0] - 2026-09-06
 
 ### Added
