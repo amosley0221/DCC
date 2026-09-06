@@ -338,7 +338,7 @@ private fun TeamGameRow(g: SnapshotGame, teamIndex: Int, next: Boolean, open: Bo
             }
             Spacer(Modifier.width(6.dp))
             MonoLabel(if (home) "VS" else "@", c.ink4, 9, Modifier.width(22.dp))
-            SchoolBadge(mono(opponent), opponent, false, 28.dp, "helmet")
+            SchoolBadge(mono(opponent), opponent, false, 28.dp, "helmetRight")
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 RowTitle(opponent, c.ink, 15)
@@ -375,11 +375,13 @@ private fun LeagueGameRow(
     DccCard(borderColor = if (isUser) c.accent else c.surfaceLine, onClick = onToggle) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Helmets rather than logos on a scoreboard, which is what a
-            // scoreboard has always had.
+            // scoreboard has always had. They sit left of the names, so they
+            // take the right-facing art and look into the row: "helmet" is the
+            // game's lt art and faces left, which is away from the text.
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                SchoolBadge(mono(g.away), g.away.orEmpty(), false, 28.dp, "helmet")
+                SchoolBadge(mono(g.away), g.away.orEmpty(), false, 28.dp, "helmetRight")
                 Spacer(Modifier.height(4.dp))
-                SchoolBadge(mono(g.home), g.home.orEmpty(), false, 28.dp, "helmet")
+                SchoolBadge(mono(g.home), g.home.orEmpty(), false, 28.dp, "helmetRight")
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {

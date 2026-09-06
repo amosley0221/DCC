@@ -1,5 +1,6 @@
 package com.dcc.app.ui.sections
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -149,7 +150,7 @@ fun RecruitSnapshotSection(vm: AppViewModel, state: Persisted, view: SnapshotVie
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             item {
-                ClassTable(view, limit = 5)
+                ClassTable(view, limit = 10)
                 Spacer(Modifier.height(10.dp))
             }
             if (shown.isEmpty()) item { DccCard { EmptyState("no recruit matches that") } }
@@ -426,24 +427,33 @@ private fun RecruitRow(
  * Which school is winning the recruiting year.
  *
  * The game's own class ranking, read off the save on the PC and carried in the
- * snapshot. An older snapshot has no such field, and then the card falls back
- * to DCC's ordering of your commits and says so.
+ * snapshot. An older snapshot has no such field, and then this falls back to
+ * DCC's ordering of your commits and says so — but only where there is room to
+ * say it. On the home tile the line was noise, so `onOpenAll` turns the header
+ * into a way through to the full list instead.
  */
 @Composable
-fun ClassTable(view: SnapshotView, limit: Int = 10) {
+fun ClassTable(view: SnapshotView, limit: Int = 10, onOpenAll: (() -> Unit)? = null) {
     val c = Dcc.colors
     val table = remember(view) { Classes.of(view.recruits, view.teams) }
     val official = table.firstOrNull()?.rank != null
     if (table.isEmpty()) return
     val myName = view.userTeam?.name
     val mine = table.indexOfFirst { it.school == myName }
-    val rows = table.take(limit).toMutableList()
-    if (mine >= limit) rows.add(table[mine])
+    var all by rememberSaveable { mutableStateOf(false) }
+    // The tile never expands in place; it sends you to the Board instead.
+    val showing = if (onOpenAll == null && all) table.size else limit
+    val rows = table.take(showing).toMutableList()
+    if (mine >= showing) rows.add(table[mine])
 
     DccCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            if (onOpenAll != null) Modifier.clickable(onClick = onOpenAll) else Modifier,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             MonoLabel("RECRUITING CLASSES", c.ink3, 9, Modifier.weight(1f))
-            MetaText("${table.size} SCHOOLS", c.ink4, 9)
+            if (onOpenAll != null) MonoLabel("ALL " + table.size + " \u2192", c.accent, 9)
+            else MetaText(table.size.toString() + " SCHOOLS", c.ink4, 9)
         }
         Spacer(Modifier.height(8.dp))
         rows.forEach { r ->
@@ -453,7 +463,7 @@ fun ClassTable(view: SnapshotView, limit: Int = 10) {
                 Modifier.fillMaxWidth().padding(vertical = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.width(20.dp)) { MetaText("$place", c.ink4, 10) }
+                Box(Modifier.width(24.dp)) { MetaText("$place", c.ink4, 10) }
                 SchoolBadge(r.school.take(2).uppercase(), r.school, own, 18.dp)
                 Spacer(Modifier.width(8.dp))
                 MetaText(
@@ -464,17 +474,27 @@ fun ClassTable(view: SnapshotView, limit: Int = 10) {
                     maxLines = 1,
                 )
                 if (r.byStar[0] > 0) {
-                    MetaText("${r.byStar[0]}×5★", c.accent, 9)
+                    MetaText("${r.byStar[0]}\u00d75\u2605", c.accent, 9)
                     Spacer(Modifier.width(7.dp))
                 }
                 NumText("${r.commits}", c.ink3, 11)
             }
         }
-        Spacer(Modifier.height(6.dp))
-        MetaText(
-            if (official) "THE GAME'S OWN CLASS RANKING, READ OUT OF YOUR SAVE"
-            else "DCC'S OWN ORDER OF YOUR SAVE'S COMMITS — NOT THE GAME'S NUMBER",
-            c.ink4, 8, maxLines = 2,
-        )
+        // Only the full screen carries the toggle and the note about whose
+        // ranking this is. The tile is a glance, and a glance does not need a
+        // footnote.
+        if (onOpenAll == null) {
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.clickable { all = !all }) {
+                    MonoLabel(if (all) "TOP $limit" else "ALL " + table.size, c.accent, 9)
+                }
+                Spacer(Modifier.weight(1f))
+                MetaText(
+                    if (official) "THE GAME'S OWN RANKING" else "DCC'S OWN ORDER \u2014 NOT THE GAME'S",
+                    c.ink4, 8, maxLines = 1,
+                )
+            }
+        }
     }
 }

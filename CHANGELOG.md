@@ -10,6 +10,30 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.62.0] - 2026-09-06
+
+### Fixed
+
+- **Every helmet now faces into the screen instead of off it.** The helmet
+  names say which way the art *looks*, not which side it sits on — the game's
+  `lt` art faces left — and DCC had read them as sides. So the away helmet on
+  the feature, both helmets on Saturday's scores, the schedule rows and the
+  bracket all pointed the wrong way. The left-hand side of a matchup takes the
+  right-facing helmet now, and a helmet standing beside a name looks towards it.
+
+- **The Heisman leader has his face on Android too.** The portrait id was
+  already being worked out and handed to the feature, which then drew him with
+  `null` — the same mistake the desktop had, fixed there in 0.59.0 and left
+  here.
+
+### Changed
+
+- **The recruiting classes tile links through to the whole table.** The note
+  under it explaining whose ranking it was is gone — it was a footnote on a
+  glance — and the header is now a way through to the Board, which shows all 138
+  schools with a top-ten toggle. The note about whose ranking it is lives there,
+  where there is room for it.
+
 ## [0.61.0] - 2026-09-06
 
 ### Fixed

@@ -168,7 +168,7 @@ fun GoldHome(
                     // The panel is taller than the column needs, and a
                     // recruiting-minded glance wants this more than it wants
                     // empty ground.
-                    ClassTable(snap, limit = 8)
+                    ClassTable(snap, limit = 8, onOpenAll = onOpenBoard)
                 }
             }
         } else {
@@ -310,17 +310,20 @@ private fun FeatureWell(
 
             when {
                 slideGame != null -> {
-                    // Away on the left, home on the right — the way the scores
-                    // rail below reads, and the way the two helmets face: the
-                    // left-hand art looks right and the right-hand art looks
-                    // left, so they meet over the score instead of both
-                    // pointing the same way.
+                    // Away on the left, home on the right, the way the scores
+                    // rail below reads.
+                    //
+                    // The helmet names describe which way the art *faces*, not
+                    // which side it goes on: "helmet" is the game's lt art and
+                    // looks left, "helmetRight" looks right. So the left-hand
+                    // side takes the right-facing one and they meet over the
+                    // score. Naming them for a side is what got this backwards.
                     val away = slideGame.away
                     val home = slideGame.home
                     val a = slideGame.awayScore
                     val h = slideGame.homeScore
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SchoolBadge(mono(away), away ?: "", away == meName, 46.dp, "helmet")
+                        SchoolBadge(mono(away), away ?: "", away == meName, 46.dp, "helmetRight")
                         Spacer(Modifier.width(11.dp))
                         GoldNum("$a", 46, if (a >= h) c.ink else c.ink3)
                         Box(
@@ -332,14 +335,14 @@ private fun FeatureWell(
                         )
                         GoldNum("$h", 46, if (h > a) c.ink else c.ink3)
                         Spacer(Modifier.width(11.dp))
-                        SchoolBadge(mono(home), home ?: "", home == meName, 46.dp, "helmetRight")
+                        SchoolBadge(mono(home), home ?: "", home == meName, 46.dp, "helmet")
                     }
                 }
                 slide == FEATURE_HEISMAN && heisman != null -> Row(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PlayerFace(
-                        "${heisman.first} ${heisman.last}", null, 52.dp, heisman.team,
+                        "${heisman.first} ${heisman.last}", heismanFace, 52.dp, heisman.team,
                     )
                     Spacer(Modifier.width(12.dp))
                     GoldNum("${heisman.overall}", 40, c.ink)
@@ -564,7 +567,8 @@ private fun ScoreCard(g: SnapshotGame, mine: Boolean, awayRank: Int?, homeRank: 
 private fun ScoreLine(team: String, score: Int, dim: Boolean, rank: Int? = null) {
     val c = Dcc.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
-        SchoolBadge(team.take(2).uppercase(), team, false, 24.dp, "helmet")
+        // Left of the name, so it looks right, into the row rather than off it.
+        SchoolBadge(team.take(2).uppercase(), team, false, 24.dp, "helmetRight")
         Spacer(Modifier.width(6.dp))
         if (rank != null && rank <= 25) {
             Label("$rank", 9.0, c.ink3, 0.5)
