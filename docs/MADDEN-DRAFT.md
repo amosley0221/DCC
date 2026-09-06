@@ -314,3 +314,47 @@ Finding that table is the single thing standing between here and every
 player-facing Madden feature — news, trades, contracts, stats, the lot. It is
 worth doing before anything else, and it should not be attempted by guessing at
 strides again.
+
+## The player table, found
+
+Madden keeps its players outside the store system in **variable-length records**,
+which is why three earlier approaches missed them: they are not a store, not at
+a fixed stride, and not in the draft class's 5,876-byte format.
+
+What makes them findable is that every player carries an **asset id shaped
+`SurnameForename_NNNNN`** — `MayfieldBaker_13117`, `AchaneDevon_22692`. Anchor on
+that and the name block sits at a **fixed offset relative to the id**, even
+though the record around it varies in length:
+
+| Offset from the id | Field |
+| --- | --- |
+| −64 | First name |
+| −47 | Head asset, e.g. `gen_2_H_B_010` |
+| −21 | Surname |
+| 0 | The asset id itself |
+
+The id must be anchored to a record boundary — matched as `\0` then the id then
+`\0`. Without that the regex latches onto the middle of a name (`AgimMcTelvin`
+matching from `McTelvin`), the offsets shift, and about 11% of records read as
+rubbish. Anchored properly: **2,747 of 2,748 records parse, 100.0%**.
+
+The table is alphabetical, running from Israel Abanikanda to Shane Zylstra, and
+the names are real: Baker Mayfield, Chris Godwin Jr, Tristan Wirfs, Bucky Irving
+and Calijah Kancey all read correctly out of the Buccaneers save.
+
+The counts line up with everything else known. A looser pattern finds 3,538
+ids, `HistoryEntryStore` references player indices 0 to 3,527, and `TeamStore`'s
+roster bytes total 2,245 players in the league — an allocation of about 3,528
+slots, roughly two thirds filled.
+
+### What is not decoded yet
+
+**Team, position, ratings and the rest.** Every attempt to read them at a fixed
+offset from the id fails, and the test that says so is a good one: no byte
+offset from −104 to +60 groups the records into 32 teams whose sizes match
+`TeamStore`'s roster counts. The records are variable-length, so those fields
+need the record's own format parsed rather than an offset guessed at.
+
+**The link from a history reference to a row of this table.** The counts agree,
+but agreeing counts are not a mapping, and there is no ground-truth pair yet to
+prove that reference *n* is the *n*th record.
