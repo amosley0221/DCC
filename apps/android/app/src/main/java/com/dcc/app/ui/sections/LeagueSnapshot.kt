@@ -328,7 +328,7 @@ fun LeagueSnapshotSection(view: SnapshotView) {
                 if (picked != null) {
                     DccCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            SchoolBadge(mono(picked.name), picked.name, pick == userIndex, 38.dp, "helmetRight")
+                            SchoolBadge(mono(picked.name), picked.name, pick == userIndex, 38.dp, "helmet")
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 RowTitle(picked.name, c.ink, 16)

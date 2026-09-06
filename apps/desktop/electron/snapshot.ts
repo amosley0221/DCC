@@ -20,8 +20,10 @@ import {
 import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
 import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
+import { buildLeague, orderByRanks, rankings, visibleGames } from './league'
+import { buildWire, type WireItem } from './wire'
 
-export const SNAPSHOT_VERSION = 3
+export const SNAPSHOT_VERSION = 4
 
 export interface SnapshotTeam {
   /** Row in the save's own team table, which is how games refer to a team. */
@@ -163,6 +165,15 @@ export interface DynastySnapshot {
    */
   ranks: Record<string, number>
   heisman: SnapshotHeisman[]
+  /**
+   * The wire: the country's week, already written.
+   *
+   * It could be derived on the phone — every number it needs is in this file —
+   * but then the same rules would exist twice, in two languages, and would
+   * drift the first time one of them was changed. It is built once on the PC
+   * and the phone renders it.
+   */
+  wire: WireItem[]
 }
 
 /** One name on the save's Heisman shortlist. */
@@ -294,6 +305,27 @@ export function buildSnapshot(
     roster.push(row)
   }
 
+  const seen = visibleGames(games, userTeamName, week)
+  const table = buildLeague(seen, teams.map((t) => ({
+    name: t.name, conference: t.conference, division: t.division,
+  })))
+  const pollOrder = extra?.ranks && Object.keys(extra.ranks).length
+    ? orderByRanks(table, extra.ranks)
+    : rankings(table)
+  const rankOf = new Map(pollOrder.map((r, i) => [r.name, i + 1]))
+  const wireWeek = (() => {
+    const played = seen.filter((g) => g.played && !g.postseason)
+    return played.length ? Math.max(...played.map((g) => g.week)) : null
+  })()
+  const wire = buildWire({
+    games: seen, week: wireWeek, table, ranks: rankOf, me: userTeamName,
+    recruits: recruits.map((r) => ({
+      index: r.index, first: r.first, last: r.last, position: r.position,
+      stars: r.stars ?? 0, nationalRank: r.nationalRank, stage: r.stage,
+      topSchools: r.topSchools,
+    })),
+  })
+
   return {
     version: SNAPSHOT_VERSION,
     generated: new Date().toISOString(),
@@ -308,5 +340,6 @@ export function buildSnapshot(
     champions: extra?.champions ?? [],
     ranks: extra?.ranks ?? {},
     heisman: extra?.heisman ?? [],
+    wire,
   }
 }

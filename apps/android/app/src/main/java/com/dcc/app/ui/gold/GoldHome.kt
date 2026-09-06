@@ -47,10 +47,14 @@ import com.dcc.app.data.SaveLabels
 import com.dcc.app.data.SnapshotGame
 import com.dcc.app.data.SnapshotHeisman
 import com.dcc.app.data.SnapshotRecruit
+import com.dcc.app.data.SnapshotWire
 import com.dcc.app.data.name
 import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.ArtImage
+import com.dcc.app.ui.components.DccCard
+import com.dcc.app.ui.components.Headline
 import com.dcc.app.ui.components.MetaText
+import com.dcc.app.ui.components.MonoLabel
 import com.dcc.app.ui.sections.ClassTable
 import com.dcc.app.ui.components.PlayerFace
 import com.dcc.app.ui.components.SchoolBadge
@@ -230,7 +234,100 @@ fun GoldHome(
         }
 
 
+        // ── the wire ──────────────────────────────────────────────────────
+        // What happened around the country, not to you. Written on the PC out
+        // of this same save — see apps/desktop/electron/wire.ts, which also
+        // says what is deliberately missing from it and why.
+        val wire = snap.snapshot.wire
+        if (wire.isNotEmpty()) {
+            Label("THE WIRE", 10.0, c.ink3, 2.0, Modifier.padding(top = 6.dp))
+            DccCard {
+                wire.take(6).forEachIndexed { i, item ->
+                    if (i > 0) {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(c.surfaceLine))
+                    }
+                    WireRow(item, snap, onOpenGame, onOpenBoard)
+                }
+            }
+        }
+
+        // ── the top 25 ────────────────────────────────────────────────────
+        // The poll itself, which the home screen never carried: Saturday's rail
+        // could be filtered to ranked games but the ranking was only ever a
+        // number beside a name.
+        val poll = remember(table, snap) {
+            val saved = snap.snapshot.ranks
+            if (saved.isNotEmpty()) League.orderByRanks(table, saved) else League.rankings(table)
+        }
+        if (poll.isNotEmpty()) {
+            Label("TOP 25", 10.0, c.ink3, 2.0, Modifier.padding(top = 6.dp))
+            DccCard {
+                poll.take(25).forEachIndexed { i, r ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MonoLabel("${i + 1}", c.ink3, 11, Modifier.width(22.dp))
+                        SchoolBadge(mono(r.name), r.name, r.index == me?.index, 24.dp, "helmet")
+                        Spacer(Modifier.width(8.dp))
+                        Ui(
+                            r.name, 14.0,
+                            if (r.index == me?.index) c.accent else c.ink,
+                            FontWeight.SemiBold, Modifier.weight(1f), maxLines = 1,
+                        )
+                        MetaText("${r.wins}-${r.losses}", c.ink3, 12)
+                    }
+                }
+            }
+        }
+
         if (!wide) BoardWell(board, state, onOpenBoard, Modifier.fillMaxWidth())
+    }
+}
+
+/**
+ * One item on the wire.
+ *
+ * A helmet pair, the kicker, the line and the sentence under it. A game opens
+ * its box score and a prospect opens the board, so the wire is a way into the
+ * app rather than a list you read and leave.
+ */
+@Composable
+private fun WireRow(
+    item: SnapshotWire,
+    snap: SnapshotView,
+    onOpenGame: (SnapshotGame) -> Unit,
+    onOpenBoard: () -> Unit,
+) {
+    val c = Dcc.colors
+    val game = item.row?.let { row -> snap.snapshot.games.firstOrNull { it.row == row } }
+    val open: (() -> Unit)? = when {
+        game != null -> ({ onOpenGame(game) })
+        item.playerIndex != null -> onOpenBoard
+        else -> null
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(open?.let { go -> Modifier.clickable { go() } } ?: Modifier)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        val other = item.other
+        Row(Modifier.width(62.dp), verticalAlignment = Alignment.CenterVertically) {
+            SchoolBadge(mono(item.team), item.team.orEmpty(), false, 34.dp, "helmet")
+            if (other != null) {
+                SchoolBadge(mono(other), other, false, 26.dp, "helmetRight")
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Label(item.kicker.uppercase(), 9.0, c.accent, 2.0)
+            Spacer(Modifier.height(3.dp))
+            Headline(item.headline, c.ink, 17)
+            Spacer(Modifier.height(3.dp))
+            MetaText(item.line, c.ink3, 12, maxLines = 3)
+        }
     }
 }
 
@@ -300,7 +397,7 @@ private fun FeatureWell(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(if (slideGame != null) 208.dp else 128.dp)
+                .height(if (slideGame != null) 236.dp else 128.dp)
                 .background(Brush.linearGradient(listOf(c.surfaceStrong, c.surface))),
             contentAlignment = Alignment.Center,
         ) {
@@ -321,10 +418,10 @@ private fun FeatureWell(
                     // its record and its score, the way a broadcast titles a
                     // game. Away left, home right, the way the rail below reads.
                     //
-                    // The helmet names say which way the art *faces*, not which
-                    // side it sits on: "helmet" is the game's lt art and looks
-                    // left, so the left-hand side takes the right-facing one and
-                    // the two meet in the middle.
+                    // The helmet names are for the SIDE a helmet is placed on,
+                    // not the way it looks: "helmet" is the game's lt art, the
+                    // left helmet of the pair, and so it faces right. Reading
+                    // the names as directions is what pointed them outward.
                     val away = slideGame.away
                     val home = slideGame.home
                     val a = slideGame.awayScore
@@ -336,7 +433,7 @@ private fun FeatureWell(
                         MatchupSide(
                             away, mono(away), rankOf[slideGame.awayIndex],
                             recordOf[slideGame.awayIndex], a, won = a >= h,
-                            isUser = away == meName, helmet = "helmetRight",
+                            isUser = away == meName, helmet = "helmet",
                             modifier = Modifier.weight(1f),
                         )
                         Column(
@@ -353,7 +450,7 @@ private fun FeatureWell(
                         MatchupSide(
                             home, mono(home), rankOf[slideGame.homeIndex],
                             recordOf[slideGame.homeIndex], h, won = h > a,
-                            isUser = home == meName, helmet = "helmet",
+                            isUser = home == meName, helmet = "helmetRight",
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -482,7 +579,7 @@ private fun MatchupSide(
 ) {
     val c = Dcc.colors
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        SchoolBadge(monogram, team ?: "", isUser, 84.dp, helmet)
+        SchoolBadge(monogram, team ?: "", isUser, 104.dp, helmet)
         Spacer(Modifier.height(7.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             if (rank != null && rank <= 25) {
@@ -646,8 +743,9 @@ private fun ScoreCard(g: SnapshotGame, mine: Boolean, awayRank: Int?, homeRank: 
 private fun ScoreLine(team: String, score: Int, dim: Boolean, rank: Int? = null) {
     val c = Dcc.colors
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // Left of the name, so it looks right, into the row rather than off it.
-        SchoolBadge(team.take(2).uppercase(), team, false, 24.dp, "helmetRight")
+        // Left of the name, so it takes the left helmet — the lt art, which
+        // faces right, into the row rather than off it.
+        SchoolBadge(team.take(2).uppercase(), team, false, 24.dp, "helmet")
         Spacer(Modifier.width(6.dp))
         if (rank != null && rank <= 25) {
             Label("$rank", 9.0, c.ink3, 0.5)

@@ -63,6 +63,37 @@ data class DynastySnapshot(
      */
     val ranks: Map<String, Int> = emptyMap(),
     val heisman: List<SnapshotHeisman> = emptyList(),
+    /**
+     * The wire: what happened around the country in the week the save has
+     * reached, already written on the PC.
+     *
+     * Every number behind it is in this document, so the phone could derive it
+     * — but then the same rules would live twice, in two languages, and drift
+     * the first time one was changed. Older snapshots have no key and the home
+     * screen simply has no wire on it.
+     */
+    val wire: List<SnapshotWire> = emptyList(),
+)
+
+/**
+ * One item on the wire: an upset, a one-possession game, a statement, who is
+ * still unbeaten, or where a prospect has landed.
+ *
+ * `row` and `playerIndex` are what make it a way into the app rather than a
+ * list you read and leave — a game opens its box score, a prospect opens their
+ * card. Mirrors WireItem in apps/desktop/electron/wire.ts.
+ */
+@Serializable
+data class SnapshotWire(
+    val key: String = "",
+    val kind: String = "",
+    val kicker: String = "",
+    val headline: String = "",
+    val line: String = "",
+    val team: String? = null,
+    val other: String? = null,
+    val row: Int? = null,
+    val playerIndex: Int? = null,
 )
 
 /** One name on the save's own Heisman shortlist. */

@@ -10,6 +10,69 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.64.0] - 2026-09-06
+
+### Added
+
+- **The wire: what is going on around the country, on the front page of both
+  apps.** Home was your team and a rotating feature; underneath it now runs the
+  league's own week. Upsets — a ranked side beaten by someone well below them,
+  named as what it was. Games decided by a possession. A top-ten team leaving no
+  doubt. Who is still unbeaten, and it only ever gets shorter. Where the best
+  prospects in the class have landed, and which of them are still a fight
+  between two schools close together on their list. Every line is arithmetic on
+  your own save — nothing is invented and nothing is a placeholder — and each
+  one opens: a game opens its box score, a prospect opens their card. Each kind
+  is capped so one busy Saturday of one-point finishes cannot crowd the rest of
+  the country off the page.
+- **The top 25, on the home screen.** Your save's own poll where it has one and
+  DCC's arithmetic where it does not, with helmets and records, and a way
+  straight into the full table.
+
+### Changed
+
+- **The headline box sits where a headline box should.** It started at the very
+  top of its column, above everything beside it, and read as a box shoved onto
+  the page. The week the country is in now takes that space and the figure drops
+  to the line the cards beside it stand on.
+- **Clicking the headline opens the game.** One gesture: the story is written
+  from that game's own numbers if there is not one yet, and the box score comes
+  up underneath it — the reading and the numbers on one page. The paragraph that
+  used to sit under the headline explaining that a story could be written is
+  gone. The box is the button.
+- **The helmets are bigger, and they face each other.** 168px on Windows and
+  104dp on Android, up from 96 and 84.
+- **No more blurred logo behind the feature.** It was one school's mark blown up
+  and thrown 30px out of focus, and at full screen it read as a smear rather
+  than a photograph. The colour DCC reads out of that same mark carries the well
+  on its own.
+
+### Fixed
+
+- **The helmets face each other everywhere, and this time for the right
+  reason.** The two names had been read as directions — as though `helmet` were
+  the left-facing art. They are not directions: they are sides. `helmet` is the
+  game's own `lt` art, the left helmet of a pair, and so it faces right. Every
+  place a helmet sits beside a name or across from another one had it backwards:
+  the front-page matchup, the scoreboard rail, the schedule rows and the league
+  table. They now look into the row and into each other.
+
+### Not in this release, and why
+
+- **Leaders in touchdowns, sacks and interceptions.** Season statistics are not
+  decoded. The record-book stores in the save hold all-time marks, not this
+  season's per-player totals, so a leaderboard would be ratings wearing a stat
+  line's clothes. It stays off until the statistics are actually read.
+- **Injury news.** The only "Injury" in a player's record is a *rating* — the
+  trait that governs how easily someone gets hurt. There is no injury status, no
+  weeks-out, and no injury table anywhere in the file. An injury wire would be
+  fiction.
+- **"Recent" commitments and decommitments.** A commitment becomes news by
+  changing, and one save is one moment: there is nothing in the file to compare
+  it against. What the wire carries is where the class stands right now, which
+  is true. Remembering the last read is how that becomes recent, and it is the
+  next thing.
+
 ## [0.63.1] - 2026-09-06
 
 ### Changed

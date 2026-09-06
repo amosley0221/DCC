@@ -8,6 +8,7 @@ import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
 import { buildLeague, orderByRanks, rankings, visibleGames, winPct } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
+import { buildWire, type WireItem } from '../../electron/wire'
 
 const UNASSIGNED = 255
 
@@ -205,6 +206,26 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
       .map(({ p, school, real }) => ({ p, school, real }))
   }, [roster, table, state.teamNames])
 
+  /**
+   * The wire: the country's week, not yours.
+   *
+   * Built from the same held-back view of the season the rest of the page uses,
+   * so it can never print a result from a week you have not reached.
+   */
+  const wire = useMemo(() => buildWire({
+    games: visibleGames(games, me, holdFrom).filter((g) => g.played || !g.postseason),
+    week, table, ranks: rankOf, me,
+    recruits: (roster?.recruitBoard ?? []).map((r) => {
+      const p = (roster?.players ?? []).find((x) => x.index === r.playerIndex)
+      return {
+        index: r.playerIndex,
+        first: p?.first ?? '', last: p?.last ?? '',
+        position: p?.position ?? '', stars: p?.stars ?? 0,
+        nationalRank: r.nationalRank, stage: r.stage, topSchools: r.topSchools,
+      }
+    }),
+  }), [games, me, holdFrom, week, table, rankOf, roster])
+
   const scouted = (p: RosterPlayer) => state.revealAllRecruits || state.revealedRecruits.includes(p.playerId)
 
   const board = useMemo(
@@ -346,12 +367,15 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
           />
         ) : (
           <>
-            <div className="gs-feature-dots">
-              {SLIDES.map((s) => (
-                <button key={s} aria-label={s} title={s.toLowerCase()}
-                  className={`gs-feature-dot${slide === s ? ' is-on' : ''}`}
-                  onClick={() => pick(s)} />
-              ))}
+            <div className="gs-main-head">
+              <Kicker>{week ? `Around the country · week ${week}` : 'Around the country'}</Kicker>
+              <div className="row" style={{ gap: 7 }}>
+                {SLIDES.map((sl) => (
+                  <button key={sl} aria-label={sl} title={sl.toLowerCase()}
+                    className={`gs-feature-dot${slide === sl ? ' is-on' : ''}`}
+                    onClick={() => pick(sl)} />
+                ))}
+              </div>
             </div>
 
             {slide === 'GAME' && last ? (
@@ -462,6 +486,46 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                 ))}
               </FeatureList>
             )}
+
+            <div className="gs-below">
+              <section>
+                <div className="card-head" style={{ marginBottom: 4 }}>
+                  <Kicker>The wire</Kicker>
+                  <Meta size={9}>{week ? `WEEK ${week}` : 'PRESEASON'}</Meta>
+                </div>
+                {wire.length ? wire.map((it) => (
+                  <WireRow
+                    key={it.key} it={it} artOf={artOf}
+                    onOpen={() => {
+                      if (it.row !== undefined) setOpen({ kind: 'game', row: it.row })
+                      else if (it.playerIndex !== undefined) setOpen({ kind: 'player', index: it.playerIndex })
+                    }}
+                  />
+                )) : (
+                  <Meta size={10}>NOTHING PLAYED YET</Meta>
+                )}
+              </section>
+
+              <section>
+                <div className="card-head" style={{ marginBottom: 4 }}>
+                  <Kicker>Top 25</Kicker>
+                  {onOpenLeague ? (
+                    <button onClick={onOpenLeague} style={{ all: 'unset', cursor: 'pointer' }}>
+                      <Meta size={9} color="var(--accent-ui)">FULL TABLE →</Meta>
+                    </button>
+                  ) : null}
+                </div>
+                {order.slice(0, 25).map((r, i) => (
+                  <div key={r.name} className={`gs-poll-row${r.name === me ? ' is-me' : ''}`}>
+                    <span className="gs-poll-rank">{i + 1}</span>
+                    <SchoolArt size={22} file={artOf(r.name, 'helmet')} />
+                    <span className="gs-poll-name">{r.name}</span>
+                    <span className="gs-poll-rec">{r.wins}<i className="gs-dash" />{r.losses}</span>
+                  </div>
+                ))}
+                {!order.length ? <Meta size={10}>NO TABLE READ</Meta> : null}
+              </section>
+            </div>
           </>
         )}
       </div>
@@ -608,12 +672,37 @@ function FeatureList({ kicker, headline, standfirst, bg, tint, children }: {
 }
 
 /**
- * The feature: the last result, told as a story.
+ * One item on the wire.
  *
- * The well carries the scoreline at broadcast size rather than a photograph —
- * the save has no images, and a fabricated one would be the only invented thing
- * on the page.
+ * A helmet, a kicker, the line, and the sentence under it. Games open their box
+ * score and prospects open their card, so the wire is a way into the page
+ * rather than a list you read and leave.
  */
+function WireRow({ it, artOf, onOpen }: {
+  it: WireItem
+  artOf: (n: string | null | undefined, k?: 'logoLight' | 'helmet' | 'helmetRight') => string | undefined
+  onOpen: () => void
+}) {
+  const openable = it.row !== undefined || it.playerIndex !== undefined
+  return (
+    <button
+      className="gs-wire-row"
+      onClick={openable ? onOpen : undefined}
+      style={{ cursor: openable ? 'pointer' : 'default' }}
+    >
+      <span className="gs-wire-art">
+        <SchoolArt size={34} file={artOf(it.team, 'helmet')} />
+        {it.other ? <SchoolArt size={26} file={artOf(it.other, 'helmetRight') ?? artOf(it.other, 'helmet')} /> : null}
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <Meta size={9} color="var(--accent-ui)">{it.kicker.toUpperCase()}</Meta>
+        <span className="gs-wire-head">{it.headline}</span>
+        <span className="gs-wire-line">{it.line}</span>
+      </span>
+    </button>
+  )
+}
+
 /**
  * One side of the feature matchup: helmet, rank and name, record, score.
  *
@@ -631,7 +720,7 @@ function MatchupSide({ name, art, rank, record, score, won }: {
 }) {
   return (
     <div className="col" style={{ alignItems: 'center', minWidth: 0, flex: 1 }}>
-      <SchoolArt size={96} file={art} />
+      <SchoolArt size={168} file={art} />
       <div className="row" style={{ gap: 5, alignItems: 'baseline', marginTop: 8 }}>
         {rank && rank <= 25 ? <Meta size={11} color="var(--ink4)">#{rank}</Meta> : null}
         <span style={{
@@ -649,6 +738,13 @@ function MatchupSide({ name, art, rank, record, score, won }: {
   )
 }
 
+/**
+ * The feature: the last result, told as a story.
+ *
+ * The well carries the scoreline at broadcast size rather than a photograph —
+ * the save has no images, and a fabricated one would be the only invented thing
+ * on the page.
+ */
 function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, rankOf, recordOf }: {
   g: SeasonGame; team: string | null; apiKey: string
   log: (text: string, kind?: 'good' | 'bad') => void
@@ -683,15 +779,36 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
     else { setError(res.message); log(res.message, 'bad') }
   }
 
+  // Opening the game is one gesture: the story is written if there is not one
+  // yet, and the game itself comes up under it either way. Nothing on the page
+  // explains that a story could be written — the box is the button.
+  const [box, setBox] = useState(false)
+  const openGame = () => {
+    if (!story && apiKey && !busy) void write()
+    setBox(true)
+  }
+
   return (
     <div className="fade-in">
-      <div className="gs-figure">
+      <div
+        className="gs-figure"
+        role="button"
+        tabIndex={0}
+        style={{ cursor: 'pointer' }}
+        title="Open the game — the story is written and the box score opens under it"
+        onClick={openGame}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGame() } }}
+      >
         <FeatureGround bg={bg} tint={tint} />
         <div className="gs-figure-kicker" style={{ zIndex: 1 }}><Kicker>{won ? 'Won' : 'Lost'} · week {g.week}</Kicker></div>
         {/*
           A matchup, not a bare scoreline. Each side stands under its own
           helmet with its rank, its record and its score, the way a broadcast
           titles a game — the helmets carry it and the numbers follow.
+
+          The helmet names are for the SIDE a helmet is placed on, not the way
+          it looks: the game's lt art belongs on the left and so faces right.
+          Reading them as directions is what pointed them outward, twice.
         */}
         <div
           className="row"
@@ -701,7 +818,7 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
           }}
         >
           <MatchupSide
-            name={g.away} art={artOf(g.away, 'helmetRight') ?? artOf(g.away, 'helmet')}
+            name={g.away} art={artOf(g.away, 'helmet')}
             rank={rankOf(g.away)} record={recordOf(g.away)}
             score={g.awayScore} won={g.awayScore >= g.homeScore}
           />
@@ -711,7 +828,7 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
             <Meta size={9} color="var(--accent-ui)">{g.played ? 'FINAL' : 'UPCOMING'}</Meta>
           </div>
           <MatchupSide
-            name={g.home} art={artOf(g.home, 'helmet')}
+            name={g.home} art={artOf(g.home, 'helmetRight') ?? artOf(g.home, 'helmet')}
             rank={rankOf(g.home)} record={recordOf(g.home)}
             score={g.homeScore} won={g.homeScore > g.awayScore}
           />
@@ -736,57 +853,45 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
             ))}
           </>
         ) : (
-          <p className="body-serif" style={{ margin: '12px 0 0', maxWidth: 520 }}>
-            {won
-              ? `${team ?? 'You'} came out of week ${g.week} at ${g.attendance ? g.attendance.toLocaleString() : 'home'}.`
-              : `A week ${g.week} loss to ${other}.`}
-            {' '}Ask for the story and it is written from this game's own numbers — the teams, the
-            records, the conditions and the score.
-          </p>
+          null
         )}
 
         <div className="row" style={{ gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
           <Btn variant="primary" onClick={write} disabled={busy || !apiKey}>
             {busy ? 'Writing…' : story ? 'Write another' : 'Read'}
           </Btn>
-          <Btn onClick={onBoxScore}>Box score</Btn>
+          <Btn onClick={() => setBox((b) => !b)}>{box ? 'Hide the game' : 'Box score'}</Btn>
+          <Btn onClick={onBoxScore}>Open it fully</Btn>
           {!apiKey ? <Meta size={10}>ADD AN API KEY IN SETTINGS</Meta> : null}
           {error ? <Meta size={10} color="var(--accent-ui)">{error.toUpperCase()}</Meta> : null}
         </div>
+
+        {/* The game under the writing, not instead of it. */}
+        {box ? <div style={{ marginTop: 22 }}><BoxLine g={g} /></div> : null}
       </div>
     </div>
   )
 }
 
-/** A game opened from the Saturday rail. */
-function BoxScore({ g, onClose }: { g: SeasonGame; onClose: () => void }) {
-  const homeWon = g.homeScore > g.awayScore
+/**
+ * The game itself: the line by quarter, the scoring compared, the conditions.
+ *
+ * Its own component because it is now wanted in two places — the full box
+ * score you open from the rail, and inline under the story on the front page,
+ * which is what "show the box score along with what was written" asks for.
+ * Team totals are not decoded, so the quarters are the only per-team series
+ * there is; the bars compare those rather than implying yardage the save has
+ * not given up.
+ */
+function BoxLine({ g }: { g: SeasonGame }) {
   const quarters = ['1', '2', '3', '4']
-  // Only the quarters the save actually holds; overtime is its own column.
+  const homeWon = g.homeScore > g.awayScore
   const rows: [string, number[], number, boolean][] = [
     [g.away ?? 'Away', g.awayQ, g.awayScore, !homeWon],
     [g.home ?? 'Home', g.homeQ, g.homeScore, homeWon],
   ]
-
   return (
-    <div className="fade-in">
-      <div className="row" style={{ gap: 14, alignItems: 'baseline' }}>
-        <Kicker>Box score · week {g.week}</Kicker>
-        <button className="gs-close" onClick={onClose}>Close ✕</button>
-      </div>
-
-      <div className="gs-figure" style={{ marginTop: 14 }}>
-        <div className="gs-figure-score">
-          <span className={homeWon ? 'is-lost' : ''}>{g.awayScore}</span>
-          <i className="gs-dash" />
-          <span className={homeWon ? '' : 'is-lost'}>{g.homeScore}</span>
-        </div>
-        <div className="gs-figure-caption">
-          {`${g.away} at ${g.home}  ·  ${dateLabel(g.month, g.day)}`}
-          {g.overtime ? '  ·  Overtime' : ''}
-        </div>
-      </div>
-
+    <>
       <table className="tbl" style={{ marginTop: 20 }}>
         <thead>
           <tr>
@@ -855,6 +960,33 @@ function BoxScore({ g, onClose }: { g: SeasonGame; onClose: () => void }) {
           </div>
         ))}
       </div>
+    </>
+  )
+}
+/** A game opened from the Saturday rail. */
+function BoxScore({ g, onClose }: { g: SeasonGame; onClose: () => void }) {
+  const homeWon = g.homeScore > g.awayScore
+
+  return (
+    <div className="fade-in">
+      <div className="row" style={{ gap: 14, alignItems: 'baseline' }}>
+        <Kicker>Box score · week {g.week}</Kicker>
+        <button className="gs-close" onClick={onClose}>Close ✕</button>
+      </div>
+
+      <div className="gs-figure" style={{ marginTop: 14 }}>
+        <div className="gs-figure-score">
+          <span className={homeWon ? 'is-lost' : ''}>{g.awayScore}</span>
+          <i className="gs-dash" />
+          <span className={homeWon ? '' : 'is-lost'}>{g.homeScore}</span>
+        </div>
+        <div className="gs-figure-caption">
+          {`${g.away} at ${g.home}  ·  ${dateLabel(g.month, g.day)}`}
+          {g.overtime ? '  ·  Overtime' : ''}
+        </div>
+      </div>
+
+      <BoxLine g={g} />
     </div>
   )
 }
