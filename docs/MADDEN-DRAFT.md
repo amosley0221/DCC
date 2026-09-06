@@ -48,25 +48,73 @@ by it exactly as football would:
 
 Which value is which position still needs one player named on screen.
 
+## The ratings are alphabetical, one byte each, from 5718
+
+A screenshot of Cooper Barkate's card in Madden settled it. Thirteen ratings
+were legible, and every one of their values appears in his record — but the
+decisive part is that they appear **in strictly increasing offset order**:
+
+| Rating | Value | Byte |
+| --- | --- | --- |
+| Acceleration | 91 | 5718 |
+| Agility | 88 | 5719 |
+| Awareness | 69 | 5720 |
+| BC Vision | 69 | 5721 |
+| Break Tackle | 68 | 5724 |
+| Carrying | 67 | 5725 |
+| Change of Direction | 88 | 5728 |
+| Juke Move | 69 | 5733 |
+| Speed | 89 | 5759 |
+| Spin Move | 67 | 5760 |
+| Stiff Arm | 59 | 5762 |
+| Strength | 53 | 5763 |
+| Trucking | 61 | 5773 |
+
+That is alphabetical order, and the gaps are the right size for the names that
+fall in them: two slots between BC Vision and Break Tackle for Block Shedding
+and Break Sack, two between Carrying and Change of Direction for Catch in
+Traffic and Catching, and Speed, Spin Move, Stamina, Stiff Arm, Strength
+landing on five consecutive bytes.
+
+**Confirmed independently**, without the screenshot, by what the class does with
+those bytes. If the order is alphabetical then Tackle and the Throw ratings fill
+the gap between Strength (5763) and Trucking (5773), and they do:
+
+| Byte | QB mean | OL mean | Receivers | Reading |
+| --- | --- | --- | --- | --- |
+| 5764 | 36 | 25 | 33 | Tackle — nobody's specialty |
+| 5765 | 72 | 12 | 17 | a throw rating |
+| 5766 | 75 | 13 | 17 | a throw rating |
+| 5768 | 77 | 13 | 17 | a throw rating |
+| 5769 | 74 | 14 | 19 | a throw rating |
+| 5770 | 90 | 24 | 30 | Throw Power |
+| 5771 | 68 | 21 | 24 | a throw rating |
+| 5772 | 90 | 90 | 85 | Toughness — everybody has it |
+
+Six bytes that only quarterbacks have, in the one place alphabetical order says
+throwing belongs. That is not a coincidence.
+
+Byte 5739 reads 127 for every player in the class, so it is a cap or a sentinel
+rather than a rating.
+
 ## What is still needed
 
-**One screenshot of a single player's card in Madden**, showing his position and
-his ratings. That is all. With the numbers beside the bytes below, most of the
-block labels itself in one pass, because the values are distinctive enough to
-line up unambiguously.
+**The rest of that same ratings list, scrolled down.** The card cuts off at Juke
+Move, which is thirteen of roughly fifty-five. Because the order is alphabetical
+and now proven, every further label pins a byte outright. The unresolved parts
+are:
 
-Cooper Barkate is **record 72**, position value 3. His bytes:
+- bytes 5729–5732, between Change of Direction and Juke Move: four slots for
+  what should be Elusiveness, Finesse Moves, Hit Power and Impact Blocking, so
+  one of the names assumed here is wrong or absent
+- everything from Jumping to Spectacular Catch — bytes 5734 to 5758, the largest
+  unlabelled run, covering kicking, coverage, blocking and route running
+- which of 5765–5771 is short, medium and deep accuracy, which is on the run,
+  and which is under pressure
 
-```
-5717: 63   5718: 91   5719: 88   5720: 69   5721: 69   5722: 36   5723: 27
-5724: 68   5725: 67   5726: 79   5727: 78   5728: 88   5729: 30   5730: 56
-5731: 39   5732: 90   5733: 69   5734: 89   5735: 27   5736: 31   5737: 59
-5738: 22   5739: 127  5740: 28   5744: 75   5750: 73   5751: 77   5752: 76
-5753: 72   5758: 76   5759: 89   5760: 67   5761: 92   5762: 59   5763: 53
-5772: 88   5773: 61   5788: 66
-```
-
-The 127 at 5739 is almost certainly a cap or sentinel rather than a rating.
+**From the Player Info tab:** position, height, weight, age and college. That
+pins position value 3 to a real position and probably explains the 16-bit fields
+at 5834–5842.
 
 The second thing needed cannot be done here at all: **whether Madden accepts a
 file DCC has written**. There is no Madden in this environment, so the loop has
