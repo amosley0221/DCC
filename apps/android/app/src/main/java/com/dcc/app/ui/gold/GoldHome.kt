@@ -49,6 +49,7 @@ import com.dcc.app.data.SnapshotRecruit
 import com.dcc.app.data.name
 import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.ArtImage
+import com.dcc.app.ui.sections.ClassTable
 import com.dcc.app.ui.components.PlayerFace
 import com.dcc.app.ui.components.SchoolBadge
 import com.dcc.app.ui.theme.Dcc
@@ -158,7 +159,13 @@ fun GoldHome(
                     me?.name, me?.wins, me?.losses, last, biggest, heisman, topCommit,
                     onOpenGame, onOpenBoard, Modifier.weight(0.58f),
                 )
-                BoardWell(board, state, onOpenBoard, Modifier.weight(0.42f))
+                Column(Modifier.weight(0.42f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BoardWell(board, state, onOpenBoard, Modifier.fillMaxWidth())
+                    // The panel is taller than the column needs, and a
+                    // recruiting-minded glance wants this more than it wants
+                    // empty ground.
+                    ClassTable(snap, limit = 8)
+                }
             }
         } else {
             FeatureWell(

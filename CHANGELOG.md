@@ -10,6 +10,30 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.58.0] - 2026-09-06
+
+### Added
+
+- **Recruiting class rankings**, on both apps. Every school with a commit,
+  strongest class first, with its five-stars, its commit count and your own
+  school always on screen even when it is not near the top.
+
+  A class is not a headcount, so one commit is worth more the higher he is
+  ranked nationally — the gap between the 20th recruit and the 200th is real and
+  both are four stars. The card says plainly that this is DCC's own ordering of
+  the commits in your save: the game keeps a class ranking of its own and it is
+  not decoded, and a ranking that looks official but is not would be worse than
+  none.
+
+  On your save it puts Penn State first with 27 commits, thirteen of them five
+  stars, including the number one recruit in the country.
+
+### Changed
+
+- **The unfolded panel no longer runs out of content halfway down.** The class
+  table fills the column beside the feature, which is what that space was
+  waiting for.
+
 ## [0.57.2] - 2026-09-06
 
 ### Fixed

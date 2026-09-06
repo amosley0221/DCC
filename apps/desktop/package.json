@@ -1,7 +1,7 @@
 {
   "name": "@dcc/desktop",
   "productName": "Dynasty Command Center",
-  "version": "0.57.2",
+  "version": "0.58.0",
   "private": true,
   "description": "Dynasty Command Center — Windows workspace and save agent.",
   "author": {
@@ -24,7 +24,8 @@
     "check:tamper": "esbuild electron/tamper.ts --bundle --platform=node --format=cjs --outfile=.tmp-tamper.cjs --external:electron --log-level=error && node check-tamper.cjs ./.tmp-tamper.cjs",
     "check:schema": "esbuild electron/schema.ts --bundle --platform=node --format=cjs --outfile=.tmp-schema.cjs --log-level=error && node check-schema.cjs ./.tmp-schema.cjs ../../shared/data/schema-index.json.gz",
     "check:league": "esbuild electron/league.ts --bundle --platform=node --format=cjs --outfile=.tmp-league.cjs --log-level=error && node check-league.cjs ./.tmp-league.cjs",
-    "check:pack": "esbuild electron/artPack.ts --bundle --platform=node --format=cjs --outfile=.tmp-pack.cjs --log-level=error && node check-pack.cjs ./.tmp-pack.cjs"
+    "check:pack": "esbuild electron/artPack.ts --bundle --platform=node --format=cjs --outfile=.tmp-pack.cjs --log-level=error && node check-pack.cjs ./.tmp-pack.cjs",
+    "check:classes": "esbuild electron/recruiting.ts --bundle --platform=node --format=cjs --outfile=.tmp-rec.cjs --log-level=error && node check-classes.cjs ./.tmp-rec.cjs"
   },
   "dependencies": {
     "electron-updater": "6.3.9"

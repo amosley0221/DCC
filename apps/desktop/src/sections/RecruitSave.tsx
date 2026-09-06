@@ -2,8 +2,12 @@ import { useCallback, useMemo, useState } from 'react'
 import { indexArt, rosterPatch, useSave } from '../saveStore'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab } from '../ui'
 import { useOps, useStore } from '../store'
+import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import type { RecruitBoard, RosterPlayer } from '../../electron/saveAnalysis'
-import { CLASS_LABEL, COMMIT_MAX, INTEREST_MAX, RECRUIT_STAGES, STAGE_LABEL } from '../../electron/recruiting'
+import {
+  CLASS_LABEL, COMMIT_MAX, INTEREST_MAX, RECRUIT_STAGES, STAGE_LABEL,
+  classTable, isCommitted, isFirm,
+} from '../../electron/recruiting'
 
 /**
  * The schools worth showing on a row: the one he picked, or the three still in
@@ -256,6 +260,7 @@ export default function RecruitSave() {
     </Card>
 
     <div className="col" style={{ gap: 12 }}>
+      <ClassRankings board={board} players={save.roster?.players ?? []} me={state.teamId} crest={crest} />
       <Card className="card-pad">
         <Kicker>Narrow the pool</Kicker>
       <div className="row" style={{ gap: 8, marginTop: 9, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -514,5 +519,93 @@ function RecruitBoardPanel(
         </div>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Which school is winning the recruiting year.
+ *
+ * The game keeps a class ranking of its own and DCC has not found it in the
+ * save, so this is DCC's ordering of your save's own commits rather than the
+ * game's number — which the card says, because a ranking that looks official
+ * and is not is worse than no ranking at all.
+ */
+function ClassRankings(
+  { board, players, me, crest }: {
+    board: Map<number, RecruitBoard>
+    players: RosterPlayer[]
+    me: number | null
+    crest: (school: string) => string | undefined
+  },
+) {
+  const [all, setAll] = useState(false)
+  const myName = me === null ? null : TEAM_ID_NAMES[me] ?? null
+
+  const table = useMemo(() => {
+    const byIndex = new Map(players.map((p) => [p.index, p]))
+    const commits: Parameters<typeof classTable>[0] = []
+    for (const b of board.values()) {
+      if (!isCommitted(b.stage)) continue
+      const school = [...b.topSchools].sort((x, y) => y.interest - x.interest)[0]?.school
+      if (!school) continue
+      commits.push({
+        school,
+        stars: byIndex.get(b.playerIndex)?.stars ?? 3,
+        nationalRank: b.nationalRank,
+        firm: isFirm(b.stage),
+      })
+    }
+    return classTable(commits)
+  }, [board, players])
+
+  if (!table.length) return null
+  const mine = table.findIndex((r) => r.school === myName)
+  // Your own class is always on screen even when it is not near the top.
+  const shown = all ? table : table.slice(0, 10)
+  const rows = !all && mine >= 10 ? [...shown, table[mine]] : shown
+
+  return (
+    <Card className="card-pad">
+      <div className="row" style={{ alignItems: 'baseline' }}>
+        <Kicker>Recruiting classes</Kicker>
+        <span style={{ marginLeft: 'auto' }}>
+          <button className="gs-close" onClick={() => setAll(!all)}>
+            {all ? 'Top ten' : `All ${table.length}`}
+          </button>
+        </span>
+      </div>
+      <div className="col" style={{ gap: 1, marginTop: 9 }}>
+        {rows.map((r) => {
+          const place = table.indexOf(r) + 1
+          const own = r.school === myName
+          return (
+            <div key={r.school} className="row"
+              style={{
+                gap: 9, alignItems: 'center', padding: '5px 6px', borderRadius: 4,
+                background: own ? 'var(--rule)' : 'transparent',
+              }}>
+              <span style={{ width: 22, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
+                {place}
+              </span>
+              <SchoolArt size={17} file={crest(r.school)} />
+              <span style={{ flex: 1, minWidth: 0, color: own ? 'var(--ink)' : 'var(--ink2)' }}>
+                {r.school}
+              </span>
+              <span style={{ color: 'var(--ink4)', fontSize: 11 }}>
+                {r.byStar[0] ? `${r.byStar[0]}×5★ ` : ''}{r.byStar[1] ? `${r.byStar[1]}×4★` : ''}
+              </span>
+              <span style={{ width: 30, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
+                {r.commits}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <Meta size={9} color="var(--ink4)">
+          DCC&rsquo;S OWN ORDERING OF THE COMMITS IN YOUR SAVE — THE GAME KEEPS ITS OWN AND IT IS NOT DECODED
+        </Meta>
+      </div>
+    </Card>
   )
 }

@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.dcc.app.data.Classes
 import com.dcc.app.data.Persisted
 import com.dcc.app.data.SaveLabels
 import com.dcc.app.data.SnapshotRecruit
@@ -147,6 +148,10 @@ fun RecruitSnapshotSection(vm: AppViewModel, state: Persisted, view: SnapshotVie
         Spacer(Modifier.height(8.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            item {
+                ClassTable(view, limit = 5)
+                Spacer(Modifier.height(10.dp))
+            }
             if (shown.isEmpty()) item { DccCard { EmptyState("no recruit matches that") } }
             items(shown, key = { it.index }) { r ->
                 RecruitRow(
@@ -414,5 +419,57 @@ private fun RecruitRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * Which school is winning the recruiting year.
+ *
+ * DCC's own ordering of the commits in the save — the game keeps a class
+ * ranking and it is not decoded — so the card says as much rather than passing
+ * off a number of its own as the game's.
+ */
+@Composable
+fun ClassTable(view: SnapshotView, limit: Int = 10) {
+    val c = Dcc.colors
+    val table = remember(view) { Classes.of(view.recruits) }
+    if (table.isEmpty()) return
+    val myName = view.userTeam?.name
+    val mine = table.indexOfFirst { it.school == myName }
+    val rows = table.take(limit).toMutableList()
+    if (mine >= limit) rows.add(table[mine])
+
+    DccCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MonoLabel("RECRUITING CLASSES", c.ink3, 9, Modifier.weight(1f))
+            MetaText("${table.size} SCHOOLS", c.ink4, 9)
+        }
+        Spacer(Modifier.height(8.dp))
+        rows.forEach { r ->
+            val place = table.indexOf(r) + 1
+            val own = r.school == myName
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.width(20.dp)) { MetaText("$place", c.ink4, 10) }
+                SchoolBadge(r.school.take(2).uppercase(), r.school, own, 18.dp)
+                Spacer(Modifier.width(8.dp))
+                MetaText(
+                    r.school,
+                    if (own) c.ink else c.ink2,
+                    11,
+                    Modifier.weight(1f),
+                    maxLines = 1,
+                )
+                if (r.byStar[0] > 0) {
+                    MetaText("${r.byStar[0]}×5★", c.accent, 9)
+                    Spacer(Modifier.width(7.dp))
+                }
+                NumText("${r.commits}", c.ink3, 11)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        MetaText("DCC'S OWN ORDER OF YOUR SAVE'S COMMITS — NOT THE GAME'S NUMBER", c.ink4, 8, maxLines = 2)
     }
 }
