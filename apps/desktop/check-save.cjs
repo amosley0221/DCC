@@ -441,6 +441,43 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
     'an empty save has no recruiting board')
 }
 
+/* ------------------------------------ the schema version is read, not assumed */
+// CFB 27 says 486 and Madden 27 says 620. The reader used to require 486, so a
+// Madden save came back with no stores at all even though its container, its
+// compression and its store headers are identical. The version is now whatever
+// the file's own stores agree on.
+{
+  const build = (major, names) => {
+    const parts = [Buffer.alloc(64)]
+    for (const [name, rows] of names) {
+      const n = Buffer.from(name, 'latin1')
+      parts.push(Buffer.concat([
+        Buffer.from('SPBF', 'latin1'), u32(major), u32(1), u32(0), u32(n.length), n,
+        u32(0x40), u32(0), u32(rows),
+        Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(4), u32(rows), u32(2), u32(0),
+        Buffer.alloc(8),
+      ]))
+    }
+    return Buffer.concat(parts)
+  }
+  for (const major of [486, 620, 999]) {
+    const payload = build(major, [['TeamStore', 143], ['DepthChartStore', 32], ['HistoryEntryStore', 900]])
+    assert.equal(S.schemaMajor(payload), major, `a save declaring ${major} reports ${major}`)
+    const names = S.readStores(payload).map((s) => s.name).sort()
+    assert.deepEqual(names, ['DepthChartStore', 'HistoryEntryStore', 'TeamStore'],
+      `every store reads in a ${major} save`)
+  }
+  // A stray marker carrying a different version is noise, not a second schema.
+  const mixed = Buffer.concat([
+    build(620, [['TeamStore', 143], ['DepthChartStore', 32], ['HistoryEntryStore', 900]]),
+    build(486, [['StrayStore', 7]]),
+  ])
+  assert.equal(S.schemaMajor(mixed), 620, 'the version the stores agree on wins')
+  assert.ok(!S.readStores(mixed).some((s) => s.name === 'StrayStore'),
+    'a store from another schema is dropped')
+  assert.equal(S.schemaMajor(Buffer.alloc(4096)), null, 'a save with no stores declares nothing')
+}
+
 /* ------------------------------------- the recruiting class ranking */
 // The game does keep a class ranking, which DCC spent a long time believing it
 // did not: every earlier search asked whether a field *holds* the numbers one
@@ -511,4 +548,5 @@ console.log('            a poll is found by pointing at one rank you can read,')
 console.log('            the Heisman five resolve to real roster rows,')
 console.log('            one poll sweep reads the store header once, not per bit,')
 console.log('            the recruiting board reads ranks, commit score and stage,')
-console.log('            and the class ranking is read only when it is a real ordering')
+console.log('            the class ranking is read only when it is a real ordering,')
+console.log('            and the schema version is read off the save, not assumed to be CFB')

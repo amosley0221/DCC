@@ -1657,29 +1657,69 @@ export function readStores(payload: Buffer): StoreRecord[] {
   return found
 }
 
-function scanStores(payload: Buffer): StoreRecord[] {
+/**
+ * Every store in the payload, with the schema version each one declares.
+ *
+ * A `SPBF` marker turns up inside ordinary data too, so a candidate only counts
+ * when it also carries a plausible name and a `BSFT` block right behind it.
+ */
+function storeCandidates(payload: Buffer): (StoreRecord & { major: number })[] {
   const marker = Buffer.from('SPBF', 'latin1')
   const bsft = Buffer.from('BSFT', 'latin1')
-  const out: StoreRecord[] = []
+  const out: (StoreRecord & { major: number })[] = []
   let i = 0
   while ((i = payload.indexOf(marker, i)) !== -1) {
     i += 4
     if (i + 16 > payload.length) break
     const major = payload.readUInt32BE(i)
     const nameLen = payload.readUInt32BE(i + 12)
-    if (major !== 486 || nameLen === 0 || nameLen > 96 || i + 16 + nameLen > payload.length) continue
+    if (!major || nameLen === 0 || nameLen > 96 || i + 16 + nameLen > payload.length) continue
     const name = payload.subarray(i + 16, i + 16 + nameLen).toString('latin1')
     if (!/^[A-Za-z0-9_]+$/.test(name)) continue
     const after = i + 16 + nameLen
     const at = payload.indexOf(bsft, after)
-    if (at < 0 || at > after + 64) continue
+    if (at < 0 || at > after + 64 || at + 24 > payload.length) continue
     out.push({
-      name,
-      offset: i - 4,
+      name, major, offset: i - 4,
       rows: payload.readUInt32BE(at + 16),
       members: payload.readUInt32BE(at + 20),
     })
   }
+  return out
+}
+
+/**
+ * The schema version a save declares, which is the game that wrote it.
+ *
+ * CFB 27 says 486 and Madden 27 says 620. This used to be hard-coded to 486,
+ * which is why pointing the reader at a Madden save found nothing at all: the
+ * container, the compression, the store headers and the `BSFT` layout are the
+ * same in both games, and that one number was rejecting every store in the file.
+ *
+ * It is read off the save rather than listed, so a title this has never seen
+ * still reads. Stores that disagree with the majority are dropped as noise — in
+ * a real save of either game the true version outnumbers the rest by more than
+ * fifty to one.
+ */
+export function schemaMajor(payload: Buffer): number | null {
+  const seen = new Map<number, number>()
+  for (const s of storeCandidates(payload)) seen.set(s.major, (seen.get(s.major) ?? 0) + 1)
+  let best: number | null = null
+  let most = 0
+  for (const [major, n] of seen) if (n > most) { most = n; best = major }
+  return best
+}
+
+function scanStores(payload: Buffer): StoreRecord[] {
+  const found = storeCandidates(payload)
+  const seen = new Map<number, number>()
+  for (const s of found) seen.set(s.major, (seen.get(s.major) ?? 0) + 1)
+  let version: number | null = null
+  let most = 0
+  for (const [major, n] of seen) if (n > most) { most = n; version = major }
+  const out: StoreRecord[] = found
+    .filter((s) => s.major === version)
+    .map(({ name, offset, rows, members }) => ({ name, offset, rows, members }))
   return out.sort((a, b) => b.rows - a.rows)
 }
 

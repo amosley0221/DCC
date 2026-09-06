@@ -81,3 +81,28 @@ everybody comes across with the floor value.
 20 MB, and structured like the dynasty save rather than like a draft class. It
 does **not** contain the class in `CAREERDRAFTCFBCLASS1`: Barkate, Mateer and
 Uiagalelei are all absent from it. It is a career from before the import.
+
+## The career save, and what adding Madden would actually cost
+
+A Madden 27 career save is the *same format as a CFB dynasty save*, not a
+cousin. Same `FBCHUNKS` wrapper, same zlib from byte 82, same `SPBF` store
+headers, same `BSFT` block describing each store's own row size and member
+offsets. Pointing DCC's reader at one originally found **nothing at all**, and
+the reason was a single hard-coded number: `scanStores` required schema major
+486, which is CFB's. Madden 27 declares **620**.
+
+The version is now read off the save instead. With that one change DCC's
+existing reader finds **92 stores in the Bucs career save**, and **38 of them
+are stores CFB has too** — `TeamStore`, `DepthChartStore`, `HistoryEntryStore`,
+`PlayerSeasonStatRecordStore`, `PlayerCareerStatRecordStore` among them.
+
+So the structural half of a Madden reader already exists and always did. What
+does not transfer is the meaning: every bit offset inside a record was derived
+against CFB and would have to be derived again, which is the part that took this
+project months. Two things make that cheaper the second time — the method is
+known, and the draft class shows Madden 27 storing ratings **unpacked, one byte
+each**, where CFB bit-packs everything.
+
+The equivalent of `C27_486_1.gz` for Madden — its schema file from the game
+install — would do for Madden what it did for CFB: name every member of all 92
+stores, without giving away a single offset.
