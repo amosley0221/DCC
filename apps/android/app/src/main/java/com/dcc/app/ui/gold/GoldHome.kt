@@ -125,7 +125,7 @@ fun GoldHome(
     val rankOf = remember(table) {
         League.rankings(table).withIndex().associate { (i, r) -> r.index to i + 1 }
     }
-    val recordOf = remember(table) { table.associate { it.index to (it.wins to it.losses) } }
+    val recordOf = remember(table) { table.mapValues { (_, r) -> r.wins to r.losses } }
     val bestRank = { g: SnapshotGame ->
         minOf(rankOf[g.homeIndex] ?: 999, rankOf[g.awayIndex] ?: 999)
     }
