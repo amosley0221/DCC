@@ -80,11 +80,13 @@ __export(saveAnalysis_exports, {
   diffSaves: () => diffSaves,
   dumpStore: () => dumpStore,
   findDictionary: () => findDictionary,
+  findRankColumns: () => findRankColumns,
   findTeamRanks: () => findTeamRanks,
   readChampions: () => readChampions,
   readCoaches: () => readCoaches,
   readDepthCharts: () => readDepthCharts,
   readHeisman: () => readHeisman,
+  readRankField: () => readRankField,
   readRoster: () => readRoster,
   readSavePayload: () => readSavePayload,
   readSeasonGames: () => readSeasonGames,
@@ -1150,7 +1152,16 @@ function readDepthCharts(payload, rosterRows) {
   }
   return charts;
 }
+var storeScans = /* @__PURE__ */ new WeakMap();
+var storeTables = /* @__PURE__ */ new WeakMap();
 function readStores(payload) {
+  const seen = storeScans.get(payload);
+  if (seen) return seen;
+  const found = scanStores(payload);
+  storeScans.set(payload, found);
+  return found;
+}
+function scanStores(payload) {
   const marker = Buffer.from("SPBF", "latin1");
   const bsft = Buffer.from("BSFT", "latin1");
   const out = [];
@@ -1242,6 +1253,18 @@ function seasonGameTable(payload) {
   return t && { data: t.data, rows: t.rows };
 }
 function storeTable(payload, name) {
+  let byName = storeTables.get(payload);
+  if (!byName) {
+    byName = /* @__PURE__ */ new Map();
+    storeTables.set(payload, byName);
+  }
+  const seen = byName.get(name);
+  if (seen !== void 0) return seen;
+  const found = locateTable(payload, name);
+  byName.set(name, found);
+  return found;
+}
+function locateTable(payload, name) {
   const store = readStores(payload).find((s) => s.name === name);
   if (!store) return null;
   const bsft = payload.indexOf(Buffer.from("BSFT", "latin1"), store.offset);
@@ -1373,36 +1396,35 @@ function findTeamRanks(payload) {
   const t = storeTable(payload, "TeamStore");
   if (!t || t.rows < 8 || t.rowBytes < 4) return [];
   const rows = t.rows;
+  const rowBits = t.rowBytes * 8;
+  const at = (base, start, w) => {
+    const i = base + (start >> 3);
+    const shift = start & 7;
+    const v = payload[i] << 16 | payload[i + 1] << 8 | payload[i + 2];
+    return v >>> 24 - shift - w & (1 << w) - 1;
+  };
   const out = [];
-  const readers = [
-    [1, "be", (at) => payload.readUInt8(at)],
-    [2, "be", (at) => payload.readUInt16BE(at)],
-    [2, "le", (at) => payload.readUInt16LE(at)]
-  ];
-  for (const [width, endian, read] of readers) {
-    for (let a = 0; a + width <= t.rowBytes; a++) {
-      const vals = [];
-      let ok = true;
-      for (let r = 0; r < rows; r++) {
-        const cell = t.data + r * t.rowBytes + a;
-        if (cell + width > payload.length) {
-          ok = false;
-          break;
-        }
-        vals.push(read(cell));
-      }
-      if (!ok) continue;
+  const seen = /* @__PURE__ */ new Set();
+  for (let w = 5; w <= 12; w++) {
+    const limit = rowBits - w;
+    for (let start = 0; start <= limit; start++) {
+      if (t.data + (rows - 1) * t.rowBytes + (start >> 3) + 3 > payload.length) break;
+      const vals = new Array(rows);
+      for (let r = 0; r < rows; r++) vals[r] = at(t.data + r * t.rowBytes, start, w);
       if (vals.every((v, i) => v === i + 1) || vals.every((v, i) => v === i)) continue;
       const kind = rankKind(vals, rows);
       if (!kind) continue;
+      const key = vals.join(",");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (out.length >= 12) return out;
       const ranks = {};
       vals.forEach((v, i) => {
         if (v >= 1 && v <= rows) ranks[i] = v;
       });
       out.push({
-        at: a,
-        width,
-        endian,
+        at: start,
+        width: w,
         kind,
         ranks,
         top: Object.entries(ranks).map(([index, rank]) => ({ index: Number(index), rank })).sort((x, y) => x.rank - y.rank).slice(0, 25)
@@ -1412,49 +1434,111 @@ function findTeamRanks(payload) {
   return out;
 }
 function rankKind(vals, rows) {
+  if (vals.length !== rows) return null;
   const sorted = [...vals].sort((a, b) => a - b);
   if (sorted.every((v, i) => v === i + 1)) return "full";
-  const ranked = vals.filter((v) => v >= 1 && v <= 25).sort((a, b) => a - b);
-  if (ranked.length !== 25 || !ranked.every((v, i) => v === i + 1)) return null;
-  const rest = new Set(vals.filter((v) => v < 1 || v > 25));
+  const ranked = vals.filter((v) => v >= 1 && v <= 40).sort((a, b) => a - b);
+  if (ranked.length < 10) return null;
+  if (!ranked.every((v, i) => v === i + 1)) return null;
+  const rest = new Set(vals.filter((v) => v < 1 || v > ranked.length));
   if (rest.size !== 1) return null;
-  if (vals.length !== rows) return null;
   return "top25";
 }
-function readHeisman(payload, playerRows) {
+function readHeisman(payload, roster) {
   const t = storeTable(payload, "HeismanRankingStore");
   if (!t || !t.rows || t.rowBytes < 4) return [];
   const rowAt = (r) => t.data + r * t.rowBytes;
-  let playerAt = -1;
-  for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
-    let all = true;
-    for (let r = 0; r < t.rows; r++) {
-      const at = rowAt(r) + a;
-      if (at + 4 > payload.length) {
-        all = false;
-        break;
-      }
-      if (!playerRows.has(payload.readUInt16BE(at + 2))) {
-        all = false;
-        break;
-      }
-    }
-    if (all) {
-      playerAt = a;
-      break;
-    }
-  }
-  const out = [];
+  const rows = [];
   for (let r = 0; r < t.rows; r++) {
     const o = rowAt(r);
-    if (o + t.rowBytes > payload.length) break;
+    if (o + t.rowBytes > payload.length) return [];
     const words = [];
     for (let i = 0; i + 4 <= t.rowBytes; i += 4) words.push(payload.readUInt32BE(o + i));
-    out.push({
-      rank: r + 1,
-      playerIndex: playerAt >= 0 ? payload.readUInt16BE(o + playerAt + 2) : -1,
-      words
-    });
+    rows.push(words);
+  }
+  const byRow = /* @__PURE__ */ new Map();
+  const byId = /* @__PURE__ */ new Map();
+  for (const p of roster) {
+    if (p.team === TEAM_UNASSIGNED) continue;
+    byRow.set(p.index, p.index);
+    byId.set(p.playerId, p.index);
+  }
+  let best = null;
+  for (const ids of [false, true]) {
+    const table = ids ? byId : byRow;
+    for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
+      const tag = payload.readUInt16BE(rowAt(0) + a);
+      if (tag < 256 || tag === 65535) continue;
+      const resolved = [];
+      for (let r = 0; r < t.rows; r++) {
+        const o = rowAt(r) + a;
+        if (payload.readUInt16BE(o) !== tag) break;
+        const hit = table.get(payload.readUInt16BE(o + 2));
+        if (hit === void 0) break;
+        resolved.push(hit);
+      }
+      if (resolved.length < 3) continue;
+      if (new Set(resolved).size !== resolved.length) continue;
+      if (resolved.every((v, i) => v === i) || resolved.every((v, i) => v === i + 1)) continue;
+      if (!best || resolved.length > best.resolved.length) best = { at: a, ids, resolved };
+    }
+  }
+  return rows.map((words, r) => ({
+    rank: r + 1,
+    playerIndex: best && r < best.resolved.length ? best.resolved[r] : -1,
+    words
+  })).filter((_, r) => best === null || r < best.resolved.length);
+}
+function readRankField(payload, at, width) {
+  const t = storeTable(payload, "TeamStore");
+  if (!t || !t.rows) return [];
+  const out = [];
+  for (let r = 0; r < t.rows; r++) {
+    const base = t.data + r * t.rowBytes;
+    const i = base + (at >> 3);
+    if (i + 3 > payload.length) return [];
+    const shift = at & 7;
+    const v = payload[i] << 16 | payload[i + 1] << 8 | payload[i + 2];
+    out.push(v >>> 24 - shift - width & (1 << width) - 1);
+  }
+  return out;
+}
+function findRankColumns(payload, known, limit = 12) {
+  const t = storeTable(payload, "TeamStore");
+  if (!t || t.rows < 8 || !known.length) return [];
+  const rows = t.rows;
+  const rowBits = t.rowBytes * 8;
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (let width = 5; width <= 12 && out.length < limit; width++) {
+    for (let at = 0; at + width <= rowBits && out.length < limit; at++) {
+      const vals = readRankField(payload, at, width);
+      if (vals.length !== rows) break;
+      for (const base of [1, 0]) {
+        if (!known.every((k) => vals[k.teamIndex] === k.rank - (1 - base))) continue;
+        if (vals.every((v, i) => v === i + base)) continue;
+        const ranks = {};
+        const placed = /* @__PURE__ */ new Set();
+        let clash = false;
+        for (let i = 0; i < rows; i++) {
+          const v = vals[i];
+          const place = v + (1 - base);
+          if (place < 1 || place > rows) continue;
+          if (placed.has(place)) {
+            clash = true;
+            break;
+          }
+          placed.add(place);
+          ranks[i] = place;
+        }
+        if (clash || placed.size < 10) continue;
+        const signature = Object.entries(ranks).sort((x, y) => x[1] - y[1]).map(([i, r]) => `${r}:${i}`).join(",");
+        if (seen.has(signature)) break;
+        seen.add(signature);
+        out.push({ at, width, base, ranked: placed.size, ranks });
+        break;
+      }
+    }
   }
   return out;
 }
@@ -1510,11 +1594,13 @@ function readHeisman(payload, playerRows) {
   diffSaves,
   dumpStore,
   findDictionary,
+  findRankColumns,
   findTeamRanks,
   readChampions,
   readCoaches,
   readDepthCharts,
   readHeisman,
+  readRankField,
   readRoster,
   readSavePayload,
   readSeasonGames,

@@ -1036,6 +1036,18 @@ function Found({ roster, me, path, onApplied }: {
  * team holds its own row number, is the poll. Name a second school and it is
  * beyond argument.
  */
+/** The three the game's own screen switches between. */
+const POLLS = ['CFP', 'MEDIA', 'COACHES'] as const
+
+/**
+ * The last sweep, kept for as long as the app runs.
+ *
+ * Not state, because it must survive the screen being thrown away and rebuilt —
+ * which is exactly what leaving the tab does, and what made a finished search
+ * run again.
+ */
+let lastFound: { for: string | null; found: PollCandidate[] } = { for: null, found: [] }
+
 function PollFinder({ me, path, onApplied }: {
   me: string | null; path: string | null; onApplied: () => void
 }) {
@@ -1045,7 +1057,10 @@ function PollFinder({ me, path, onApplied }: {
   const [rank, setRank] = useState(() => localStorage.getItem('dcc.poll.rank') ?? '')
   const [other, setOther] = useState(() => localStorage.getItem('dcc.poll.other') ?? '')
   const [otherRank, setOtherRank] = useState(() => localStorage.getItem('dcc.poll.otherRank') ?? '')
-  const [found, setFound] = useState<PollCandidate[] | null>(null)
+  // The result outlives the screen: it belongs to the save, and re-deriving it
+  // costs a minute. Cleared when the save changes, which is the only thing that
+  // can make it wrong.
+  const [found, setFound] = useState<PollCandidate[] | null>(() => lastFound.for === path ? lastFound.found : null)
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState<SavedPollView[]>([])
@@ -1054,12 +1069,17 @@ function PollFinder({ me, path, onApplied }: {
 
   useEffect(() => { void window.dcc.savedPolls().then((r) => setSaved(r.polls)) }, [])
 
-  // Coming back to the screen picks up where it was left, rather than showing
-  // an empty box beside polls that are already kept.
+  // Coming back to the screen picks up where it was left. What it must not do
+  // is search again: the sweep is the most expensive thing DCC does, and there
+  // is nothing to find once all three polls are named. Searching on the way in
+  // meant every visit to this tab froze the window for a minute to rediscover
+  // what was already kept.
   useEffect(() => {
-    if (path && me && rank.trim() && !found) void look()
+    if (!path || !me || !rank.trim() || found || busy) return
+    if (POLLS.every((n) => saved.some((p) => p.name === n))) return
+    void look()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, me])
+  }, [path, me, saved])
 
   // What the game's own schema says a team carries, so the number of orderings
   // a search turns up can be recognised rather than wondered at.
@@ -1081,6 +1101,7 @@ function PollFinder({ me, path, onApplied }: {
     setBusy(false)
     if (!res.ok) { setNote(res.message); return }
     setFound(res.found)
+    lastFound = { for: path, found: res.found }
     if (!res.found.length) {
       setNote('nothing in the team table holds those ranks — check the numbers, or the poll is somewhere else')
     }
@@ -1153,7 +1174,7 @@ function PollFinder({ me, path, onApplied }: {
                 </Meta>
                 <span className="row" style={{ gap: 6, marginLeft: 'auto' }}>
                   <Meta size={9} color="var(--ink4)">THIS IS THE</Meta>
-                  {['CFP', 'MEDIA', 'COACHES'].map((name) => (
+                  {POLLS.map((name) => (
                     <button key={name} className="gs-close"
                       style={saved.some((p) => p.name === name && p.at === c.at && p.width === c.width)
                         ? { color: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}

@@ -1,7 +1,7 @@
 {
   "name": "@dcc/desktop",
   "productName": "Dynasty Command Center",
-  "version": "0.49.1",
+  "version": "0.49.2",
   "private": true,
   "description": "Dynasty Command Center — Windows workspace and save agent.",
   "author": {

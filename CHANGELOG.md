@@ -10,6 +10,31 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.49.2] - 2026-09-06
+
+### Fixed
+
+- **Leaving the Save screen and coming back froze the app for a minute.** The
+  window went *Not Responding* because the poll search runs on the process that
+  draws it, and it was running on the way in — rediscovering polls that were
+  already found and kept.
+
+  Two faults, both fixed. It should not have been searching at all: with CFP,
+  Coaches and Media all named there is nothing left to find, so it now only
+  looks when one is missing, and it remembers the last search so returning shows
+  it instantly.
+
+  And the search should never have been slow. Every read of a field starts by
+  locating the store header, and locating it walks the whole save. Once is
+  nothing; the sweep reads a field at every bit position and width, so it did it
+  sixteen thousand times — seventeen seconds on a thirty-megabyte save, and
+  longer on a real one. The header is found once per save now. The same sweep
+  that took 16.9 seconds takes under a tenth of one, and every other reader in
+  the app got faster with it.
+
+  check-save fails on the old code: it asserts the directory is found once, and
+  puts a five-second ceiling on a sweep that used to take seventeen.
+
 ## [0.49.1] - 2026-09-06
 
 ### Fixed

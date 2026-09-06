@@ -1624,7 +1624,29 @@ export function readDepthCharts(payload: Buffer, rosterRows: Set<number>): Depth
   return charts
 }
 
+/**
+ * Where the store directory and its tables were last found, per save.
+ *
+ * Both walk the whole payload — `readStores` scans it end to end for every
+ * `SPBF`, and `storeTable` scans again for the `BSFT` that follows one. That is
+ * cheap once and ruinous in a loop: the poll search reads a field at every bit
+ * position and width, so it called this sixteen thousand times and spent
+ * seventeen seconds of a thirty-megabyte save on nothing but finding the same
+ * header again. Keyed on the buffer itself, so a re-read of the save gets a
+ * fresh answer and nothing has to remember to clear it.
+ */
+const storeScans = new WeakMap<Buffer, StoreRecord[]>()
+const storeTables = new WeakMap<Buffer, Map<string, StoreTable | null>>()
+
 export function readStores(payload: Buffer): StoreRecord[] {
+  const seen = storeScans.get(payload)
+  if (seen) return seen
+  const found = scanStores(payload)
+  storeScans.set(payload, found)
+  return found
+}
+
+function scanStores(payload: Buffer): StoreRecord[] {
   const marker = Buffer.from('SPBF', 'latin1')
   const bsft = Buffer.from('BSFT', 'latin1')
   const out: StoreRecord[] = []
@@ -1802,6 +1824,16 @@ export interface StoreTable {
  * word means something else — so a caller must range-check before reading.
  */
 export function storeTable(payload: Buffer, name: string): StoreTable | null {
+  let byName = storeTables.get(payload)
+  if (!byName) { byName = new Map(); storeTables.set(payload, byName) }
+  const seen = byName.get(name)
+  if (seen !== undefined) return seen
+  const found = locateTable(payload, name)
+  byName.set(name, found)
+  return found
+}
+
+function locateTable(payload: Buffer, name: string): StoreTable | null {
   const store = readStores(payload).find((s) => s.name === name)
   if (!store) return null
   const bsft = payload.indexOf(Buffer.from('BSFT', 'latin1'), store.offset)

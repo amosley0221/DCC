@@ -309,8 +309,56 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
     'a counter is not a player reference, however valid its values look')
 }
 
+/* ------------------------------------- the search does not rescan the save */
+// Every reader starts by finding the store header, and both ways of finding it
+// walk the whole payload. Once that is fine. The poll search reads a field at
+// every bit position and every width, so it did it sixteen thousand times and
+// took seventeen seconds on a thirty-megabyte save, with the window frozen the
+// whole time because it runs on the process that draws it.
+{
+  const TEAMS = 138, TMEMBERS = 424, TROW = 256
+  const tname = Buffer.from('TeamStore', 'latin1')
+  const thead = Buffer.concat([
+    Buffer.from('SPBF', 'latin1'), u32(486), u32(1), u32(0), u32(tname.length), tname,
+    u32(0x40), u32(0), u32(TEAMS),
+    Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(TROW / 4), u32(TEAMS), u32(TMEMBERS), u32(0),
+    Buffer.alloc(TMEMBERS * 4),
+  ])
+  const trows = Buffer.alloc(TROW * TEAMS)
+  const putBits = (row, start, w, v) => {
+    for (let b = 0; b < w; b++) {
+      const bit = start + b
+      const mask = 1 << (7 - (bit & 7))
+      const at = row * TROW + (bit >> 3)
+      if ((v >> (w - 1 - b)) & 1) trows[at] |= mask
+      else trows[at] &= ~mask
+    }
+  }
+  // Twenty-five ranked, the rest holding stale numbers past the last place, the
+  // way a real poll sits — the unranked keep whatever they held before.
+  const poll = Array.from({ length: TEAMS }, (_, i) => (i < 25 ? i + 1 : 200 + (i % 50)))
+  for (let r = 0; r < TEAMS; r++) putBits(r, 300, 8, poll[r])
+
+  // Sized like the real thing, because the cost is per byte of payload.
+  const big = Buffer.concat([Buffer.alloc(64), thead, trows, Buffer.alloc(30 * 1024 * 1024)])
+
+  // The direct claim: the scan happens once per save, not once per read.
+  assert.equal(S.readStores(big), S.readStores(big),
+    'the store directory is found once per save and remembered')
+
+  const started = Date.now()
+  const cols = S.findRankColumns(big, [{ teamIndex: 0, rank: 1 }, { teamIndex: 4, rank: 5 }])
+  const took = Date.now() - started
+  assert.ok(cols.some((c) => c.ranks[0] === 1 && c.ranks[4] === 5),
+    'the poll is still found after the header stopped being looked up in the loop')
+  // Seventeen seconds before, a rounded zero after. Five is far enough below the
+  // old number to mean something and far enough above the new one not to flake.
+  assert.ok(took < 5000, `the search rescanned the save: ${took}ms for one sweep`)
+}
+
 console.log('check-save: game table decodes 2/2 synthetic rows, team order verified,')
 console.log('            champions read per season and unplayed seasons name nobody,')
 console.log('            rankings found in TeamStore without mistaking a counter for one,')
 console.log('            a poll is found by pointing at one rank you can read,')
-console.log('            and the Heisman five resolve to real roster rows')
+console.log('            the Heisman five resolve to real roster rows,')
+console.log('            and one poll sweep reads the store header once, not per bit')

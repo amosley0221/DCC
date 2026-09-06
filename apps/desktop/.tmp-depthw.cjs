@@ -329,7 +329,16 @@ function readDepthCharts(payload, rosterRows) {
   }
   return charts;
 }
+var storeScans = /* @__PURE__ */ new WeakMap();
+var storeTables = /* @__PURE__ */ new WeakMap();
 function readStores(payload) {
+  const seen = storeScans.get(payload);
+  if (seen) return seen;
+  const found = scanStores(payload);
+  storeScans.set(payload, found);
+  return found;
+}
+function scanStores(payload) {
   const marker = Buffer.from("SPBF", "latin1");
   const bsft = Buffer.from("BSFT", "latin1");
   const out = [];
@@ -385,6 +394,18 @@ function seasonGameTable(payload) {
   return t && { data: t.data, rows: t.rows };
 }
 function storeTable(payload, name) {
+  let byName = storeTables.get(payload);
+  if (!byName) {
+    byName = /* @__PURE__ */ new Map();
+    storeTables.set(payload, byName);
+  }
+  const seen = byName.get(name);
+  if (seen !== void 0) return seen;
+  const found = locateTable(payload, name);
+  byName.set(name, found);
+  return found;
+}
+function locateTable(payload, name) {
   const store = readStores(payload).find((s) => s.name === name);
   if (!store) return null;
   const bsft = payload.indexOf(Buffer.from("BSFT", "latin1"), store.offset);
