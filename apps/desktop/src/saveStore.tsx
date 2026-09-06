@@ -54,6 +54,11 @@ export interface SaveState {
      * save's own recruit records rather than inferred from ratings.
      */
     recruitBoard: RecruitBoard[]
+    /**
+     * The game's own recruiting class ranking, school name to place, or null
+     * when the save did not hold it in the shape the reader insists on.
+     */
+    classRanks: Record<string, number> | null
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -236,6 +241,7 @@ export function rosterPatch(
     players: res.players, season: res.season, titles: res.titles,
     rankColumns: res.rankColumns ?? [], heisman: res.heisman ?? [],
     recruitBoard: res.recruitBoard ?? [],
+    classRanks: res.classRanks ?? null,
   }
 }
 

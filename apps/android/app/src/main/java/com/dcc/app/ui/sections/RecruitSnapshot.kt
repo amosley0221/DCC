@@ -425,14 +425,15 @@ private fun RecruitRow(
 /**
  * Which school is winning the recruiting year.
  *
- * DCC's own ordering of the commits in the save — the game keeps a class
- * ranking and it is not decoded — so the card says as much rather than passing
- * off a number of its own as the game's.
+ * The game's own class ranking, read off the save on the PC and carried in the
+ * snapshot. An older snapshot has no such field, and then the card falls back
+ * to DCC's ordering of your commits and says so.
  */
 @Composable
 fun ClassTable(view: SnapshotView, limit: Int = 10) {
     val c = Dcc.colors
-    val table = remember(view) { Classes.of(view.recruits) }
+    val table = remember(view) { Classes.of(view.recruits, view.teams) }
+    val official = table.firstOrNull()?.rank != null
     if (table.isEmpty()) return
     val myName = view.userTeam?.name
     val mine = table.indexOfFirst { it.school == myName }
@@ -446,7 +447,7 @@ fun ClassTable(view: SnapshotView, limit: Int = 10) {
         }
         Spacer(Modifier.height(8.dp))
         rows.forEach { r ->
-            val place = table.indexOf(r) + 1
+            val place = r.rank ?: (table.indexOf(r) + 1)
             val own = r.school == myName
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -470,6 +471,10 @@ fun ClassTable(view: SnapshotView, limit: Int = 10) {
             }
         }
         Spacer(Modifier.height(6.dp))
-        MetaText("DCC'S OWN ORDER OF YOUR SAVE'S COMMITS — NOT THE GAME'S NUMBER", c.ink4, 8, maxLines = 2)
+        MetaText(
+            if (official) "THE GAME'S OWN CLASS RANKING, READ OUT OF YOUR SAVE"
+            else "DCC'S OWN ORDER OF YOUR SAVE'S COMMITS — NOT THE GAME'S NUMBER",
+            c.ink4, 8, maxLines = 2,
+        )
     }
 }

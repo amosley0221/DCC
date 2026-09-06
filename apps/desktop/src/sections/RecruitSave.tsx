@@ -8,6 +8,7 @@ import {
   CLASS_LABEL, COMMIT_MAX, INTEREST_MAX, RECRUIT_STAGES, STAGE_LABEL,
   classTable, isCommitted, isFirm,
 } from '../../electron/recruiting'
+import type { ClassRow } from '../../electron/recruiting'
 
 /**
  * The schools worth showing on a row: the one he picked, or the three still in
@@ -260,7 +261,8 @@ export default function RecruitSave() {
     </Card>
 
     <div className="col" style={{ gap: 12 }}>
-      <ClassRankings board={board} players={save.roster?.players ?? []} me={state.teamId} crest={crest} />
+      <ClassRankings board={board} players={save.roster?.players ?? []} me={state.teamId} crest={crest}
+        official={save.roster?.classRanks ?? null} />
       <Card className="card-pad">
         <Kicker>Narrow the pool</Kicker>
       <div className="row" style={{ gap: 8, marginTop: 9, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -525,17 +527,19 @@ function RecruitBoardPanel(
 /**
  * Which school is winning the recruiting year.
  *
- * The game keeps a class ranking of its own and DCC has not found it in the
- * save, so this is DCC's ordering of your save's own commits rather than the
- * game's number — which the card says, because a ranking that looks official
- * and is not is worse than no ranking at all.
+ * The game's own ranking when the save holds it, which it does: every school
+ * placed, in the order the game's recruiting screen lists them. DCC's own
+ * ordering of your commits is the fallback, and the card says which one you are
+ * looking at, because a ranking that looks official and is not is worse than no
+ * ranking at all.
  */
 function ClassRankings(
-  { board, players, me, crest }: {
+  { board, players, me, crest, official }: {
     board: Map<number, RecruitBoard>
     players: RosterPlayer[]
     me: number | null
     crest: (school: string) => string | undefined
+    official: Record<string, number> | null
   },
 ) {
   const [all, setAll] = useState(false)
@@ -555,8 +559,22 @@ function ClassRankings(
         firm: isFirm(b.stage),
       })
     }
-    return classTable(commits)
-  }, [board, players])
+    const rows = classTable(commits)
+    // The game's ranking covers every school, including the ones with no
+    // commits yet, so it decides the order outright and the computed table is
+    // only there for the star counts.
+    if (!official) return rows
+    const byName = new Map(rows.map((r) => [r.school, r]))
+    return Object.entries(official)
+      .sort((a, b) => a[1] - b[1])
+      .map(([school, rank]) => ({
+        rank,
+        ...(byName.get(school) ?? {
+          school, commits: 0, soft: 0, byStar: [0, 0, 0, 0, 0] as ClassRow['byStar'],
+          best: Number.MAX_SAFE_INTEGER, points: 0,
+        }),
+      }))
+  }, [board, players, official])
 
   if (!table.length) return null
   const mine = table.findIndex((r) => r.school === myName)
@@ -576,7 +594,7 @@ function ClassRankings(
       </div>
       <div className="col" style={{ gap: 1, marginTop: 9 }}>
         {rows.map((r) => {
-          const place = table.indexOf(r) + 1
+          const place = (r as { rank?: number }).rank ?? table.indexOf(r) + 1
           const own = r.school === myName
           return (
             <div key={r.school} className="row"
@@ -603,7 +621,9 @@ function ClassRankings(
       </div>
       <div style={{ marginTop: 8 }}>
         <Meta size={9} color="var(--ink4)">
-          DCC&rsquo;S OWN ORDERING OF THE COMMITS IN YOUR SAVE — THE GAME KEEPS ITS OWN AND IT IS NOT DECODED
+          {official
+            ? 'THE GAME\u2019S OWN CLASS RANKING, READ OUT OF YOUR SAVE'
+            : 'DCC\u2019S OWN ORDERING OF THE COMMITS IN YOUR SAVE \u2014 THE SAVE DID NOT HOLD THE GAME\u2019S'}
         </Meta>
       </div>
     </Card>

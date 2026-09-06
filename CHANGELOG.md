@@ -10,6 +10,42 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.60.0] - 2026-09-06
+
+### Added
+
+- **The game's own recruiting class ranking.** It is in the save after all.
+  Every earlier search asked whether some field *holds* the numbers one to
+  fourteen, which a ranking the game orders at display time never would, and
+  coming up empty I said the game did not store one. The right question was
+  whether a field *sorts* the teams into the game's order, and one does: eight
+  bits in each team's row, a complete ordering of all 138 schools with every
+  place used exactly once. It reads Penn State first through TCU fourteenth on
+  both current saves — all fourteen the game's screen lists, in its order — and
+  a different ordering on an older save, which is the point: it moves as the
+  class fills.
+
+  Both apps now show that number instead of DCC's own arithmetic, and each says
+  which it is showing. The arithmetic stays as the fallback for a snapshot
+  written before this existed.
+
+### Fixed
+
+- **Five teams were reading under the wrong name.** The team table was being
+  put in order by sorting the schools by name, which agreed with the save for
+  138 of its 143 rows — enough to pass a check of 44 team appearances — and was
+  wrong for the rest. The save's own order is not alphabetical by either name
+  it stores: it has E. Michigan before East Carolina, which sorts by the short
+  name, and Georgia before Ga Southern, which does not.
+
+  So East Carolina and E. Michigan were swapped, and FIU, Florida and FLA
+  Atlantic were rotated — every game, poll place, champion and recruit's top
+  school involving those five named the wrong school. Their schedules settle
+  it: one plays South Carolina, Vanderbilt, Ole Miss, Georgia, Auburn and
+  Kentucky, and the other plays UCF, Army, USF, Temple, Tulsa and North Texas.
+  The table is now read in the order the save writes it, and needs no sort at
+  all.
+
 ## [0.59.0] - 2026-09-06
 
 ### Fixed

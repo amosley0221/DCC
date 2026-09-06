@@ -10,7 +10,7 @@ const W = require(process.argv[2])
 const S = require(process.argv[3])
 
 const teams = ['Air Force', 'Akron', 'Alabama', 'UConn', 'Delaware', 'Penn State', 'Pittsburgh']
-  .map((name) => ({ slug: name, name, fullName: name, abbr: null, nickname: null, shortNickname: null, altAbbr: null }))
+  .map((name, tableIndex) => ({ tableIndex, slug: name, name, fullName: name, abbr: null, nickname: null, shortNickname: null, altAbbr: null }))
 
 const ROW = 100, MEMBERS = 69, ROWS = 3
 const u32 = (v) => { const b = Buffer.alloc(4); b.writeUInt32BE(v); return b }

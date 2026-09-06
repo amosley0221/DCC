@@ -13,7 +13,7 @@ import {
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
   readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman, readRecruitBoard,
-  findRankColumns, readRankField,
+  findRankColumns, readRankField, readClassRankByName,
 } from './saveAnalysis'
 import type { RankColumnView } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
@@ -433,6 +433,8 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       // offers and stage. Read out of the save's own recruit records, so the
       // pool can be ordered the way the game orders it rather than by overall.
       recruitBoard: readRecruitBoard(payload, players),
+      // The game's own recruiting class ranking, school name to place.
+      classRanks: readClassRankByName(payload),
     }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }

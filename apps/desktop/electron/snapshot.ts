@@ -14,10 +14,10 @@
  * the fields a list view actually shows.
  */
 import {
-  RATING_BITS, readCoaches, readRecruitBoard, readRoster, readSeasonGames, readTeamNames,
+  RATING_BITS, readClassRanks, readCoaches, readRecruitBoard, readRoster, readSeasonGames,
+  readTeamNames, teamTableOrder,
 } from './saveAnalysis'
 import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
-import { teamTableOrder } from './saveAnalysis'
 import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
 
@@ -37,6 +37,12 @@ export interface SnapshotTeam {
   coach: string | null
   wins: number
   losses: number
+  /**
+   * The game's own recruiting class rank, or null when the save did not hold
+   * it. Read on the PC and carried, like the poll rank, so the phone shows the
+   * game's number rather than an ordering of its own.
+   */
+  classRank: number | null
 }
 
 export interface SnapshotPlayer {
@@ -237,6 +243,8 @@ export function buildSnapshot(
     }
   }
 
+  const classRanks = readClassRanks(payload)
+
   const teams: SnapshotTeam[] = order.map((t, index) => {
     const teamId = idByName.get(t.name) ?? null
     const c = teamId === null ? undefined : coachById.get(teamId)
@@ -245,6 +253,7 @@ export function buildSnapshot(
       index, teamId, name: t.name, fullName: t.fullName, abbr: t.abbr,
       nickname: t.nickname, conference: c?.conference ?? null, division: c?.division ?? null,
       coach: c?.coach ?? null, wins: r.wins, losses: r.losses,
+      classRank: classRanks?.[index] || null,
     }
   })
 

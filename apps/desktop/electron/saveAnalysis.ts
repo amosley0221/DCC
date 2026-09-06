@@ -1381,6 +1381,12 @@ export interface TeamRecord {
   nickname: string | null
   shortNickname: string | null
   altAbbr: string | null
+  /**
+   * The record's own position in the save's team table — the number games,
+   * polls and recruit boards reference. Kept because the list is handed round
+   * sorted for display, and sorting is not how the game numbers its teams.
+   */
+  tableIndex: number
 }
 
 
@@ -1696,6 +1702,7 @@ export function readTeamNames(payload: Buffer): TeamRecord[] {
     const name = text(payload, hits[k] - 278, 30)
     if (!slug || !name || !/^[A-Z]/.test(name)) continue
     out.push({
+      tableIndex: out.length,
       slug, name,
       fullName: text(payload, hits[k] - 227, 30) || null,
       abbr: text(payload, hits[k] - 204, 8) || null,
@@ -1767,13 +1774,26 @@ const TEAM_TAG = 0x319e
 export const SEASON_GAME_ROW = 100
 
 /**
- * The order the game's team table uses: every school sorted by its full name,
- * with UConn filed under Connecticut. Verified against 44 team appearances in
- * 29 games named by the user's own schedule and a week's scoreboard.
+ * The order the game's team table uses: the order the records are written in.
+ *
+ * This used to sort the schools by full name, which agreed with the save for
+ * 138 of its 143 teams and so passed a check of 44 team appearances across 29
+ * games. It is wrong for the other five, because the save's own order is not
+ * alphabetical by either name it stores — it has E. Michigan before East
+ * Carolina, which sorts by the short name, but Georgia before Ga Southern,
+ * which does not.
+ *
+ * The five it got wrong were East Carolina and E. Michigan, swapped, and FIU,
+ * Florida and FLA Atlantic, rotated — so a Florida row was read as Florida
+ * Atlantic everywhere a team is referenced. Their schedules settle it: row 36
+ * plays South Carolina, Vanderbilt, Ole Miss, Georgia, Auburn and Kentucky,
+ * and row 37 plays UCF, Army, USF, Temple, Tulsa and North Texas. The first is
+ * Florida's SEC slate and the second is Florida Atlantic's American one.
  */
 export function teamTableOrder(teams: TeamRecord[]): TeamRecord[] {
-  const key = (t: TeamRecord) => (t.name === 'UConn' ? 'Connecticut' : (t.fullName ?? t.name))
-  return [...teams].sort((a, b) => key(a).localeCompare(key(b), 'en'))
+  const out: TeamRecord[] = []
+  for (const t of teams) out[t.tableIndex] = t
+  return out
 }
 
 /**
@@ -2269,6 +2289,58 @@ export function readRankField(payload: Buffer, at: number, width: number): numbe
     out.push((v >>> (24 - shift - width)) & ((1 << width) - 1))
   }
   return out
+}
+
+/**
+ * Where a team's recruiting class rank sits in its `TeamStore` row.
+ *
+ * It was found by asking the wrong question first. Every earlier search tested
+ * whether a field *holds* the numbers one to fourteen, which a rank the game
+ * orders at display time never would; that came up empty and I concluded the
+ * save did not keep one. The right question is whether a field *sorts* the
+ * teams into the game's order, and one does.
+ */
+const CLASS_RANK_BIT = 5592
+const CLASS_RANK_WIDTH = 8
+
+/**
+ * Each team's recruiting class rank, by team-table row, or null.
+ *
+ * The save writes a complete ordering: every one of the 138 real schools holds
+ * a different place from 1 to 138, and the five table rows that are not schools
+ * hold zero. That shape is the check — a field that is not a permutation is not
+ * this field, whatever it reads, so a save that has moved the bits gets no
+ * answer rather than a wrong one.
+ *
+ * Verified against the game's own recruiting screen on two saves: all fourteen
+ * teams it lists, in its order, from Penn State first to TCU fourteenth. A
+ * third, earlier save reads a different ordering, which is the point — it moves
+ * as the class fills.
+ */
+export function readClassRanks(payload: Buffer): number[] | null {
+  const vals = readRankField(payload, CLASS_RANK_BIT, CLASS_RANK_WIDTH)
+  if (!vals.length) return null
+  const placed = vals.filter((v) => v > 0)
+  if (placed.length < 100) return null
+  if (new Set(placed).size !== placed.length) return null
+  if (Math.max(...placed) !== placed.length) return null
+  return vals
+}
+
+/**
+ * The recruiting class rank of every school, by name, or null when the save
+ * does not hold the field in the shape `readClassRanks` insists on.
+ */
+export function readClassRankByName(payload: Buffer): Record<string, number> | null {
+  const ranks = readClassRanks(payload)
+  if (!ranks) return null
+  const order = teamTableOrder(readTeamNames(payload))
+  const out: Record<string, number> = {}
+  order.forEach((team, i) => {
+    const rank = ranks[i]
+    if (team && rank > 0) out[team.name] = rank
+  })
+  return Object.keys(out).length ? out : null
 }
 
 /** A field that might be the ranking, with enough about it to recognise. */

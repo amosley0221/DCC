@@ -1017,6 +1017,37 @@ programs hold ten different places, and no team holds its own row number. Naming
 a second school makes it certain. The field is remembered by bit offset and
 width, so every later read uses it without being asked again.
 
+### The recruiting class ranking: asking the right question
+
+The game's recruiting screen ranks every school's class, and DCC spent a long
+time reporting an ordering of its own with a note saying the game's was not in
+the save. That note was wrong, and it was wrong for a reason worth writing down.
+
+Every search made for it asked whether some field **holds** the numbers one to
+fourteen — `findRankColumns` requires each named team to hold exactly its place.
+A field the game orders at display time would never pass that, and neither would
+one whose numbering runs over all 138 schools while the screen shows fourteen.
+Coming up empty, the conclusion drawn was that the game computed the ranking
+rather than storing it.
+
+The right question is whether a field **sorts** the teams into the game's order.
+Sweeping `TeamStore` for a field whose values put fourteen named schools in the
+right sequence finds it immediately: **bit 5592, eight bits wide, ascending**.
+
+Two things guard against a coincidence. The first is shape: across the 143-row
+table, 138 rows hold a different value from 1 to 138 and the five rows that are
+not schools hold zero. That is a complete ordering, not a field that happens to
+trend the right way, and `readClassRanks` refuses anything that is not one — a
+tie, or a handful of teams placed, gets no answer rather than a wrong one. The
+second is agreement: on both current saves it reads Penn State first through TCU
+fourteenth, matching all fourteen the game's screen lists, in its order. An
+earlier save reads a different ordering, which is what it should do.
+
+The first sweep of this kind returned 3,152 hits, all of them fields that are
+zero for most teams — with a loose comparison, ties satisfy "in order" trivially.
+Requiring the fourteen values to be **distinct** and **strictly** ordered is what
+turned 3,152 into one.
+
 ### Three polls, not one
 
 The search returns several orderings because the save holds several. The game's
@@ -1295,9 +1326,23 @@ two bits into byte 72 and are bit-packed, most significant bit first.
 
 **Teams are the two handles at bytes 12 and 40**, away first, then home, both
 tagged `0x319e`. They are *not* the team ids players carry. They index the
-143-row team table, whose order is every school sorted by full name with UConn
-filed under Connecticut — verified against 44 team appearances across 29 games
-named from a season schedule and one week's scoreboard.
+143-row team table, **whose order is simply the order the save writes its
+`teamdb_` records in** — no sort is involved.
+
+This was got wrong for a long time and was worth the correction. The order was
+originally taken to be the schools sorted by full name with UConn filed under
+Connecticut, which reproduced 44 team appearances across 29 games and so looked
+settled. It agrees with the save for 138 of the 143 rows. The five it does not
+are East Carolina and E. Michigan, swapped, and FIU, Florida and FLA Atlantic,
+rotated one place — so every game, poll place, champion and recruit's top school
+involving those five named the wrong school.
+
+No sort explains the real order: the save has E. Michigan before East Carolina,
+which is the short name's order, and Georgia before Ga Southern, which is not.
+The schedules are what settle the identities. Row 36 plays South Carolina,
+Vanderbilt, Ole Miss, Georgia, Auburn and Kentucky — Florida's SEC slate — and
+row 37 plays UCF, Army, USF, Temple, Tulsa and North Texas, which is Florida
+Atlantic's American one.
 
 **How it was found.** Every field above was located by taking a box score,
 searching every bit position in the row for that value, and keeping only

@@ -4,10 +4,12 @@ package com.dcc.app.data
  * Which school is winning the recruiting year.
  *
  * A mirror of `recruiting.ts` on the desktop, formula for formula, so the two
- * apps never disagree about who has the best class. The game keeps a class
- * ranking of its own and it is not decoded, so this is DCC's ordering of the
- * commits in your save — which the screens say, because a ranking that looks
- * official and is not is worse than none.
+ * apps never disagree about who has the best class.
+ *
+ * The game's own ranking is in the save and travels in the snapshot, so it is
+ * what the screens show. This arithmetic is the fallback for a snapshot written
+ * before DCC could read it, and the screens say which one you are looking at —
+ * a ranking that looks official and is not is worse than none.
  */
 object Classes {
 
@@ -30,6 +32,8 @@ object Classes {
         /** The best commit's national rank, which is the class's headline. */
         val best: Int,
         val points: Double,
+        /** The game's own place, when the snapshot carries one. */
+        val rank: Int? = null,
     )
 
     private val COMMITTED = setOf("SoftCommitted", "HardCommitted", "Signed")
@@ -82,4 +86,25 @@ object Classes {
             Commit(school, r.stars ?: 3, r.nationalRank ?: 0, isFirm(r.stage))
         },
     )
+
+    /**
+     * The class table, ordered by the game's own ranking when the snapshot
+     * carries one.
+     *
+     * The game ranks every school, including the ones with no commits yet, so
+     * its ordering replaces this one outright and the computed table is left
+     * only for the star counts. A snapshot written before DCC could read the
+     * field carries no rank, and then the arithmetic stands on its own.
+     */
+    fun of(recruits: List<SnapshotRecruit>, teams: List<SnapshotTeam>): List<Row> {
+        val computed = of(recruits)
+        val ranked = teams.filter { it.classRank != null }.sortedBy { it.classRank }
+        if (ranked.isEmpty()) return computed
+        val bySchool = computed.associateBy { it.school }
+        return ranked.map { t ->
+            val row = bySchool[t.name]
+                ?: Row(t.name, 0, 0, listOf(0, 0, 0, 0, 0), Int.MAX_VALUE, 0.0)
+            row.copy(rank = t.classRank)
+        }
+    }
 }

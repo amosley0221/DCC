@@ -32,7 +32,9 @@ declare global {
             /** The save's own five-name Heisman shortlist. */
             heisman: HeismanView[]
             /** The game's own recruiting board, one record per prospect. */
-            recruitBoard: RecruitBoard[] }
+            recruitBoard: RecruitBoard[]
+            /** The game's own recruiting class ranking, school name to place. */
+            classRanks: Record<string, number> | null }
         | { ok: false; message: string }
       >
       transfers(): Promise<TransferView>

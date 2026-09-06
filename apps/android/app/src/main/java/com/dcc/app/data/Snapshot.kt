@@ -144,6 +144,12 @@ data class SnapshotTeam(
     val coach: String? = null,
     val wins: Int = 0,
     val losses: Int = 0,
+    /**
+     * The game's own recruiting class rank, read off the save on the PC. Null
+     * on a snapshot written before DCC could find it, which is why the screen
+     * still knows how to order the classes itself.
+     */
+    val classRank: Int? = null,
 )
 
 @Serializable

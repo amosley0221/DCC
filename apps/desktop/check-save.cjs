@@ -4,11 +4,19 @@
 const assert = require('node:assert/strict')
 const S = require(process.argv[2])
 
-const teams = ['Air Force', 'Akron', 'Alabama', 'UConn', 'Delaware', 'Penn State', 'Pittsburgh']
-  .map((name) => ({ slug: name, name, fullName: name === 'Air Force' ? 'Air Force' : name, abbr: null, nickname: null, shortNickname: null, altAbbr: null }))
-// Team-table order: full name, UConn as Connecticut → Air Force, Akron, Alabama, UConn, Delaware, Penn State, Pittsburgh
+const NAMES = ['Air Force', 'Akron', 'Alabama', 'UConn', 'Delaware', 'Penn State', 'Pittsburgh']
+const teams = NAMES.map((name, tableIndex) => ({
+  tableIndex, slug: name, name, fullName: name, abbr: null,
+  nickname: null, shortNickname: null, altAbbr: null,
+}))
+// The team table is in the order the save writes its records, not any sort of
+// them. Handing the list over shuffled must not move a single team, which is
+// the whole point: sorting by name agreed with the save for 138 of its 143
+// schools and put Florida's row under Florida Atlantic's name.
+const shuffled = [teams[5], teams[0], teams[6], teams[2], teams[4], teams[3], teams[1]]
+assert.deepEqual(S.teamTableOrder(shuffled).map((t) => t.name), NAMES)
 const order = S.teamTableOrder(teams).map((t) => t.name)
-assert.deepEqual(order, ['Air Force', 'Akron', 'Alabama', 'UConn', 'Delaware', 'Penn State', 'Pittsburgh'])
+assert.deepEqual(order, NAMES)
 
 const ROW = 100, MEMBERS = 69, ROWS = 2
 const name = Buffer.from('SeasonGameStore', 'latin1')
@@ -433,10 +441,74 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
     'an empty save has no recruiting board')
 }
 
+/* ------------------------------------- the recruiting class ranking */
+// The game does keep a class ranking, which DCC spent a long time believing it
+// did not: every earlier search asked whether a field *holds* the numbers one
+// to fourteen, and this one is a complete ordering of all 138 schools. The
+// shape is the check — a permutation, every place used once — so a save that
+// has moved the bits gets no answer instead of a wrong one.
+{
+  const TEAMS = 150, TROW = 704, TMEMBERS = 6
+  const tname = Buffer.from('TeamStore', 'latin1')
+  const thead = Buffer.concat([
+    Buffer.from('SPBF', 'latin1'), u32(486), u32(1), u32(0), u32(tname.length), tname,
+    u32(0x40), u32(0), u32(TEAMS),
+    Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(TROW / 4), u32(TEAMS), u32(TMEMBERS), u32(0),
+    Buffer.alloc(TMEMBERS * 4),
+  ])
+  const AT = 5592, W = 8
+  const build = (ranks) => {
+    const trows = Buffer.alloc(TROW * TEAMS)
+    ranks.forEach((v, row) => {
+      for (let b = 0; b < W; b++) {
+        const bit = AT + b
+        const at = row * TROW + (bit >> 3)
+        if ((v >> (W - 1 - b)) & 1) trows[at] |= 1 << (7 - (bit & 7))
+      }
+    })
+    return Buffer.concat([Buffer.alloc(128), thead, trows, Buffer.alloc(64)])
+  }
+
+  // 138 schools placed one to 138, shuffled, and twelve table rows that are not
+  // schools reading zero — the real save's shape exactly.
+  const PLACED = 138
+  const ranks = Array.from({ length: TEAMS }, () => 0)
+  const places = Array.from({ length: PLACED }, (_, i) => i + 1)
+  for (let i = places.length - 1; i > 0; i--) {
+    const j = (i * 11 + 5) % (i + 1)
+    ;[places[i], places[j]] = [places[j], places[i]]
+  }
+  places.forEach((v, i) => { ranks[i] = v })
+
+  const got = S.readClassRanks(build(ranks))
+  assert.ok(got, 'a complete ordering is read')
+  assert.deepEqual(got.slice(0, TEAMS), ranks, 'every team keeps its own place')
+
+  // Two teams sharing a place is not an ordering, however plausible it reads.
+  const dupe = ranks.slice()
+  dupe[3] = dupe[4]
+  assert.equal(S.readClassRanks(build(dupe)), null, 'a field with a tie is refused')
+
+  // Nor is a field that only places a handful.
+  const sparse = Array.from({ length: TEAMS }, () => 0)
+  for (let i = 0; i < 20; i++) sparse[i] = i + 1
+  assert.equal(S.readClassRanks(build(sparse)), null, 'a field placing 20 teams is refused')
+
+  // A counter — 1..150 across every row, the trap that fooled the poll search —
+  // places more teams than there are places, so the top of the range fails.
+  const counter = Array.from({ length: TEAMS }, (_, i) => (i + 1) & 0xff)
+  const c = S.readClassRanks(build(counter))
+  assert.ok(c === null || Math.max(...c.filter((v) => v > 0)) === c.filter((v) => v > 0).length,
+    'a counter is not mistaken for a ranking')
+
+  assert.equal(S.readClassRanks(Buffer.alloc(200000)), null, 'an empty save has no ranking')
+}
+
 console.log('check-save: game table decodes 2/2 synthetic rows, team order verified,')
 console.log('            champions read per season and unplayed seasons name nobody,')
 console.log('            rankings found in TeamStore without mistaking a counter for one,')
 console.log('            a poll is found by pointing at one rank you can read,')
 console.log('            the Heisman five resolve to real roster rows,')
 console.log('            one poll sweep reads the store header once, not per bit,')
-console.log('            and the recruiting board reads ranks, commit score and stage')
+console.log('            the recruiting board reads ranks, commit score and stage,')
+console.log('            and the class ranking is read only when it is a real ordering')
