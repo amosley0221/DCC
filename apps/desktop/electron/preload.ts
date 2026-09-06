@@ -96,6 +96,8 @@ const api = {
   writeRecruits: (path: string, edits: unknown[]) =>
     ipcRenderer.invoke('save:writeRecruits', { path, edits }),
   writePress: (req: unknown) => ipcRenderer.invoke('press:write', req),
+  stories: () => ipcRenderer.invoke('press:all'),
+  forgetStory: (key: string) => ipcRenderer.invoke('press:forget', key),
   snapshot: (path: string, teamId: number | null) =>
     ipcRenderer.invoke('save:snapshot', { path, teamId }),
   writeGames: (path: string, edits: unknown[]) =>

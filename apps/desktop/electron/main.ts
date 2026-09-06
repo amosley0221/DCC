@@ -18,8 +18,9 @@ import {
 import type { RankColumnView } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
-  readLedger, readSettings, readThreads, rememberSchoolColors, rememberTitles,
-  snapshotExtras, writeLedger, writeSettings, writeThreads,
+  fileStory, forgetStory, readLedger, readSettings, readStories, readThreads,
+  rememberSchoolColors, rememberTitles, snapshotExtras, storyKey, writeLedger,
+  writeSettings, writeThreads,
 } from './sidecar'
 import type { TamperThread } from './sidecar'
 import { TEAM_ID_NAMES } from './teamIds'
@@ -31,7 +32,7 @@ import {
 } from './gameAssets'
 import { writeStory } from './press'
 import type { PressRequest } from './press'
-import { resistance, standing } from './tamper'
+import { opener, resistance, standing } from './tamper'
 import type { TamperCoach, TamperTarget } from './tamper'
 import { sendText } from './tamperTalk'
 import { buildSnapshot } from './snapshot'
@@ -618,10 +619,32 @@ ipcMain.handle('save:writeRecruits', (_e, { path, edits }: { path: string; edits
   }
 })
 
-ipcMain.handle('press:write', async (_e, req: PressRequest) => {
+/**
+ * Writes a story and files it in the same breath.
+ *
+ * Saving happens here rather than in the renderer because a screen that
+ * unmounts is exactly how the story used to be lost: the component held it in
+ * state, and leaving the schedule threw away something the user had paid for.
+ * The main process cannot forget.
+ */
+ipcMain.handle('press:write', async (_e, req: PressRequest & { season?: number | null }) => {
   const key = String(readSettings().anthropicKey ?? '')
-  return writeStory(key, req)
+  const res = await writeStory(key, req)
+  if (!res.ok) return res
+  const stories = fileStory(storyKey(req.season ?? null, req.game.row), {
+    ...res.story,
+    kind: req.kind,
+    written: new Date().toISOString(),
+    home: req.game.home,
+    away: req.game.away,
+    week: req.game.week,
+  })
+  return { ...res, stories: stories.stories }
 })
+
+ipcMain.handle('press:all', () => ({ stories: readStories().stories }))
+
+ipcMain.handle('press:forget', (_e, key: string) => ({ stories: forgetStory(key).stories }))
 
 const withStanding = (t: TamperThread) => ({ ...t, standing: standing(t.interest) })
 
@@ -643,7 +666,10 @@ ipcMain.handle('tamper:send', async (_e, req: {
   const existing = file.threads[req.key]
   const { score, because } = resistance(req.target, req.coach)
   const interest = existing?.interest ?? 0
-  const turns = existing?.turns ?? []
+  // A new conversation starts with him picking up to a number he does not know.
+  // The line is DCC's, not the model's — it costs nothing and it is what makes
+  // the coach's first text a reply rather than a cold open.
+  const turns = existing?.turns ?? [{ from: 'player' as const, text: opener(req.key) }]
 
   const res = await sendText(
     String(readSettings().anthropicKey ?? ''),

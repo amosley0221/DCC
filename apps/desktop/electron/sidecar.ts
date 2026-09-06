@@ -40,6 +40,33 @@ export interface TamperThread {
 
 export interface TamperFile { version: number; threads: Record<string, TamperThread> }
 
+/**
+ * A press story the user paid for, with enough about the game to show it again
+ * without re-reading the save.
+ */
+export interface StoredStory {
+  headline: string
+  standfirst: string
+  body: string
+  kind: 'preview' | 'recap'
+  /** When it was written, so a list can be ordered newest first. */
+  written: string
+  home: string | null
+  away: string | null
+  week: number
+}
+
+export interface PressFile { version: number; stories: Record<string, StoredStory> }
+
+/**
+ * The key a story is filed under: the season and the game's row.
+ *
+ * A row is the only stable id a game has, and it is only unique within a
+ * season — row 12 is a different fixture next year — so the season goes in
+ * front of it.
+ */
+export const storyKey = (season: number | null, row: number) => `${season ?? 0}:${row}`
+
 /** Settings live in userData so they survive every in-place upgrade. */
 const settingsFile = () => join(app.getPath('userData'), 'settings.json')
 
@@ -111,6 +138,7 @@ export const rememberHeisman = (h: SnapshotHeisman[]) => { heismanCache = h }
 
 const ledgerFile = () => join(app.getPath('userData'), 'transfers.json')
 const tamperFile = () => join(app.getPath('userData'), 'tampering.json')
+const pressFile = () => join(app.getPath('userData'), 'press.json')
 
 export function readLedger(): Ledger {
   try {
@@ -125,6 +153,44 @@ export function readLedger(): Ledger {
 export function writeLedger(next: Ledger) {
   mkdirSync(app.getPath('userData'), { recursive: true })
   writeFileSync(ledgerFile(), JSON.stringify(next))
+}
+
+/**
+ * The stories written so far.
+ *
+ * These live beside the save for the same reason the tampering threads do, and
+ * one more: every story costs the user's own API credit. Losing one to a change
+ * of screen is losing money, which is what this fixes.
+ */
+export function readStories(): PressFile {
+  try {
+    const f = JSON.parse(readFileSync(pressFile(), 'utf8')) as PressFile
+    if (!f || typeof f !== 'object' || !f.stories) return { version: 1, stories: {} }
+    return { version: 1, stories: f.stories }
+  } catch {
+    return { version: 1, stories: {} }
+  }
+}
+
+export function writeStories(next: PressFile) {
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  writeFileSync(pressFile(), JSON.stringify(next, null, 2))
+}
+
+/** Files one story and returns the whole set, so a caller needs one round trip. */
+export function fileStory(key: string, story: StoredStory): PressFile {
+  const f = readStories()
+  f.stories[key] = story
+  writeStories(f)
+  return f
+}
+
+/** Throws one away. The user paid for it, so only they can decide it is wrong. */
+export function forgetStory(key: string): PressFile {
+  const f = readStories()
+  delete f.stories[key]
+  writeStories(f)
+  return f
 }
 
 export function readThreads(): TamperFile {

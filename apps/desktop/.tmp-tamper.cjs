@@ -20,8 +20,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // electron/tamper.ts
 var tamper_exports = {};
 __export(tamper_exports, {
+  OPENERS: () => OPENERS,
   TAMPER_OPENS_WEEK: () => TAMPER_OPENS_WEEK,
   capMove: () => capMove,
+  opener: () => opener,
   resistance: () => resistance,
   standing: () => standing
 });
@@ -93,10 +95,25 @@ function standing(interest) {
   if (interest > 0) return "He has not told you to stop.";
   return "Nothing yet.";
 }
+var OPENERS = [
+  "Who is this?",
+  "Yeah? Who\u2019s this?",
+  "Hello? Who am I talking to?",
+  "New number \u2014 who\u2019s this?",
+  "Yeah, this is him. Who\u2019s asking?",
+  "Who dis?"
+];
+function opener(key) {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = h * 31 + key.charCodeAt(i) >>> 0;
+  return OPENERS[h % OPENERS.length];
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  OPENERS,
   TAMPER_OPENS_WEEK,
   capMove,
+  opener,
   resistance,
   standing
 });

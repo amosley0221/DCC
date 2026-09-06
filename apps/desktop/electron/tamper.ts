@@ -64,6 +64,8 @@ export interface TamperTarget {
   teamLosses: number
   /** Average overall of their roster, which stands in for the program's pull. */
   teamStrength: number
+  /** Freshman through Senior, or null when the save does not say. */
+  year?: string | null
 }
 
 export interface TamperCoach {
@@ -162,4 +164,30 @@ export function standing(interest: number): string {
   if (interest >= 25) return 'He is listening.'
   if (interest > 0) return 'He has not told you to stop.'
   return 'Nothing yet.'
+}
+
+
+/**
+ * What he says when he picks up to a number he does not know.
+ *
+ * Written here rather than asked of the model: it is the same line every time
+ * for the same player, it costs no API credit, and a man who answered his phone
+ * with a paragraph would give the game away. The reply the model writes comes
+ * after the coach has actually said something.
+ *
+ * Chosen from the player's own key so it does not change as the screen redraws.
+ */
+export const OPENERS = [
+  'Who is this?',
+  'Yeah? Who\u2019s this?',
+  'Hello? Who am I talking to?',
+  'New number \u2014 who\u2019s this?',
+  'Yeah, this is him. Who\u2019s asking?',
+  'Who dis?',
+] as const
+
+export function opener(key: string): string {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+  return OPENERS[h % OPENERS.length]
 }

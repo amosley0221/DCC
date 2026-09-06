@@ -26,7 +26,11 @@ const ord = (n: number) => (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : '
 /** Everything the model is told, and the only things it is allowed to know. */
 export function brief(t: TamperTarget, coach: TamperCoach, interest: number, resist: number): string {
   const lines = [
-    `You are ${t.first} ${t.last}, a ${t.position} at ${t.team}. You are between 18 and 21.`,
+    `You are ${t.first} ${t.last}, a ${t.position} at ${t.team}`
+    + (t.year ? `, a ${t.year.toLowerCase()}` : '')
+    + '. You are between 18 and 21.'
+    + (t.year === 'Senior' ? ' This is your last year, so a move has to be worth it now.'
+      : t.year === 'Freshman' ? ' You have three years left and time to sit and learn.' : ''),
     `You are rated ${t.overall} overall. ${t.team} are ${t.teamWins}-${t.teamLosses} this season.`,
     t.depth
       ? `You are ${t.depth.string}${ord(t.depth.string)} on the depth chart at ${t.depth.slot}, out of ${t.depth.of}.`

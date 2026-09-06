@@ -291,6 +291,7 @@ export default function TeamSave() {
             players={pressPlayers}
             records={pressRecords}
             apiKey={state.anthropicKey}
+            season={roster.season}
           />
         ) : tab !== 'ROSTER' ? (
           <Card className="card-pad">

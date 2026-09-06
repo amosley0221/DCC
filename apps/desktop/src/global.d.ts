@@ -7,6 +7,7 @@ import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets
 import type { SchemaMember } from '../electron/schema'
 import type { GameEdit, PlayerEdit, PlayerWriteResult, RecruitEdit, RecruitWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
+import type { StoredStory } from '../electron/sidecar'
 import type { RelayState } from '../electron/relay'
 import type { TamperThreadView, TransferView } from '../electron/preload'
 import type { TamperCoach, TamperTarget } from '../electron/tamper'
@@ -80,9 +81,13 @@ declare global {
       relayStart(path: string | null, teamId: number | null, port?: number): Promise<RelayState>
       relayStop(): Promise<RelayState>
       relayState(ctx?: { path: string | null; teamId: number | null }): Promise<RelayState>
-      writePress(req: PressRequest): Promise<
-        { ok: true; story: PressStory } | { ok: false; message: string }
+      writePress(req: PressRequest & { season?: number | null }): Promise<
+        { ok: true; story: PressStory; stories: Record<string, StoredStory> }
+        | { ok: false; message: string }
       >
+      /** Every story written so far, filed by season and game row. */
+      stories(): Promise<{ stories: Record<string, StoredStory> }>
+      forgetStory(key: string): Promise<{ stories: Record<string, StoredStory> }>
       snapshot(path: string, teamId: number | null): Promise<
         | { ok: true; path: string; teams: number; games: number; players: number; recruits: number }
         | { ok: false; message: string }

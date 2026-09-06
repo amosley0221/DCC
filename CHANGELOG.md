@@ -10,6 +10,33 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.61.0] - 2026-09-06
+
+### Fixed
+
+- **A press story you paid for is no longer thrown away.** Each story lived in
+  the state of the row that showed it, so changing screen — to the Heisman
+  watch and back, or anywhere else — unmounted the row and lost it. Stories now
+  live beside your save in `press.json`, filed by season and game, and the
+  desktop app files each one the moment it is written rather than trusting the
+  screen to remember. They come back when you return, dated, with a button to
+  throw one away when you want to.
+
+### Added
+
+- **Class year in tampering.** Every player in the country now shows FR, SO, JR
+  or SR beside his position and overall, and the first-contact card spells it
+  out. The model is told as well, so a senior with one year left and a freshman
+  with three answer differently.
+
+- **He picks up the phone.** Opening a player you have never texted now shows
+  him answering — "Who is this?" — before you type anything, and your first
+  message is a reply to that rather than a cold open. The line is DCC's own, so
+  it costs no API credit, and it is the same every time for the same player. It
+  is kept as the first turn of the conversation, so the thread reads properly
+  afterwards. Someone you have already texted opens straight into the thread you
+  had, as before.
+
 ## [0.60.0] - 2026-09-06
 
 ### Added

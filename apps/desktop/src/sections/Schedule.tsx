@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, SchoolArt } from '../ui'
 import type { SeasonGame } from '../../electron/saveAnalysis'
+import type { StoredStory } from '../../electron/sidecar'
 import { WEATHER, dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 
 /** Kickoff times the game offers, in minutes after midnight. */
@@ -93,7 +94,21 @@ function Hero({ g, team, mark }: {
  * own game and keeps those scores out of sight until it is played, so showing
  * them here would spoil the week.
  */
-export default function Schedule({ games, team, art, savePath, onEdited, log, players, records, apiKey }: {
+/**
+ * The stories written so far, read from disk on mount.
+ *
+ * They are deliberately not component state. The first version kept each story
+ * in `useState` inside the row that showed it, so changing screen unmounted the
+ * row and threw away a story the user had paid API credit for. Disk is the
+ * source of truth now, and coming back re-reads it.
+ */
+function useStories() {
+  const [stories, setStories] = useState<Record<string, StoredStory>>({})
+  useEffect(() => { void window.dcc.stories().then((r) => setStories(r.stories)) }, [])
+  return [stories, setStories] as const
+}
+
+export default function Schedule({ games, team, art, savePath, onEdited, log, players, records, apiKey, season }: {
   games: SeasonGame[]
   team: string | null
   art: Record<string, string>
@@ -104,7 +119,10 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
   players: Map<string, { first: string; last: string; position: string; overall: number }[]>
   records: Map<string, { wins: number; losses: number }>
   apiKey: string
+  /** Stamps a story's key: a game row is only unique within a season. */
+  season: number | null
 }) {
+  const [stories, setStories] = useStories()
   const [open, setOpen] = useState<number | null>(null)
   const [spoilers, setSpoilers] = useState(false)
   const [week, setWeek] = useState<number | null>(null)
@@ -159,7 +177,8 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
             <GameRow key={g.row} g={g} team={team} icon={icon} open={open === g.row}
               onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={false}
               savePath={savePath} onEdited={onEdited} log={log}
-              players={players} records={records} apiKey={apiKey} />
+              players={players} records={records} apiKey={apiKey}
+              season={season} stories={stories} setStories={setStories} />
           ))}
         </Card>
         ) : null}
@@ -181,7 +200,8 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
           <GameRow key={g.row} g={g} team={team} icon={icon} open={open === g.row}
             onToggle={() => setOpen(open === g.row ? null : g.row)} hidden={hidden(g)}
             savePath={savePath} onEdited={onEdited} log={log}
-            players={players} records={records} apiKey={apiKey} />
+            players={players} records={records} apiKey={apiKey}
+            season={season} stories={stories} setStories={setStories} />
         ))}
         </Card>
       </div>
@@ -189,7 +209,7 @@ export default function Schedule({ games, team, art, savePath, onEdited, log, pl
   )
 }
 
-function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, log, players, records, apiKey }: {
+function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, log, players, records, apiKey, season, stories, setStories }: {
   g: SeasonGame; team: string | null; icon: (n: string | null) => string | undefined
   open: boolean; onToggle: () => void; hidden: boolean
   savePath: string | null; onEdited: () => void
@@ -197,6 +217,9 @@ function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, lo
   players: Map<string, { first: string; last: string; position: string; overall: number }[]>
   records: Map<string, { wins: number; losses: number }>
   apiKey: string
+  season: number | null
+  stories: Record<string, StoredStory>
+  setStories: (next: Record<string, StoredStory>) => void
 }) {
   const mineHome = team !== null && g.home === team
   const mineAway = team !== null && g.away === team
@@ -248,19 +271,23 @@ function GameRow({ g, team, icon, open, onToggle, hidden, savePath, onEdited, lo
       </button>
       {open && !hidden ? (
         <BoxScore g={g} savePath={savePath} onEdited={onEdited} log={log}
-          players={players} records={records} apiKey={apiKey} team={team} />
+          players={players} records={records} apiKey={apiKey} team={team}
+          season={season} stories={stories} setStories={setStories} />
       ) : null}
     </div>
   )
 }
 
-function BoxScore({ g, savePath, onEdited, log, players, records, apiKey, team }: {
+function BoxScore({ g, savePath, onEdited, log, players, records, apiKey, team, season, stories, setStories }: {
   g: SeasonGame; savePath: string | null; onEdited: () => void
   log: (text: string, kind?: 'good' | 'bad') => void
   players: Map<string, { first: string; last: string; position: string; overall: number }[]>
   records: Map<string, { wins: number; losses: number }>
   apiKey: string
   team: string | null
+  season: number | null
+  stories: Record<string, StoredStory>
+  setStories: (next: Record<string, StoredStory>) => void
 }) {
   const [editing, setEditing] = useState(false)
   const kickoff = kickoffLabel(g.kickoff)
@@ -305,7 +332,8 @@ function BoxScore({ g, savePath, onEdited, log, players, records, apiKey, team }
           <Meta size={9}>Team and player statistics are only kept by the game for the current week; DCC shows what the save still holds.</Meta>
         </div>
       ) : null}
-      <Press g={g} players={players} records={records} apiKey={apiKey} team={team} log={log} />
+      <Press g={g} players={players} records={records} apiKey={apiKey} team={team} log={log}
+        season={season} stories={stories} setStories={setStories} />
       {savePath && !g.played ? (
         editing
           ? <Conditions g={g} savePath={savePath} onDone={() => { setEditing(false); onEdited() }}
@@ -399,17 +427,21 @@ function Conditions({ g, savePath, onDone, onCancel, log }: {
  * ahead of time: it costs the user's own API credit, and most games will never
  * be asked about.
  */
-function Press({ g, players, records, apiKey, team, log }: {
+function Press({ g, players, records, apiKey, team, log, season, stories, setStories }: {
   g: SeasonGame
   players: Map<string, { first: string; last: string; position: string; overall: number }[]>
   records: Map<string, { wins: number; losses: number }>
   apiKey: string
   team: string | null
   log: (text: string, kind?: 'good' | 'bad') => void
+  season: number | null
+  stories: Record<string, StoredStory>
+  setStories: (next: Record<string, StoredStory>) => void
 }) {
-  const [story, setStory] = useState<{ headline: string; standfirst: string; body: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const key = `${season ?? 0}:${g.row}`
+  const story = stories[key] ?? null
 
   const write = async () => {
     setBusy(true); setError(null)
@@ -421,23 +453,43 @@ function Press({ g, players, records, apiKey, team, log }: {
       homePlayers: g.home ? players.get(g.home) : undefined,
       awayPlayers: g.away ? players.get(g.away) : undefined,
       userTeam: team,
+      season,
     })
     setBusy(false)
-    if (res.ok) { setStory(res.story); log(`wrote a ${g.played ? 'recap' : 'preview'} for ${g.away} at ${g.home}`) }
-    else { setError(res.message); log(res.message, 'bad') }
+    // The main process files the story before it answers, so what comes back is
+    // what is on disk. Taking it from the reply rather than re-reading means the
+    // story is on screen the instant it exists.
+    if (res.ok) {
+      setStories(res.stories)
+      log(`wrote a ${g.played ? 'recap' : 'preview'} for ${g.away} at ${g.home}`)
+    } else {
+      setError(res.message)
+      log(res.message, 'bad')
+    }
+  }
+
+  const forget = async () => {
+    setStories((await window.dcc.forgetStory(key)).stories)
+    log('threw that story away')
   }
 
   return (
     <div style={{ marginTop: 10 }}>
       {story ? (
         <div style={{ borderLeft: '2px solid var(--accent)', paddingLeft: 10 }}>
-          <Meta size={9}>{g.played ? 'RECAP' : 'PREVIEW'}</Meta>
+          <Meta size={9}>
+            {story.kind === 'recap' ? 'RECAP' : 'PREVIEW'} · KEPT SINCE{' '}
+            {new Date(story.written).toLocaleDateString()}
+          </Meta>
           <h3 style={{ margin: '4px 0 2px', color: 'var(--ink)', fontSize: 17 }}>{story.headline}</h3>
           <p className="body-serif" style={{ margin: '0 0 6px', color: 'var(--ink2)' }}>{story.standfirst}</p>
           {story.body.split(/\n+/).map((para, i) => (
             <p key={i} className="body-serif" style={{ margin: '0 0 6px' }}>{para}</p>
           ))}
-          <Btn size="sm" onClick={write} disabled={busy}>{busy ? 'Writing…' : 'Write another'}</Btn>
+          <div className="row" style={{ gap: 6 }}>
+            <Btn size="sm" onClick={write} disabled={busy}>{busy ? 'Writing…' : 'Write another'}</Btn>
+            <Btn size="sm" onClick={forget} disabled={busy}>Throw it away</Btn>
+          </div>
         </div>
       ) : (
         <Btn size="sm" onClick={write} disabled={busy || !apiKey}>

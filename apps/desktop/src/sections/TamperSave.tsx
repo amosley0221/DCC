@@ -6,6 +6,12 @@ import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { playerKey } from '../../electron/transfers'
 import { TAMPER_OPENS_WEEK } from '../../electron/tamper'
 import { UNITS } from '../../electron/positions'
+import { opener } from '../../electron/tamper'
+
+/** Class year as a roster sheet writes it. */
+const YEAR_SHORT: Record<string, string> = {
+  Freshman: 'FR', Sophomore: 'SO', Junior: 'JR', Senior: 'SR',
+}
 import { currentWeek } from '../../electron/season'
 import type { DepthStanding, TamperTarget } from '../../electron/tamper'
 import type { TamperThreadView } from '../../electron/preload'
@@ -166,6 +172,7 @@ export default function TamperSave() {
     const r = records.get(team) ?? { wins: 0, losses: 0 }
     return {
       first: p.first, last: p.last, position: p.position, overall: p.overall,
+      year: p.classYear ?? null,
       team, depth: depthOf(p),
       teamWins: r.wins, teamLosses: r.losses,
       teamStrength: Math.round(strength.get(p.team) ?? 70),
@@ -363,20 +370,31 @@ export default function TamperSave() {
 
             {pending ? (
               <Card className="card-pad">
-                <Kicker>First text to {pending.first} {pending.last}</Kicker>
+                <Kicker>Calling {pending.first} {pending.last}</Kicker>
                 <div style={{ marginTop: 4 }}>
                   <Meta color="var(--ink4)">
                     {(() => {
                       const t = targetOf(pending)
-                      return `${t.position} · ${t.overall} · ${t.team} ${t.teamWins}-${t.teamLosses} · ${standingOf(t.depth)}`
+                      const yr = t.year ? ` · ${t.year}` : ''
+                      return `${t.position} · ${t.overall}${yr} · ${t.team} ${t.teamWins}-${t.teamLosses} · ${standingOf(t.depth)}`
                     })()}
                   </Meta>
+                </div>
+                <div className="col" style={{ gap: 6, marginTop: 10 }}>
+                  <Meta size={9} color="var(--ink4)">HE PICKS UP</Meta>
+                  <div style={{
+                    alignSelf: 'flex-start', maxWidth: '80%',
+                    background: 'var(--rule)', color: 'var(--ink)',
+                    borderRadius: '12px 12px 12px 3px', padding: '7px 11px',
+                  }}>
+                    <span className="body-serif">{opener(playerKey(pending))}</span>
+                  </div>
                 </div>
                 <div className="row" style={{ gap: 8, marginTop: 10 }}>
                   <span style={{ flex: 1 }}>
                     <Input
                       autoFocus
-                      placeholder="he has never heard from you before"
+                      placeholder="tell him who you are"
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !busy) void send(pending) }}
@@ -464,6 +482,7 @@ export default function TamperSave() {
                           {...kit(p.team)} />
                         <span style={{ minWidth: 170 }}>{p.first} {p.last}</span>
                         <Meta>{p.position} · {p.overall}</Meta>
+                        {p.classYear ? <Meta color="var(--ink4)">{YEAR_SHORT[p.classYear] ?? p.classYear}</Meta> : null}
                         <SchoolArt file={logoFor(nameOf(p.team))} size={16} />
                         <Meta color="var(--ink4)">{nameOf(p.team)}</Meta>
                       </span>

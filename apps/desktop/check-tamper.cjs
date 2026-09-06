@@ -79,4 +79,23 @@ const score = (t, c) => T.resistance(t, c).score
   assert.match(T.standing(100), /coming with you/)
 }
 
+/* ----------------------------------------- he answers before you say anything */
+// A new conversation opens with the player picking up to a number he does not
+// know. The line is DCC's own: it costs no API credit, and it is what makes the
+// coach's first text a reply rather than a cold open.
+{
+  assert.ok(T.OPENERS.length >= 3, 'there is more than one way to answer a phone')
+  for (const line of T.OPENERS) assert.ok(/\?$/.test(line), `"${line}" asks who is calling`)
+  // The same player always answers the same way, so the screen does not reshuffle
+  // as it redraws.
+  const k = 'smith:john:42'
+  assert.equal(T.opener(k), T.opener(k), 'the same key gives the same line')
+  assert.ok(T.OPENERS.includes(T.opener(k)), 'the line comes from the list')
+  // And different players do not all say the same thing.
+  const seen = new Set()
+  for (let i = 0; i < 400; i++) seen.add(T.opener(`player:${i}`))
+  assert.ok(seen.size >= 3, `keys spread across the openers: got ${seen.size}`)
+  assert.equal(T.opener(''), T.OPENERS[0], 'an empty key still answers')
+}
+
 console.log('tamper OK')
