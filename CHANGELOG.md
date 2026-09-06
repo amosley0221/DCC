@@ -10,6 +10,30 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.59.0] - 2026-09-06
+
+### Fixed
+
+- **The Heisman leader's face is his face.** The front page drew him with no
+  portrait id at all, so it fell back to his initials while the roster screen
+  showed the picture. The shortlist names his roster row precisely so his
+  portrait can be found; now it is.
+
+- **Both helmets exist.** The art index matched `thel_lthelmets_` and
+  `thel_rthelmets_` with one pattern, so whichever the scan reached last was
+  the only helmet a school had. Left and right are now separate marks and both
+  travel in the art pack.
+
+### Changed
+
+- **Bigger helmets on the front page**, and each side faces the other: away on
+  the left looking right, home on the right looking left, over the score
+  between them. That also puts the game the way the scores rail below it reads.
+
+  Rebuild the art pack on the desktop to pick up the second helmet. A pack made
+  before this has only one, and the right-hand side falls back to it rather
+  than dropping to a monogram.
+
 ## [0.58.0] - 2026-09-06
 
 ### Added

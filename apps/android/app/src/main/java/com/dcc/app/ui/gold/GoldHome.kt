@@ -108,6 +108,10 @@ fun GoldHome(
     // picked up all week. Only stories the snapshot can actually tell are in the
     // rotation, so it never turns over to an empty card.
     val heisman = snap.snapshot.heisman.minByOrNull { it.rank }
+    // The shortlist names a roster row precisely so his portrait can be found;
+    // drawing it with no asset id was why the front page showed initials for a
+    // player the roster screen draws properly.
+    val heismanFace = heisman?.let { snap.playerByIndex[it.index]?.assetId }
     val topCommit = snap.recruits.firstOrNull()
     val biggest = saturday.firstOrNull { !snap.isUserGame(it) }
     val table = remember(snap) {
@@ -156,7 +160,7 @@ fun GoldHome(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 FeatureWell(
-                    me?.name, me?.wins, me?.losses, last, biggest, heisman, topCommit,
+                    me?.name, me?.wins, me?.losses, last, biggest, heisman, heismanFace, topCommit,
                     onOpenGame, onOpenBoard, Modifier.weight(0.58f),
                 )
                 Column(Modifier.weight(0.42f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -169,7 +173,7 @@ fun GoldHome(
             }
         } else {
             FeatureWell(
-                me?.name, me?.wins, me?.losses, last, biggest, heisman, topCommit,
+                me?.name, me?.wins, me?.losses, last, biggest, heisman, heismanFace, topCommit,
                 onOpenGame, onOpenBoard, Modifier.fillMaxWidth(),
             )
         }
@@ -242,6 +246,7 @@ private fun FeatureWell(
     last: SnapshotGame?,
     biggest: SnapshotGame?,
     heisman: SnapshotHeisman?,
+    heismanFace: String?,
     topCommit: SnapshotRecruit?,
     onOpenGame: (SnapshotGame) -> Unit,
     onOpenBoard: () -> Unit,
@@ -299,21 +304,25 @@ private fun FeatureWell(
             val wash = when (slide) {
                 FEATURE_HEISMAN -> listOfNotNull(heisman?.team)
                 FEATURE_CLASS -> listOfNotNull(topCommit?.topSchools?.maxByOrNull { it.interest }?.school)
-                else -> listOfNotNull(slideGame?.home, slideGame?.away)
+                else -> listOfNotNull(slideGame?.away, slideGame?.home)
             }
             CrestWash(wash)
 
             when {
                 slideGame != null -> {
-                    val home = slideGame.home == meName
-                    val us = if (home) slideGame.homeScore else slideGame.awayScore
-                    val them = if (home) slideGame.awayScore else slideGame.homeScore
-                    val ours = if (home) slideGame.home else slideGame.away
-                    val theirs = if (home) slideGame.away else slideGame.home
+                    // Away on the left, home on the right — the way the scores
+                    // rail below reads, and the way the two helmets face: the
+                    // left-hand art looks right and the right-hand art looks
+                    // left, so they meet over the score instead of both
+                    // pointing the same way.
+                    val away = slideGame.away
+                    val home = slideGame.home
+                    val a = slideGame.awayScore
+                    val h = slideGame.homeScore
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SchoolBadge(mono(ours), ours ?: "", false, 30.dp, "helmet")
-                        Spacer(Modifier.width(9.dp))
-                        GoldNum("$us", 46, if (us >= them) c.ink else c.ink3)
+                        SchoolBadge(mono(away), away ?: "", away == meName, 46.dp, "helmet")
+                        Spacer(Modifier.width(11.dp))
+                        GoldNum("$a", 46, if (a >= h) c.ink else c.ink3)
                         Box(
                             Modifier
                                 .padding(horizontal = 10.dp)
@@ -321,9 +330,9 @@ private fun FeatureWell(
                                 .height(3.dp)
                                 .background(c.ink3),
                         )
-                        GoldNum("$them", 46, if (them > us) c.ink else c.ink3)
-                        Spacer(Modifier.width(9.dp))
-                        SchoolBadge(mono(theirs), theirs ?: "", false, 30.dp, "helmet")
+                        GoldNum("$h", 46, if (h > a) c.ink else c.ink3)
+                        Spacer(Modifier.width(11.dp))
+                        SchoolBadge(mono(home), home ?: "", home == meName, 46.dp, "helmetRight")
                     }
                 }
                 slide == FEATURE_HEISMAN && heisman != null -> Row(

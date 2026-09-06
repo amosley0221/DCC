@@ -39,7 +39,10 @@ var PACK_CATEGORIES = {
   icon: "logo",
   logoLight: "logo",
   logoGold: "gold",
+  // Both helmets travel. A matchup wants each side facing the other, and one
+  // image cannot do that — which is what it had been doing.
   helmet: "helmet",
+  helmetRight: "helmetRight",
   jersey: "jersey"
 };
 var safe = (s) => s.replace(/[^A-Za-z0-9._-]+/g, "_");

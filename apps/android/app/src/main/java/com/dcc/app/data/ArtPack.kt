@@ -119,10 +119,15 @@ object ArtPack {
         cache.evictAll()
     }
 
-    /** A school's mark: "logo", "gold", "helmet" or "jersey". */
+    /** A school's mark: "logo", "gold", "helmet", "helmetRight" or "jersey". */
     fun school(context: Context, name: String?, kind: String): File? {
         if (name.isNullOrBlank()) return null
-        return File(root(context), "schools/${safe(name)}__$kind.png").takeIf { it.exists() }
+        val file = File(root(context), "schools/${safe(name)}__$kind.png")
+        if (file.exists()) return file
+        // Packs built before the helmets were split carry only the one. A left
+        // helmet on both sides beats a monogram beside a real helmet.
+        if (kind == "helmetRight") return school(context, name, "helmet")
+        return null
     }
 
     /**

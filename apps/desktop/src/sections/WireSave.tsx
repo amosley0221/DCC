@@ -250,7 +250,10 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
     ? (roster.players ?? []).find((p) => p.index === open.index) ?? null
     : null
 
-  const artOf = (name: string | null | undefined, kind: 'logoLight' | 'helmet' = 'logoLight') =>
+  const artOf = (
+    name: string | null | undefined,
+    kind: 'logoLight' | 'helmet' | 'helmetRight' = 'logoLight',
+  ) =>
     (name
       ? save.schoolArt[`${name}|${kind}`] ?? save.schoolArt[`${name}|logoLight`] ??
         save.schoolArt[`${name}|icon`] ?? save.schoolArt[`${name}|logoGold`]
@@ -386,7 +389,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                       <span className="gs-feature-num" style={{ color: homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.awayScore}</span>
                       <span style={{ color: 'var(--ink3)', fontSize: 11 }}>at</span>
                       <span className="row" style={{ gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
-                        <SchoolArt size={28} file={artOf(g.home, 'helmet')} />
+                        <SchoolArt size={28} file={artOf(g.home, 'helmetRight') ?? artOf(g.home, 'helmet')} />
                         <span className="gs-feature-name" style={{ color: homeWon ? 'var(--ink)' : 'var(--ink3)' }}>
                           {rankOf.get(g.home ?? '') && rankOf.get(g.home ?? '')! <= 25
                             ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(g.home ?? '')} </span> : null}

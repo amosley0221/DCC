@@ -823,6 +823,7 @@ export function matchFaces(index: FaceIndex, assetIds: string[]): FaceMatch {
  *   3d_logos/PNG_OD/Alabama_OD              logo, dark
  *   3d_logos/png_OL/Alabama_OL              logo, light
  *   helmet/left/thel_lthelmets_Alabama_result
+ *   helmet/right/thel_rthelmets_Alabama_result
  *   coachpolos/tjer_coachpolos_Alabama_Polos_result
  *
  * so the school is pulled out per category rather than guessed at.
@@ -831,7 +832,11 @@ const SCHOOL_PATTERNS: [string, RegExp][] = [
   ['logoGold', /^(.+)_gold$/i],
   ['logoDark', /^(.+)_OD$/i],
   ['logoLight', /^(.+)_OL$/i],
-  ['helmet', /^thel_[lr]thelmets_(.+)_result$/i],
+  // Left and right are separate images and separate marks. One pattern for
+  // both meant whichever the scan reached last overwrote the other, so a
+  // matchup could only ever be drawn with one helmet facing one way.
+  ['helmetLeft', /^thel_lthelmets_(.+)_result$/i],
+  ['helmetRight', /^thel_rthelmets_(.+)_result$/i],
   ['polo', /^tjer_coachpolos_(.+?)(?:_Polos)?_result$/i],
   ['jersey', /^tjer_teamjerseys_(.+)_result$/i],
   // icons/ncaa-logos is a flat set of school marks in lowerCamelCase, and it
@@ -931,6 +936,11 @@ export function matchSchools(
       break
     }
   }
+
+  // "helmet" stays a name the app can ask for, meaning the left one. Screens
+  // that want a matchup ask for both; screens that want a mark ask for this.
+  const left = bank.get('helmetLeft')
+  if (left) bank.set('helmet', left)
 
   const art: Record<string, string> = {}
   const matched: string[] = []

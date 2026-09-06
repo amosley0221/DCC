@@ -95,6 +95,13 @@ class SnapshotView(val snapshot: DynastySnapshot) {
     val userTeam: SnapshotTeam? = meta.userTeamIndex?.let { teamsByIndex[it] }
         ?: meta.userTeamId?.let { id -> indexByTeamId[id]?.let { teamsByIndex[it] } }
 
+    /**
+     * Every rostered player by their row in the save, so anything holding an
+     * index — the Heisman shortlist, most of all — can find the player it is
+     * naming rather than showing his initials.
+     */
+    val playerByIndex: Map<Int, SnapshotPlayer> = snapshot.players.associateBy { it.index }
+
     private val rosters: Map<Int, List<SnapshotPlayer>> = snapshot.players
         .groupBy { it.team }
         .mapValues { (_, list) -> list.sortedByDescending { it.overall } }

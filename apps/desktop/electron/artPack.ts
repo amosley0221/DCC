@@ -56,7 +56,10 @@ export const PACK_CATEGORIES: Record<string, string> = {
   icon: 'logo',
   logoLight: 'logo',
   logoGold: 'gold',
+  // Both helmets travel. A matchup wants each side facing the other, and one
+  // image cannot do that — which is what it had been doing.
   helmet: 'helmet',
+  helmetRight: 'helmetRight',
   jersey: 'jersey',
 }
 
