@@ -301,8 +301,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
 
-        val players = sending.filter { it.applyKind == "ovr" && it.applyOvr != null }
-            .joinToString(",") { """{"index":${it.applyIndex},"overall":${it.applyOvr}}""" }
+        val quoted = { v: String -> "\"" + v.replace("\"", "") + "\"" }
+        val players = sending.filter { it.applyKind == "ovr" || it.applyKind == "player" }
+            .joinToString(",") { q ->
+                val parts = mutableListOf("\"index\":${q.applyIndex}")
+                q.applyOvr?.let { parts += "\"overall\":$it" }
+                q.applyStars?.let { parts += "\"stars\":$it" }
+                q.applyDev?.let { parts += "\"devTrait\":" + quoted(it) }
+                q.applyDealbreaker?.let { parts += "\"dealbreaker\":" + quoted(it) }
+                q.applyPitch?.let { parts += "\"idealPitch\":" + quoted(it) }
+                if (q.applyRatings.isNotEmpty()) {
+                    parts += "\"ratings\":{" +
+                        q.applyRatings.entries.joinToString(",") { (k, v) -> quoted(k) + ":" + v } + "}"
+                }
+                "{" + parts.joinToString(",") + "}"
+            }
         val recruits = sending.filter { it.applyKind == "stage" }.joinToString(",") { q ->
             val parts = mutableListOf("\"playerIndex\":${q.applyIndex}")
             q.applyStage?.let { parts += "\"stage\":\"$it\"" }
@@ -534,6 +547,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         applyOvr: Int? = null,
         applyIndex: Int? = null,
         applyCommit: Int? = null,
+        applyRatings: Map<String, Int> = emptyMap(),
+        applyStars: Int? = null,
+        applyDev: String? = null,
+        applyDealbreaker: String? = null,
+        applyPitch: String? = null,
         applyProspectId: String? = null,
         applyStage: String? = null,
         applyTeamId: String? = null,
@@ -545,6 +563,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             at = System.currentTimeMillis(), needsConfirm = needsConfirm,
             applyKind = applyKind, applyPlayerId = applyPlayerId, applyOvr = applyOvr,
             applyIndex = applyIndex, applyCommit = applyCommit,
+            applyRatings = applyRatings, applyStars = applyStars, applyDev = applyDev,
+            applyDealbreaker = applyDealbreaker, applyPitch = applyPitch,
             applyProspectId = applyProspectId, applyStage = applyStage,
             applyTeamId = applyTeamId, applyPos = applyPos, applyOrder = applyOrder,
         )

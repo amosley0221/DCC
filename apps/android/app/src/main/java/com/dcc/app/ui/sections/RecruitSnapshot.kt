@@ -38,6 +38,16 @@ private fun SnapshotRecruit.leaders(): List<String> {
     }
 }
 
+/** One change the phone wants made to a recruit, as the queue will carry it. */
+data class QueuedEdit(
+    val overall: Int? = null,
+    val stars: Int? = null,
+    val dev: String? = null,
+    val dealbreaker: String? = null,
+    val pitch: String? = null,
+    val ratings: Map<String, Int> = emptyMap(),
+)
+
 /** Where a recruit is coming from, in the game's own words rather than the roster's. */
 private val CLASS_WORD = mapOf(
     "HighSchool" to "High school",
@@ -156,6 +166,29 @@ fun RecruitSnapshotSection(vm: AppViewModel, state: Persisted, view: SnapshotVie
                             applyIndex = r.index,
                         )
                     },
+                    onEdit = { e ->
+                        vm.enqueue(
+                            type = "PLAYER",
+                            title = r.name,
+                            detail = listOfNotNull(
+                                e.overall?.let { "overall to $it" },
+                                e.stars?.let { "$it stars" },
+                                e.dev?.let { "dev trait to $it" },
+                                e.dealbreaker?.let { "dealbreaker to $it" },
+                                e.pitch?.let { "responds to $it" },
+                                e.ratings.entries.firstOrNull()?.let { (k, v) -> "$k to $v" },
+                            ).joinToString(", "),
+                            applyKind = "player",
+                            applyPlayerId = r.playerId.toString(),
+                            applyIndex = r.index,
+                            applyOvr = e.overall,
+                            applyStars = e.stars,
+                            applyDev = e.dev,
+                            applyDealbreaker = e.dealbreaker,
+                            applyPitch = e.pitch,
+                            applyRatings = e.ratings,
+                        )
+                    },
                 )
             }
             item { Spacer(Modifier.height(24.dp)) }
@@ -171,6 +204,7 @@ private fun RecruitRow(
     onScout: () -> Unit,
     onToggle: () -> Unit,
     onStage: (String) -> Unit,
+    onEdit: (QueuedEdit) -> Unit,
 ) {
     val c = Dcc.colors
     DccCard(onClick = onToggle) {
@@ -202,18 +236,18 @@ private fun RecruitRow(
                         SchoolBadge(s.take(2).uppercase(), s, isUser = false, size = 17.dp)
                         Spacer(Modifier.width(4.dp))
                     }
-                    // An unscouted overall keeps its slot rather than leaving one,
-                    // so the rows do not shift under the thumb as they are revealed.
+                    // The slot keeps its width whether or not the number is in
+                    // it, so rows do not shift under the thumb as they are
+                    // scouted — but an unscouted overall shows nothing rather
+                    // than two dashes, which beside a crest read as a fault.
                     Box(Modifier.width(24.dp), contentAlignment = Alignment.CenterEnd) {
-                        NumText(
-                            if (revealed) "${r.overall}" else "––",
-                            when {
-                                !revealed -> c.ink4
-                                r.overall >= 85 -> c.ink
-                                else -> c.ink2
-                            },
-                            13, FontWeight.SemiBold,
-                        )
+                        if (revealed) {
+                            NumText(
+                                "${r.overall}",
+                                if (r.overall >= 85) c.ink else c.ink2,
+                                13, FontWeight.SemiBold,
+                            )
+                        }
                     }
                 }
             }
@@ -270,6 +304,54 @@ private fun RecruitRow(
                     }
                 }
             }
+            if (revealed) {
+                Spacer(Modifier.height(11.dp))
+                MonoLabel("CHANGE HIM", c.ink3, 9)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    (1..5).forEach { n ->
+                        DccChip("$n★", r.stars == n) { onEdit(QueuedEdit(stars = n)) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    SaveLabels.DEV_TRAITS.forEach { t ->
+                        DccChip(t, r.dev == t) { onEdit(QueuedEdit(dev = t)) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    listOf(-5, -1, 1, 5).forEach { d ->
+                        DccChip(if (d > 0) "OVR +$d" else "OVR $d", false) {
+                            onEdit(QueuedEdit(overall = (r.overall + d).coerceIn(0, 99)))
+                        }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                MetaText("DEALBREAKER", c.ink4, 9)
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    SaveLabels.DEALBREAKERS.forEach { t ->
+                        DccChip(t, r.dealbreaker == t) { onEdit(QueuedEdit(dealbreaker = t)) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                MetaText("RESPONDS TO", c.ink4, 9)
+                Spacer(Modifier.height(4.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    SaveLabels.IDEAL_PITCHES.forEach { t ->
+                        DccChip(t, r.idealPitch == t) { onEdit(QueuedEdit(pitch = t)) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                }
+                Spacer(Modifier.height(5.dp))
+                MetaText("EACH TAP QUEUES A WRITE FOR THE WINDOWS APP", c.ink4, 9)
+            }
+
             // Changing a recruitment is a save write, and the phone does not do
             // those — it queues the ask and the Windows app makes the change.
             if (r.stage != null) {
@@ -305,6 +387,14 @@ private fun RecruitRow(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             MetaText(label, c.ink3, 9, Modifier.weight(1f), maxLines = 1)
+                            DccChip("−", false) {
+                                onEdit(QueuedEdit(ratings = mapOf(label to (value - 1).coerceIn(0, 99))))
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            DccChip("+", false) {
+                                onEdit(QueuedEdit(ratings = mapOf(label to (value + 1).coerceIn(0, 99))))
+                            }
+                            Spacer(Modifier.width(6.dp))
                             Box(Modifier.width(70.dp)) {
                                 DccTrack(value, color = if (value >= 85) c.accent else c.ink4)
                             }

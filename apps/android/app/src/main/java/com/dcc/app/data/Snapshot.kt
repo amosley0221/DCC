@@ -273,6 +273,22 @@ val SnapshotTeam.monogram: String get() = (abbr ?: name).take(2).uppercase()
  */
 object SaveLabels {
 
+    /** What the game will accept for each of these, so the phone offers nothing else. */
+    val DEV_TRAITS = listOf("Normal", "Impact", "Star", "Elite")
+
+    val DEALBREAKERS = listOf(
+        "Brand Exposure", "Championship Contender", "Coach Prestige", "Conference Prestige",
+        "Playing Style", "Playing Time", "Pro Potential", "Proximity to Home",
+    )
+
+    val IDEAL_PITCHES = listOf(
+        "College Experience", "Team Player", "Campus Personality", "It's Game Time", "Prestigious",
+        "Student of the Game", "Hometown Hero", "Prove Yourself", "The Clutch", "TV Time",
+        "Coach's Favorite", "Aspirational", "To the House", "Football Influencer",
+        "Time to Get to Work", "Starter", "Grassroots", "Conference Spotlight", "Sunday Bound",
+        "Work Horse",
+    )
+
     /** `Weather`, four bits in a game row. Values past the list are unset. */
     val WEATHER = listOf(
         "Clear", "Overcast", "Partly cloudy", "Windy", "Light rain", "Rain", "Heavy rain",

@@ -266,9 +266,20 @@ var RECRUIT_FIELDS = {
   nationalRank: [100, 13],
   positionRank: [136, 12],
   stateRank: [148, 12],
+  recruitClass: [162, 4],
   totalOffers: [176, 6],
   commitScore: [182, 10]
 };
+var RECRUIT_CLASSES = [
+  "HighSchool",
+  "JuniorCollege_Sophomore",
+  "JuniorCollege_Junior",
+  "JuniorCollege_Senior",
+  "Transfer_Freshman",
+  "Transfer_Sophomore",
+  "Transfer_Junior",
+  "Transfer_Senior"
+];
 var TOP_SCHOOLS_PER_RECRUIT = 10;
 
 // electron/saveAnalysis.ts
@@ -1758,7 +1769,8 @@ function readRecruitBoard(payload, players) {
       stateRank: f("stateRank"),
       commitScore: f("commitScore"),
       totalOffers: f("totalOffers"),
-      stage: RECRUIT_STAGES[f("stage")] ?? "Top10"
+      stage: RECRUIT_STAGES[f("stage")] ?? "Top10",
+      recruitClass: RECRUIT_CLASSES[f("recruitClass")] ?? "HighSchool"
     });
   }
   return out;

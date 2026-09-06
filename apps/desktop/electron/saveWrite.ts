@@ -19,8 +19,9 @@ import { dirname, join } from 'node:path'
 import { deflateSync, inflateSync } from 'node:zlib'
 import {
   DEPTH_REF_TAG, DEPTH_SLOT_BYTES, DEPTH_SLOT_FIELDS, DEPTH_SLOTS_PER_TEAM,
-  GAME_BITS, NIL_BIT, OVERALL_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE, REDSHIRT_BIT,
-  readDepthCharts, readRecruitBoard, readRoster, seasonGameTable, storeTable,
+  DEALBREAKER_BIT, DEALBREAKERS, DEV_TRAIT_BIT, DEV_TRAITS, GAME_BITS, IDEAL_PITCHES,
+  NIL_BIT, OVERALL_BIT, PITCH_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE, REDSHIRT_BIT,
+  STARS_BIT, readDepthCharts, readRecruitBoard, readRoster, seasonGameTable, storeTable,
 } from './saveAnalysis'
 import {
   COMMIT_MAX, INTEREST_MAX, RECRUIT_FIELDS, RECRUIT_STAGES, TOP_SCHOOLS_PER_RECRUIT,
@@ -280,7 +281,28 @@ export interface PlayerEdit {
   redshirt?: boolean
   /** NIL in thousands. Nine bits with a 255 floor, so -255 to 256. */
   nilK?: number
+  /** Normal, Impact, Star or Elite. */
+  devTrait?: string
+  /** 1 to 5. */
+  stars?: number
+  /** What he will not compromise on — one of DEALBREAKERS. */
+  dealbreaker?: string
+  /** The pitch he responds to — one of IDEAL_PITCHES. */
+  idealPitch?: string
 }
+
+/**
+ * The named fields a player carries beside his ratings, and where each sits.
+ *
+ * Every one of these is already read, so the bit is known rather than guessed
+ * at; what makes them writable is that the writer refuses unless the edit lands
+ * on exactly these bits and the value reads back.
+ */
+const NAMED_FIELDS = {
+  devTrait: { bit: DEV_TRAIT_BIT, width: 2, table: DEV_TRAITS },
+  dealbreaker: { bit: DEALBREAKER_BIT, width: 4, table: DEALBREAKERS },
+  idealPitch: { bit: PITCH_BIT, width: 5, table: IDEAL_PITCHES },
+} as const
 
 /** Ratings and overall are 7-bit fields, so 0 to 99 is the whole usable range. */
 const RATING_MIN = 0
@@ -300,6 +322,20 @@ export function checkPlayerEdits(edits: PlayerEdit[], playerCount: number): Edit
       }
     }
     check('overall', e.overall)
+    if (e.stars !== undefined && (!Number.isInteger(e.stars) || e.stars < 1 || e.stars > 5)) {
+      out.push({ row: e.index, field: 'stars', message: 'must be a whole number from 1 to 5' })
+    }
+    for (const [field, spec] of Object.entries(NAMED_FIELDS)) {
+      const v = e[field as keyof typeof NAMED_FIELDS]
+      if (v === undefined) continue
+      if (!spec.table.includes(v)) {
+        out.push({
+          row: e.index,
+          field,
+          message: `must be one of ${spec.table.filter(Boolean).join(', ')}`,
+        })
+      }
+    }
     if (e.nilK !== undefined && (!Number.isInteger(e.nilK) || e.nilK < -255 || e.nilK > 256)) {
       out.push({ row: e.index, field: 'nilK', message: 'the field holds -255 to 256 (in thousands)' })
     }
@@ -323,9 +359,22 @@ export function checkPlayerEdits(edits: PlayerEdit[], playerCount: number): Edit
 const PLAYER_FIELD_WIDTH = 7
 const startOf = (endBit: number) => endBit - PLAYER_FIELD_WIDTH + 1
 
+/**
+ * Where a field of `width` bits begins, given the bit it ends at.
+ *
+ * Every position in `saveAnalysis` names the *last* bit of its field — that is
+ * how the reader was written and how all of them were found. A one-bit flag
+ * reads the same either way, which is why this went unnoticed: the redshirt bit
+ * is fine and NIL, nine bits wide, was being read and written eight bits off.
+ */
+const beginsAt = (endBit: number, width: number) => endBit - width + 1
+
 export function readPlayerNumbers(
   payload: Buffer, index: number,
-): { overall: number; ratings: Record<string, number>; redshirt: boolean; nilK: number } | null {
+): {
+  overall: number; ratings: Record<string, number>; redshirt: boolean; nilK: number
+  stars: number; devTrait: string | null; dealbreaker: string | null; idealPitch: string | null
+} | null {
   const at = (RECORD_BASE + index) * RECORD_STRIDE
   if (at + RECORD_STRIDE > payload.length) return null
   const rd = (endBit: number) => {
@@ -335,15 +384,21 @@ export function readPlayerNumbers(
   }
   const ratings: Record<string, number> = {}
   for (const [name, bit] of Object.entries(RATING_BITS)) ratings[name] = rd(bit)
-  const bit = (b: number, w: number) => {
+  const bit = (endBit: number, w: number) => {
     let v = 0
-    for (let i = b; i < b + w; i++) v = (v << 1) | ((payload[at + (i >> 3)] >> (7 - (i & 7))) & 1)
+    for (let i = beginsAt(endBit, w); i <= endBit; i++) {
+      v = (v << 1) | ((payload[at + (i >> 3)] >> (7 - (i & 7))) & 1)
+    }
     return v
   }
   return {
     overall: rd(OVERALL_BIT), ratings,
     redshirt: bit(REDSHIRT_BIT, 1) === 1,
     nilK: bit(NIL_BIT, 9) - 255,
+    stars: bit(STARS_BIT, 3) + 1,
+    devTrait: DEV_TRAITS[bit(DEV_TRAIT_BIT, 2)] ?? null,
+    dealbreaker: DEALBREAKERS[bit(DEALBREAKER_BIT, 4)] ?? null,
+    idealPitch: IDEAL_PITCHES[bit(PITCH_BIT, 5)] ?? null,
   }
 }
 
@@ -367,9 +422,21 @@ export function applyPlayerEdits(payload: Buffer, edits: PlayerEdit[]): { next: 
       putBits(next, at, REDSHIRT_BIT, 1, e.redshirt ? 1 : 0)
       touched.add(at + (REDSHIRT_BIT >> 3))
     }
-    if (e.nilK !== undefined) {
-      putBits(next, at, NIL_BIT, 9, e.nilK + 255)
-      for (let b = NIL_BIT; b < NIL_BIT + 9; b++) touched.add(at + (b >> 3))
+    // Each of these names the bit its field ends at, so the write starts back
+    // by its own width.
+    const put = (endBit: number, width: number, value: number) => {
+      const start = beginsAt(endBit, width)
+      putBits(next, at, start, width, value)
+      for (let b = start; b <= endBit; b++) touched.add(at + (b >> 3))
+    }
+    if (e.nilK !== undefined) put(NIL_BIT, 9, e.nilK + 255)
+    if (e.stars !== undefined) put(STARS_BIT, 3, e.stars - 1)
+    for (const [field, spec] of Object.entries(NAMED_FIELDS)) {
+      const v = e[field as keyof typeof NAMED_FIELDS]
+      if (v === undefined) continue
+      const code = spec.table.indexOf(v)
+      if (code < 0) continue
+      put(spec.bit, spec.width, code)
     }
   }
   return { next, touched }
@@ -379,7 +446,8 @@ export interface PlayerWriteResult {
   ok: boolean
   message: string
   backup?: string
-  changed?: { index: number; field: string; before: number; after: number }[]
+  /** Text for the named fields, a number for a rating. */
+  changed?: { index: number; field: string; before: string | number; after: string | number }[]
 }
 
 /**
@@ -415,7 +483,7 @@ export function writePlayerEdits(path: string, edits: PlayerEdit[], playerCount:
     return { ok: false, message: 'the rebuilt save did not read back identically; nothing was written' }
   }
 
-  const changed: { index: number; field: string; before: number; after: number }[] = []
+  const changed: PlayerWriteResult['changed'] = []
   for (const e of edits) {
     const was = readPlayerNumbers(c.payload, e.index)
     const now = readPlayerNumbers(check.payload, e.index)
@@ -433,12 +501,23 @@ export function writePlayerEdits(path: string, edits: PlayerEdit[], playerCount:
     for (const [field, want, before, after] of [
       ['redshirt', e.redshirt, was.redshirt, now.redshirt],
       ['nilK', e.nilK, was.nilK, now.nilK],
+      ['stars', e.stars, was.stars, now.stars],
+      ['devTrait', e.devTrait, was.devTrait, now.devTrait],
+      ['dealbreaker', e.dealbreaker, was.dealbreaker, now.dealbreaker],
+      ['idealPitch', e.idealPitch, was.idealPitch, now.idealPitch],
     ] as [string, unknown, unknown, unknown][]) {
       if (want !== undefined) {
         if (after !== want) {
           return { ok: false, message: `player ${e.index}: ${field} read back as ${after}, not ${want}; nothing was written` }
         }
-        if (before !== after) changed.push({ index: e.index, field, before: Number(before), after: Number(after) })
+        if (before !== after) {
+          changed.push({
+            index: e.index,
+            field,
+            before: (before ?? '') as string | number,
+            after: (after ?? '') as string | number,
+          })
+        }
       } else if (before !== after) {
         return { ok: false, message: `player ${e.index}: ${field} changed without being asked to; nothing was written` }
       }

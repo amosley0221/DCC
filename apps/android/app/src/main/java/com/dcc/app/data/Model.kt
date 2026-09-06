@@ -198,6 +198,12 @@ data class QueueItem(
     val applyIndex: Int? = null,
     /** 0..1023, for a recruiting edit. */
     val applyCommit: Int? = null,
+    /** A rating name to its new value, for a player edit. */
+    val applyRatings: Map<String, Int> = emptyMap(),
+    val applyStars: Int? = null,
+    val applyDev: String? = null,
+    val applyDealbreaker: String? = null,
+    val applyPitch: String? = null,
     val applyProspectId: String? = null,
     val applyStage: String? = null,
     val applyTeamId: String? = null,

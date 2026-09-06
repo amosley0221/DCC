@@ -10,6 +10,37 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.57.0] - 2026-09-06
+
+### Fixed
+
+- **NIL was being written to the wrong bits.** Every field position in the
+  reader names the *last* bit of its field. The writer read and wrote NIL as
+  though the number were the first, which is invisible on a one-bit flag like
+  redshirt and eight bits wrong on a nine-bit field. Editing a player's NIL on
+  the desktop wrote into whatever sat next to it.
+
+  Found because the new fields tripped the writer's own "nothing else moved"
+  check, which is what that check is for. check-write now lays a record out the
+  way the reader reads it and fails if a write lands anywhere else.
+
+- **The two dashes beside a recruit's crest are gone.** They were a placeholder
+  for an unscouted overall, holding the slot so rows would not shift as you
+  scout. Next to a school crest they read as a broken field. The slot still
+  holds its width; it is simply empty until he is scouted.
+
+### Added
+
+- **Recruit editing on the phone.** Stars, dev trait, overall, dealbreaker, what
+  he responds to, and any individual rating — each tap queues a write, and the
+  queue sends it to the Windows app, which makes the change with its own writer
+  and its own refusals.
+
+  Verified against a real save: overall 77→88, dev trait Impact→Elite,
+  dealbreaker and pitch changed, Speed 78→95, seven bytes moved, all inside his
+  record, nobody else touched. A dev trait the game has no name for and a
+  six-star recruit are both refused before anything is written.
+
 ## [0.56.0] - 2026-09-06
 
 ### Added

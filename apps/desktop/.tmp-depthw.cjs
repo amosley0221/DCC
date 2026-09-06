@@ -203,9 +203,20 @@ var RECRUIT_FIELDS = {
   nationalRank: [100, 13],
   positionRank: [136, 12],
   stateRank: [148, 12],
+  recruitClass: [162, 4],
   totalOffers: [176, 6],
   commitScore: [182, 10]
 };
+var RECRUIT_CLASSES = [
+  "HighSchool",
+  "JuniorCollege_Sophomore",
+  "JuniorCollege_Junior",
+  "JuniorCollege_Senior",
+  "Transfer_Freshman",
+  "Transfer_Sophomore",
+  "Transfer_Junior",
+  "Transfer_Senior"
+];
 var TOP_SCHOOLS_PER_RECRUIT = 10;
 var COMMIT_MAX = 1023;
 var INTEREST_MAX = 65535;
@@ -637,7 +648,8 @@ function readRecruitBoard(payload, players) {
       stateRank: f("stateRank"),
       commitScore: f("commitScore"),
       totalOffers: f("totalOffers"),
-      stage: RECRUIT_STAGES[f("stage")] ?? "Top10"
+      stage: RECRUIT_STAGES[f("stage")] ?? "Top10",
+      recruitClass: RECRUIT_CLASSES[f("recruitClass")] ?? "HighSchool"
     });
   }
   return out;
@@ -832,6 +844,11 @@ function writeGameEdits(path, edits) {
     changed
   };
 }
+var NAMED_FIELDS = {
+  devTrait: { bit: DEV_TRAIT_BIT, width: 2, table: DEV_TRAITS },
+  dealbreaker: { bit: DEALBREAKER_BIT, width: 4, table: DEALBREAKERS },
+  idealPitch: { bit: PITCH_BIT, width: 5, table: IDEAL_PITCHES }
+};
 var RATING_MIN = 0;
 var RATING_MAX = 99;
 function checkPlayerEdits(edits, playerCount) {
@@ -848,6 +865,20 @@ function checkPlayerEdits(edits, playerCount) {
       }
     };
     check("overall", e.overall);
+    if (e.stars !== void 0 && (!Number.isInteger(e.stars) || e.stars < 1 || e.stars > 5)) {
+      out.push({ row: e.index, field: "stars", message: "must be a whole number from 1 to 5" });
+    }
+    for (const [field, spec] of Object.entries(NAMED_FIELDS)) {
+      const v = e[field];
+      if (v === void 0) continue;
+      if (!spec.table.includes(v)) {
+        out.push({
+          row: e.index,
+          field,
+          message: `must be one of ${spec.table.filter(Boolean).join(", ")}`
+        });
+      }
+    }
     if (e.nilK !== void 0 && (!Number.isInteger(e.nilK) || e.nilK < -255 || e.nilK > 256)) {
       out.push({ row: e.index, field: "nilK", message: "the field holds -255 to 256 (in thousands)" });
     }
@@ -863,6 +894,7 @@ function checkPlayerEdits(edits, playerCount) {
 }
 var PLAYER_FIELD_WIDTH = 7;
 var startOf = (endBit) => endBit - PLAYER_FIELD_WIDTH + 1;
+var beginsAt = (endBit, width) => endBit - width + 1;
 function readPlayerNumbers(payload, index) {
   const at = (RECORD_BASE + index) * RECORD_STRIDE;
   if (at + RECORD_STRIDE > payload.length) return null;
@@ -873,16 +905,22 @@ function readPlayerNumbers(payload, index) {
   };
   const ratings = {};
   for (const [name, bit2] of Object.entries(RATING_BITS)) ratings[name] = rd(bit2);
-  const bit = (b, w) => {
+  const bit = (endBit, w) => {
     let v = 0;
-    for (let i = b; i < b + w; i++) v = v << 1 | payload[at + (i >> 3)] >> 7 - (i & 7) & 1;
+    for (let i = beginsAt(endBit, w); i <= endBit; i++) {
+      v = v << 1 | payload[at + (i >> 3)] >> 7 - (i & 7) & 1;
+    }
     return v;
   };
   return {
     overall: rd(OVERALL_BIT),
     ratings,
     redshirt: bit(REDSHIRT_BIT, 1) === 1,
-    nilK: bit(NIL_BIT, 9) - 255
+    nilK: bit(NIL_BIT, 9) - 255,
+    stars: bit(STARS_BIT, 3) + 1,
+    devTrait: DEV_TRAITS[bit(DEV_TRAIT_BIT, 2)] ?? null,
+    dealbreaker: DEALBREAKERS[bit(DEALBREAKER_BIT, 4)] ?? null,
+    idealPitch: IDEAL_PITCHES[bit(PITCH_BIT, 5)] ?? null
   };
 }
 function applyPlayerEdits(payload, edits) {
@@ -904,9 +942,19 @@ function applyPlayerEdits(payload, edits) {
       putBits(next, at, REDSHIRT_BIT, 1, e.redshirt ? 1 : 0);
       touched.add(at + (REDSHIRT_BIT >> 3));
     }
-    if (e.nilK !== void 0) {
-      putBits(next, at, NIL_BIT, 9, e.nilK + 255);
-      for (let b = NIL_BIT; b < NIL_BIT + 9; b++) touched.add(at + (b >> 3));
+    const put = (endBit, width, value) => {
+      const start = beginsAt(endBit, width);
+      putBits(next, at, start, width, value);
+      for (let b = start; b <= endBit; b++) touched.add(at + (b >> 3));
+    };
+    if (e.nilK !== void 0) put(NIL_BIT, 9, e.nilK + 255);
+    if (e.stars !== void 0) put(STARS_BIT, 3, e.stars - 1);
+    for (const [field, spec] of Object.entries(NAMED_FIELDS)) {
+      const v = e[field];
+      if (v === void 0) continue;
+      const code = spec.table.indexOf(v);
+      if (code < 0) continue;
+      put(spec.bit, spec.width, code);
     }
   }
   return { next, touched };
@@ -947,13 +995,24 @@ function writePlayerEdits(path, edits, playerCount) {
     }
     for (const [field, want, before, after] of [
       ["redshirt", e.redshirt, was.redshirt, now.redshirt],
-      ["nilK", e.nilK, was.nilK, now.nilK]
+      ["nilK", e.nilK, was.nilK, now.nilK],
+      ["stars", e.stars, was.stars, now.stars],
+      ["devTrait", e.devTrait, was.devTrait, now.devTrait],
+      ["dealbreaker", e.dealbreaker, was.dealbreaker, now.dealbreaker],
+      ["idealPitch", e.idealPitch, was.idealPitch, now.idealPitch]
     ]) {
       if (want !== void 0) {
         if (after !== want) {
           return { ok: false, message: `player ${e.index}: ${field} read back as ${after}, not ${want}; nothing was written` };
         }
-        if (before !== after) changed.push({ index: e.index, field, before: Number(before), after: Number(after) });
+        if (before !== after) {
+          changed.push({
+            index: e.index,
+            field,
+            before: before ?? "",
+            after: after ?? ""
+          });
+        }
       } else if (before !== after) {
         return { ok: false, message: `player ${e.index}: ${field} changed without being asked to; nothing was written` };
       }

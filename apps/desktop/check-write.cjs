@@ -220,6 +220,60 @@ assert.ok(moved > 0 && moved <= 12, `expected a handful of changed bytes, got ${
   }
 }
 
+/* --------------------- named fields end where the reader says they end */
+// Every bit position in saveAnalysis names the LAST bit of its field. The
+// writer read and wrote NIL as if the number were the first, which is invisible
+// on a one-bit flag and eight bits wrong on a nine-bit one.
+{
+  const index = 5
+  const big = Buffer.alloc((S.RECORD_BASE + index + 2) * S.RECORD_STRIDE)
+  const at = (S.RECORD_BASE + index) * S.RECORD_STRIDE
+  const put = (endBit, width, value) => {
+    for (let i = 0; i < width; i++) {
+      const b = endBit - width + 1 + i
+      const mask = 1 << (7 - (b & 7))
+      if ((value >> (width - 1 - i)) & 1) big[at + (b >> 3)] |= mask
+      else big[at + (b >> 3)] &= ~mask
+    }
+  }
+  // Lay the record out the way saveAnalysis reads it, then ask the writer.
+  put(S.NIL_BIT, 9, 40 + 255)
+  put(S.STARS_BIT, 3, 4 - 1)
+  put(S.DEV_TRAIT_BIT, 2, S.DEV_TRAITS.indexOf('Star'))
+  put(S.DEALBREAKER_BIT, 4, S.DEALBREAKERS.indexOf('Playing Time'))
+  put(S.PITCH_BIT, 5, S.IDEAL_PITCHES.indexOf('Sunday Bound'))
+
+  const read = W.readPlayerNumbers(big, index)
+  assert.equal(read.nilK, 40, `nilK reads where saveAnalysis writes it: got ${read.nilK}`)
+  assert.equal(read.stars, 4, `stars: got ${read.stars}`)
+  assert.equal(read.devTrait, 'Star')
+  assert.equal(read.dealbreaker, 'Playing Time')
+  assert.equal(read.idealPitch, 'Sunday Bound')
+
+  // And a write lands on the same bits it just read.
+  const { next, touched } = W.applyPlayerEdits(big, [{
+    index, nilK: -12, stars: 2, devTrait: 'Elite', dealbreaker: 'Pro Potential', idealPitch: 'The Clutch',
+  }])
+  for (let i = 0; i < next.length; i++) {
+    assert.ok(next[i] === big[i] || touched.has(i), `byte ${i} moved unclaimed`)
+  }
+  const after = W.readPlayerNumbers(next, index)
+  assert.equal(after.nilK, -12)
+  assert.equal(after.stars, 2)
+  assert.equal(after.devTrait, 'Elite')
+  assert.equal(after.dealbreaker, 'Pro Potential')
+  assert.equal(after.idealPitch, 'The Clutch')
+  // Ratings sit elsewhere in the record and must be untouched by any of it.
+  assert.deepEqual(after.ratings, read.ratings, 'a named-field write left the ratings alone')
+
+  // Values the game has no name for never reach the save.
+  assert.equal(W.checkPlayerEdits([{ index, devTrait: 'Godlike' }], index + 1).length, 1)
+  assert.equal(W.checkPlayerEdits([{ index, stars: 9 }], index + 1).length, 1)
+  assert.equal(W.checkPlayerEdits([{ index, idealPitch: 'Whatever' }], index + 1).length, 1)
+  assert.equal(W.checkPlayerEdits([{ index, stars: 5, devTrait: 'Elite' }], index + 1).length, 0)
+}
+
 fs.rmSync(dir, { recursive: true, force: true })
 console.log(`check-write: container round-trips, edit applied, ${moved} bytes changed, neighbours intact,`)
-console.log('            player fields read from the field end, and a recruiting edit lands on its own bits')
+console.log('            player fields read from the field end, a recruiting edit lands on its own bits,')
+console.log('            and stars, dev trait, NIL and personality write where the reader reads them')
