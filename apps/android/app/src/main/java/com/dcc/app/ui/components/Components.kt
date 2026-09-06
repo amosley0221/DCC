@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dcc.app.data.Rules
 import com.dcc.app.ui.theme.Dcc
+import com.dcc.app.ui.theme.LocalFlipHelmets
 import com.dcc.app.ui.theme.initialsOf
 import com.dcc.app.ui.theme.toneFor
 
@@ -508,23 +509,39 @@ fun SchoolBadge(
 ) {
     val c = Dcc.colors
     val context = LocalContext.current
-    // A pack built before the helmets were split holds only one of them, and
-    // which one is not recorded anywhere: the old builder matched both
-    // `lthelmets` and `rthelmets` with a single pattern and kept whichever it
-    // reached last. So the right-facing art is drawn by mirroring the left one
-    // ONLY when the pack is new enough to say the lone helmet is the left one
-    // (version 2 and up). On an older pack nothing here knows which way that
-    // image looks, and mirroring it is a coin flip — which is exactly how both
-    // sides of a matchup ended up facing outward. Unknown means draw the same
-    // art on both sides: a pair facing the same way reads as a choice, a pair
-    // facing apart reads as a bug. Rebuilding the pack on the PC and sending it
-    // across replaces it with the real right-facing helmets.
-    val lone = remember(name, kind) {
-        kind == "helmetRight" && !ArtPack.hasSplitHelmets(context, name)
+    // Which way a helmet looks.
+    //
+    // A pack built before the helmets were split holds ONE per school, and
+    // which of the two it is was never recorded: the old builder matched the
+    // game's `lthelmets` and `rthelmets` with a single pattern and kept
+    // whichever it reached last. Two releases went on guessing at that — first
+    // mirroring the unknown image, then refusing to mirror it at all — and both
+    // were coin flips dressed up as reasoning. It is not a guess: a folder walk
+    // reaches `helmet/left` before `helmet/right`, so the last write is the
+    // right helmet, and that one faces left.
+    //
+    // `flip` says the lone helmet faces left. Its default is derived from the
+    // pack version rather than guessed — see ArtPack.loneHelmetFacesLeft — and
+    // Settings can override it, because what the person can see beats a
+    // derivation about somebody else's folder order. When it is on, a helmet
+    // asked for by its left-hand name is mirrored and the right-hand one is
+    // drawn as it is; when off, the other way round.
+    //
+    // A pack that carries both helmets never mirrors anything: the art is
+    // already correct, and rebuilding on the PC is still the real fix.
+    val split = remember(name) { ArtPack.hasSplitHelmets(context, name) }
+    // Nobody has said, so the pack's own version decides. A version 1 pack holds
+    // the right helmet — the walk reaches `helmet/left` before `helmet/right`
+    // and the last write won — and that one faces left.
+    val flip = LocalFlipHelmets.current ?: remember { ArtPack.loneHelmetFacesLeft(context) }
+    val helmet = kind == "helmet" || kind == "helmetRight"
+    val mirror = remember(kind, split, flip, helmet) {
+        helmet && !split && (if (flip) kind == "helmet" else kind == "helmetRight")
     }
-    val mirror = remember(lone) { lone && ArtPack.helmetFacesRight(context) }
-    val file = remember(name, kind, lone) {
-        ArtPack.school(context, name, if (lone) "helmet" else kind)
+    val file = remember(name, kind, split, helmet) {
+        // With one helmet in the pack, both sides draw it; the mirror above is
+        // what makes them a pair.
+        ArtPack.school(context, name, if (helmet && !split) "helmet" else kind)
     }
 
     // A logo is drawn as itself, on nothing: these marks carry their own shape,

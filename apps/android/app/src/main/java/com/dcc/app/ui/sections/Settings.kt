@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -256,13 +257,41 @@ fun SettingsSection(
                 // than guessing and getting it wrong half the time.
                 if (m.version < 2) {
                     Spacer(Modifier.height(9.dp))
-                    MonoLabel("ONE HELMET PER SCHOOL — BUILD THE PACK AGAIN ON THE PC", c.warn, 10)
+                    MonoLabel("ONE HELMET PER SCHOOL", c.warn, 10)
                     Spacer(Modifier.height(5.dp))
                     BodySerif(
                         "This pack was built before DCC took both helmets, so it holds one per " +
-                            "school and nothing here can tell which way it looks. Rebuild it on " +
-                            "Windows — Devices, then Build the art pack — and the two sides of a " +
-                            "matchup will face each other.",
+                            "school. Which of the two it is was never recorded, but it can be " +
+                            "worked out: the old builder kept whichever it reached last, and a " +
+                            "folder walk reaches left before right, so this pack holds the right " +
+                            "helmet — the one that faces left. DCC assumes that. If it is wrong " +
+                            "for your pack, the two helmets below will face away from each other, " +
+                            "and this switch fixes it.",
+                    )
+                    Spacer(Modifier.height(9.dp))
+                    // The switch, with the thing it changes right beside it —
+                    // your own school where there is one, so the pair is
+                    // recognisable rather than an arbitrary crest.
+                    val preview = snapshot?.userTeam?.name
+                        ?: m.schools.entries.firstOrNull { "helmet" in it.value }?.key
+                        ?: m.schools.keys.firstOrNull()
+                        ?: ""
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SchoolBadge(preview.take(2).uppercase(), preview, false, 38.dp, "helmet")
+                        Spacer(Modifier.width(2.dp))
+                        SchoolBadge(preview.take(2).uppercase(), preview, false, 38.dp, "helmetRight")
+                        Spacer(Modifier.width(12.dp))
+                        val flipped = state.helmetsFlipped ?: true
+                        DccChip(
+                            if (flipped) "Flipped" else "Flip the helmets", flipped,
+                        ) { vm.setHelmetsFlipped(!flipped) }
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    MetaText("THE TWO ABOVE SHOULD FACE EACH OTHER", c.ink4, 9)
+                    Spacer(Modifier.height(7.dp))
+                    BodySerif(
+                        "Rebuilding the pack on Windows — Devices, then Build the art pack — " +
+                            "carries both helmets and makes the switch irrelevant.",
                     )
                 }
             } else {

@@ -10,6 +10,32 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.67.0] - 2026-09-06
+
+### Fixed
+
+- **The helmets on the phone, worked out instead of guessed at.** Third attempt,
+  and the first one that is not a coin flip.
+
+  A pack built before 0.59.0 holds one helmet per school, and which of the two
+  it is was never written down — the old builder matched the game's `lthelmets`
+  and `rthelmets` with a single pattern and kept whichever it reached last.
+  0.64.0 mirrored that unknown image. 0.66.0 refused to mirror it. Both were
+  guesses, and one of them was always going to be wrong.
+
+  It is not actually unknowable. A folder walk reaches `helmet/left` before
+  `helmet/right`, because that is what alphabetical order is, so the last write
+  wins and **a version 1 pack holds the right helmet — the one that faces
+  left.** DCC now assumes exactly that for an old pack, and nothing at all for a
+  version 2 pack, which carries both and needs no assumption.
+
+  And because a derivation about somebody else's folder order is worth less than
+  what you can see: Settings → art pack shows the pair and a switch to flip
+  them, with the two helmets sitting right beside it. One tap, remembered.
+
+  Rebuilding the art pack on Windows still makes all of this moot, and is still
+  worth doing — it is also what carries the stadium photographs.
+
 ## [0.66.0] - 2026-09-06
 
 ### Added

@@ -182,6 +182,18 @@ private val GoldShapes = DccRadii.getValue("gold")
 
 private val NightWire = resolve(NightWirePalette, NightWirePalette.accent!!, derived = false)
 
+/**
+ * Whether a pack's lone helmet faces left rather than right.
+ *
+ * It rides here because the component that needs it — `SchoolBadge` — is a leaf
+ * drawn from eight different screens, and threading a boolean through all of
+ * them to reach it would be worse than the problem.
+ *
+ * Null means nobody has said: the pack's own version decides, in
+ * `ArtPack.loneHelmetFacesLeft`. See Persisted.helmetsFlipped.
+ */
+val LocalFlipHelmets = staticCompositionLocalOf<Boolean?> { null }
+
 val LocalDccColors = staticCompositionLocalOf { NightWire }
 val LocalDccFonts = staticCompositionLocalOf { NightFonts }
 val LocalDccShapes = staticCompositionLocalOf { NightShapes }
@@ -200,6 +212,7 @@ fun DccTheme(
     theme: String,
     mode: String = "dark",
     accent: String = "",
+    flipHelmets: Boolean? = null,
     content: @Composable () -> Unit,
 ) {
     val colors = when (theme) {
@@ -216,6 +229,7 @@ fun DccTheme(
         }
     }
     CompositionLocalProvider(
+        LocalFlipHelmets provides flipHelmets,
         LocalDccColors provides colors,
         LocalDccFonts provides when (theme) {
             "field" -> FieldFonts

@@ -255,6 +255,20 @@ data class Persisted(
      */
     val dynastySource: String = "none",
     val theme: String = "gold",
+    /**
+     * Whether the pack's lone helmet faces left rather than right.
+     *
+     * A pack built before the helmets were split holds one per school and no
+     * record of which of the two it is — the old builder matched the game's
+     * `lthelmets` and `rthelmets` with a single pattern and kept whichever it
+     * reached last. Nothing in the app can work out which way that image looks,
+     * and guessing is a coin flip, so this is the one thing the person holding
+     * the phone can see in a second and the app cannot: a switch, not a guess.
+     * Null until they say, and then the pack's own version decides — see
+     * ArtPack.loneHelmetFacesLeft, which is a derivation rather than a guess.
+     * Irrelevant once the pack is rebuilt, which carries both helmets.
+     */
+    val helmetsFlipped: Boolean? = null,
     /** Gold Standard only: which of its two modes, and the accent it derives from. */
     val mode: String = "dark",
     val accent: String = "#D4AF5A",
