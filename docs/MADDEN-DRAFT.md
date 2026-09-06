@@ -34,120 +34,46 @@ filled; the rest are empty slots.
 | 5711–5789 | The ratings, **one byte each, unpacked** |
 | 5834–5842 | A few 16-bit fields, not yet identified |
 
-## Position, byte 5710
+## Position, byte 5710 — the same enum CFB uses
 
-22 distinct values across the 389 filled records, and the rating profiles split
-by it exactly as football would:
+Byte 5710 is the position, and its values are **exactly `POSITIONS` from
+`positions.ts`, in order** — the list DCC already had for the dynasty save. No
+translation is needed between the two games at all.
 
-- Six values (5, 6, 7, 8, 9, 21) are high in *both* byte 5712 and byte 5738,
-  mean 62–71 and 64–70. Two blocking ratings and the offensive line.
-- One value, 0, with 27 players, reads **75** at byte 5766 where every other
-  group reads 11–21. A throwing rating, and those 27 are the quarterbacks.
-- Value 3 is the largest group, 78 players, fast (byte 5718 mean 92) and no
-  blocking at all. Cooper Barkate is in it, and he is a receiver.
+| Value | Position | n | Weight | Height | What the group is best at |
+| --- | --- | --- | --- | --- | --- |
+| 0 | QB | 27 | 212 | 6ft2 | throwing |
+| 1 | HB | 28 | 206 | 5ft10 | speed and carrying |
+| 2 | FB | 1 | 215 | 5ft11 | — one in the class |
+| 3 | WR | 78 | 193 | 6ft0 | catching — Barkate is here |
+| 4 | TE | 8 | 247 | 6ft4 | catching, and blocks |
+| 5–9 | LT LG C RG RT | 50 | 309–320 | 6ft3–6ft6 | run blocking |
+| 10–11 | LE RE | 47 | 253–265 | 6ft4 | tackling, block shedding |
+| 12 | DT | 24 | 310 | 6ft3 | block shedding |
+| 13–15 | LOLB MLB ROLB | 36 | 233–237 | 6ft1–6ft3 | tackling |
+| 16 | CB | 53 | 190 | 6ft0 | man coverage |
+| 17–18 | FS SS | 22 | 199–206 | 6ft1 | zone coverage |
+| 19 | K | 5 | 178 | 5ft11 | kicking |
+| 20 | P | 5 | 205 | 6ft1 | kicking |
 
-Which value is which position still needs one player named on screen.
+Two details confirm the order rather than assume it. **Centre is the shortest
+lineman** — value 7 averages 6ft3 where the tackles at 5 and 9 average 6ft6,
+which is what the enum predicts and a different arrangement would not. And
+**value 19 is named**: Tate Sandell, Lucas Carneiro, Brock Taylor, Mateen
+Bhaghani and Colton Boomer, five real placekickers. So 19 is K and 20 is P, and
+no screenshot of a kicker was needed to say so.
 
-## The ratings: all 54, by byte
+### The one value past the end
 
-A full set of screenshots of Cooper Barkate's card settled the whole block. He
-is **record 72**, a 71-overall WR out of Miami, 6ft1, 195lb, age 23. Every one
-of his 54 ratings matches a byte, and they run in order:
+Value 21 is a sixth group of five offensive linemen — Andrew Gentry, Nathan
+Elwood, Luke Vonderhaar, John Pastore, Matthew McCoy — 285 to 325 lb, blocking
+in the low sixties where the real line is high sixties, and awareness of 41
+against the line's 58. CFB's list ends at P, so this is a position Madden has
+and CFB does not, and **long snapper** is the obvious candidate.
 
-| Byte | Rating | Byte | Rating |
-| --- | --- | --- | --- |
-| 5718 | Acceleration | 5747 | Power Moves |
-| 5719 | Agility | 5748 | Press |
-| 5720 | Awareness | 5749 | Pursuit |
-| 5721 | BC Vision | 5750 | Release |
-| 5722 | Block Shedding | 5751 | Deep Route Running |
-| 5723 | Break Sack | 5752 | Medium Route Running |
-| 5724 | Break Tackle | 5753 | Short Route Running |
-| 5725 | Carrying | 5754 | Run Block Finesse |
-| 5726 | Catching | 5755 | Run Block Power |
-| 5727 | Catch in Traffic | 5756 | Run Blocking |
-| 5728 | Change of Direction | 5757 | Long Snap |
-| 5729 | Finesse Moves | 5758 | Spectacular Catch |
-| 5730 | Hit Power | 5759 | Speed |
-| 5731 | Impact Blocking | 5760 | Spin Move |
-| 5732 | Injury | 5761 | Stamina |
-| 5733 | Juke Move | 5762 | Stiff Arm |
-| 5734 | Jumping | 5763 | Strength |
-| 5735 | Kicking Accuracy | 5764 | Tackling |
-| 5736 | Kicking Power | 5765 | Deep Throw Accuracy |
-| 5737 | Kick/Punt Return | 5766 | Medium Throw Accuracy |
-| 5738 | Lead Block | 5768 | Short Throw Accuracy |
-| 5740 | Man Coverage | 5769 | Throw on the Run |
-| 5741 | Pass Block Finesse | 5770 | Throwing Power |
-| 5742 | Pass Block Power | 5771 | Throw Under Pressure |
-| 5743 | Pass Blocking | 5772 | Toughness |
-| 5745 | Play Action | 5773 | Trucking |
-| 5746 | Play Recognition | 5774 | Zone Coverage |
-
-**The order is alphabetical by the game's own internal names, not by the labels
-on screen.** That is what makes the three odd-looking spots make sense. The
-throw ratings sit at the end because they are `ThrowAccuracyDeep` and friends,
-not "Deep Throw Accuracy". Route running sits under R, between Release and Run
-Block, in deep-medium-short order. Long Snap sits between Run Blocking and
-Spectacular Catch, so its internal name begins `Sn`. And each blocking trio runs
-finesse, power, plain — `PassBlockFinesse`, `PassBlockPower`, `PassBlocking` —
-which is a case-sensitive sort, capitals before lowercase.
-
-Three bytes in the run are **not** ratings: 5739 reads 127 for every player in
-the class, and 5744 and 5767 hold values that match nothing on the card.
-
-### Proved against the class, not just one card
-
-One player could be a coincidence. These cannot:
-
-| Rating | Highest groups | Class mean |
-| --- | --- | --- |
-| Kicking Power (5736) | two groups of five, both **94** | 36 |
-| Throwing Power (5770) | one group of 27, **90** | 32 |
-| Man Coverage (5740) | groups of 53, 14 and 8 — **64–65** | 38 |
-| Run Blocking (5756) | the six heavy groups — **62–68** | 40 |
-| Long Snap (5757) | **1** for all 389 | 1 |
-
-A rating only kickers have spiking for exactly two groups of five, and only two
-groups of five, is the whole proof.
-
-## The rest of the record
-
-| Byte | Field |
-| --- | --- |
-| 5706 | Age — class runs 20 to 25 |
-| 5707 | Height in inches — class runs 66 to 80 |
-| 5708 | Weight, **stored as pounds minus 160** — class runs 160 to 375 lb |
-| 5710 | Position |
-
-Overall and jersey number are **not** in the record. Madden shows Barkate at 71
-overall and #85, and neither number appears anywhere in his 5876 bytes, so both
-are worked out by the game — the overall from the ratings and the archetype, the
-number when he is drafted.
-
-## Position, byte 5710
-
-Named by what each group is good at, with its size, average weight and height:
-
-| Value | n | Weight | Height | Reading |
-| --- | --- | --- | --- | --- |
-| 0 | 27 | 212 | 6ft2 | QB — throwing 90 |
-| 1 | 28 | 206 | 5ft10 | HB |
-| 2 | 1 | 215 | 5ft11 | FB |
-| 3 | 78 | 193 | 6ft0 | WR — Barkate is here |
-| 4 | 8 | 247 | 6ft4 | TE — catches 79 and blocks 54 |
-| 5, 6, 7, 8, 9, 21 | 55 | 303–320 | 6ft4–6ft6 | the offensive line |
-| 10, 11 | 47 | 253–265 | 6ft4 | edge rushers |
-| 12 | 24 | 310 | 6ft3 | defensive tackle |
-| 13, 14, 15 | 36 | 233–237 | 6ft1–6ft3 | linebackers |
-| 16 | 53 | 190 | 6ft0 | CB |
-| 17, 18 | 22 | 199–206 | 6ft1 | safeties |
-| 19 | 5 | 178 | 5ft11 | K |
-| 20 | 5 | 205 | 6ft1 | P |
-
-Which of the six line values is left tackle and which is centre, and which way
-round the two kicking groups go, still needs a card from one of them. Everything
-else about a player can now be read and written.
+It cannot be confirmed from the ratings, because Long Snap reads 1 for all 389
+players including these five — CFB has no long-snapping rating to export, so
+everybody comes across with the floor value.
 
 ## What these files are not
 
