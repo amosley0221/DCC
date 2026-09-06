@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useKit, usePoll, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
+import type { StoredStory } from '../../electron/sidecar'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
@@ -362,6 +363,13 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                 apiKey={state.anthropicKey}
                 log={(text, kind) => dispatch({ type: 'log', line: { text, kind: kind ?? 'good' } })}
                 onBoxScore={() => setOpen({ kind: 'game', row: last.row })}
+                season={save.roster?.season ?? null}
+                artOf={artOf}
+                rankOf={(n) => (n ? rankOf.get(n) : undefined)}
+                recordOf={(n) => {
+                  const r = n ? table.get(n) : undefined
+                  return r ? { wins: r.wins, losses: r.losses } : undefined
+                }}
               />
             ) : slide === 'COUNTRY' || (slide === 'GAME' && !last) ? (
               <FeatureList
@@ -606,13 +614,58 @@ function FeatureList({ kicker, headline, standfirst, bg, tint, children }: {
  * the save has no images, and a fabricated one would be the only invented thing
  * on the page.
  */
-function Feature({ g, team, apiKey, log, onBoxScore, bg, tint }: {
+/**
+ * One side of the feature matchup: helmet, rank and name, record, score.
+ *
+ * Stacked rather than strung along a line — a headline is a picture of a game,
+ * and a row of small type is not one. The loser dims, so the result reads
+ * before any of the words do.
+ */
+function MatchupSide({ name, art, rank, record, score, won }: {
+  name: string | null
+  art: string | undefined
+  rank: number | undefined
+  record: { wins: number; losses: number } | undefined
+  score: number
+  won: boolean
+}) {
+  return (
+    <div className="col" style={{ alignItems: 'center', minWidth: 0, flex: 1 }}>
+      <SchoolArt size={96} file={art} />
+      <div className="row" style={{ gap: 5, alignItems: 'baseline', marginTop: 8 }}>
+        {rank && rank <= 25 ? <Meta size={11} color="var(--ink4)">#{rank}</Meta> : null}
+        <span style={{
+          fontSize: 15, letterSpacing: '0.04em', fontWeight: 700,
+          color: won ? 'var(--ink)' : 'var(--ink3)', whiteSpace: 'nowrap',
+        }}>
+          {(name ?? 'TBD').toUpperCase()}
+        </span>
+      </div>
+      {record ? <Meta size={10} color="var(--ink4)">{record.wins}-{record.losses}</Meta> : null}
+      <span className="gs-figure-score" style={{ marginTop: 2 }}>
+        <span className={won ? '' : 'is-lost'}>{score}</span>
+      </span>
+    </div>
+  )
+}
+
+function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, rankOf, recordOf }: {
   g: SeasonGame; team: string | null; apiKey: string
   log: (text: string, kind?: 'good' | 'bad') => void
   onBoxScore: () => void
   bg?: string; tint?: string | null
+  season: number | null
+  artOf: (name: string | null | undefined, kind?: 'logoLight' | 'helmet' | 'helmetRight') => string | undefined
+  rankOf: (name: string | null | undefined) => number | undefined
+  recordOf: (name: string | null | undefined) => { wins: number; losses: number } | undefined
 }) {
-  const [story, setStory] = useState<{ headline: string; standfirst: string; body: string } | null>(null)
+  // Kept on disk, not in this component's state. The home feature had the same
+  // bug the schedule did: the story lived here, so leaving the screen threw
+  // away something the user had paid API credit for.
+  const [stories, setStories] = useState<Record<string, StoredStory>>({})
+  useEffect(() => { void window.dcc.stories().then((r) => setStories(r.stories)) }, [])
+  const storyKey = `${season ?? 0}:${g.row}`
+  const story = stories[storyKey] ?? null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -624,9 +677,9 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint }: {
 
   const write = async () => {
     setBusy(true); setError(null)
-    const res = await window.dcc.writePress({ game: g, kind: 'recap', userTeam: team })
+    const res = await window.dcc.writePress({ game: g, kind: 'recap', userTeam: team, season })
     setBusy(false)
-    if (res.ok) { setStory(res.story); log(`wrote a recap for ${g.away} at ${g.home}`) }
+    if (res.ok) { setStories(res.stories); log(`wrote a recap for ${g.away} at ${g.home}`) }
     else { setError(res.message); log(res.message, 'bad') }
   }
 
@@ -635,10 +688,33 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint }: {
       <div className="gs-figure">
         <FeatureGround bg={bg} tint={tint} />
         <div className="gs-figure-kicker" style={{ zIndex: 1 }}><Kicker>{won ? 'Won' : 'Lost'} · week {g.week}</Kicker></div>
-        <div className="gs-figure-score" style={{ position: 'relative', zIndex: 1 }}>
-          <span className={won ? '' : 'is-lost'}>{us}</span>
-          <i className="gs-dash" />
-          <span className={won ? 'is-lost' : ''}>{them}</span>
+        {/*
+          A matchup, not a bare scoreline. Each side stands under its own
+          helmet with its rank, its record and its score, the way a broadcast
+          titles a game — the helmets carry it and the numbers follow.
+        */}
+        <div
+          className="row"
+          style={{
+            position: 'relative', zIndex: 1, alignItems: 'center',
+            justifyContent: 'center', gap: 4, width: '100%',
+          }}
+        >
+          <MatchupSide
+            name={g.away} art={artOf(g.away, 'helmetRight') ?? artOf(g.away, 'helmet')}
+            rank={rankOf(g.away)} record={recordOf(g.away)}
+            score={g.awayScore} won={g.awayScore >= g.homeScore}
+          />
+          <div className="col" style={{ alignItems: 'center', padding: '0 10px' }}>
+            <Meta size={10} color="var(--ink4)">AT</Meta>
+            <div style={{ height: 46 }} />
+            <Meta size={9} color="var(--accent-ui)">{g.played ? 'FINAL' : 'UPCOMING'}</Meta>
+          </div>
+          <MatchupSide
+            name={g.home} art={artOf(g.home, 'helmet')}
+            rank={rankOf(g.home)} record={recordOf(g.home)}
+            score={g.homeScore} won={g.homeScore > g.awayScore}
+          />
         </div>
         <div className="gs-figure-caption" style={{ zIndex: 1 }}>
           {[home ? `vs ${other}` : `at ${other}`, dateLabel(g.month, g.day),
@@ -655,7 +731,7 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint }: {
         {story ? (
           <>
             <p className="body-serif" style={{ margin: '12px 0 0', maxWidth: 520 }}>{story.standfirst}</p>
-            {story.body.split(/\n+/).map((para, i) => (
+            {story.body.split(/\n+/).map((para: string, i: number) => (
               <p key={i} className="body-serif" style={{ margin: '10px 0 0', maxWidth: 520 }}>{para}</p>
             ))}
           </>

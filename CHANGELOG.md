@@ -10,6 +10,26 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.63.0] - 2026-09-06
+
+### Changed
+
+- **The headline is a headline now, on both apps.** It read as something
+  dropped in to fill space, and it was: two small helmets either side of a
+  score. It is now a matchup the way a broadcast titles one — the helmets are
+  large and face each other, and each side stands under its own with its poll
+  place, its name, its record and its score, the loser dimmed so the result
+  reads before any of the words. Underneath, the game's own particulars: the
+  date, the kickoff, who was at whose place, the weather, the wind and the
+  crowd. Every one of those is read out of your save.
+
+### Fixed
+
+- **The home feature keeps its story too.** 0.61.0 fixed this on the schedule
+  and left the front page alone, where the same story lived in the same kind of
+  component state and went the same way when you changed screen. It is on disk
+  with the rest of them now.
+
 ## [0.62.1] - 2026-09-06
 
 ### Fixed

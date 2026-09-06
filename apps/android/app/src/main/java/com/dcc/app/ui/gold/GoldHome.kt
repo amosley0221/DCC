@@ -43,12 +43,14 @@ import androidx.compose.ui.unit.sp
 import com.dcc.app.data.ArtPack
 import com.dcc.app.data.League
 import com.dcc.app.data.Persisted
+import com.dcc.app.data.SaveLabels
 import com.dcc.app.data.SnapshotGame
 import com.dcc.app.data.SnapshotHeisman
 import com.dcc.app.data.SnapshotRecruit
 import com.dcc.app.data.name
 import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.ArtImage
+import com.dcc.app.ui.components.MetaText
 import com.dcc.app.ui.sections.ClassTable
 import com.dcc.app.ui.components.PlayerFace
 import com.dcc.app.ui.components.SchoolBadge
@@ -123,6 +125,7 @@ fun GoldHome(
     val rankOf = remember(table) {
         League.rankings(table).withIndex().associate { (i, r) -> r.index to i + 1 }
     }
+    val recordOf = remember(table) { table.associate { it.index to (it.wins to it.losses) } }
     val bestRank = { g: SnapshotGame ->
         minOf(rankOf[g.homeIndex] ?: 999, rankOf[g.awayIndex] ?: 999)
     }
@@ -161,7 +164,7 @@ fun GoldHome(
             ) {
                 FeatureWell(
                     me?.name, me?.wins, me?.losses, last, biggest, heisman, heismanFace, topCommit,
-                    onOpenGame, onOpenBoard, Modifier.weight(0.58f),
+                    rankOf, recordOf, onOpenGame, onOpenBoard, Modifier.weight(0.58f),
                 )
                 Column(Modifier.weight(0.42f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     BoardWell(board, state, onOpenBoard, Modifier.fillMaxWidth())
@@ -174,7 +177,7 @@ fun GoldHome(
         } else {
             FeatureWell(
                 me?.name, me?.wins, me?.losses, last, biggest, heisman, heismanFace, topCommit,
-                onOpenGame, onOpenBoard, Modifier.fillMaxWidth(),
+                rankOf, recordOf, onOpenGame, onOpenBoard, Modifier.fillMaxWidth(),
             )
         }
 
@@ -248,6 +251,9 @@ private fun FeatureWell(
     heisman: SnapshotHeisman?,
     heismanFace: String?,
     topCommit: SnapshotRecruit?,
+    /** Poll place by team index, and each side's record, for the matchup line. */
+    rankOf: Map<Int, Int>,
+    recordOf: Map<Int, Pair<Int, Int>>,
     onOpenGame: (SnapshotGame) -> Unit,
     onOpenBoard: () -> Unit,
     modifier: Modifier = Modifier,
@@ -294,7 +300,7 @@ private fun FeatureWell(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(112.dp)
+                .height(if (slideGame != null) 208.dp else 128.dp)
                 .background(Brush.linearGradient(listOf(c.surfaceStrong, c.surface))),
             contentAlignment = Alignment.Center,
         ) {
@@ -310,32 +316,46 @@ private fun FeatureWell(
 
             when {
                 slideGame != null -> {
-                    // Away on the left, home on the right, the way the scores
-                    // rail below reads.
+                    // A matchup, not a scoreline squeezed into a strip. The
+                    // helmets carry it, each side under its own with its rank,
+                    // its record and its score, the way a broadcast titles a
+                    // game. Away left, home right, the way the rail below reads.
                     //
-                    // The helmet names describe which way the art *faces*, not
-                    // which side it goes on: "helmet" is the game's lt art and
-                    // looks left, "helmetRight" looks right. So the left-hand
-                    // side takes the right-facing one and they meet over the
-                    // score. Naming them for a side is what got this backwards.
+                    // The helmet names say which way the art *faces*, not which
+                    // side it sits on: "helmet" is the game's lt art and looks
+                    // left, so the left-hand side takes the right-facing one and
+                    // the two meet in the middle.
                     val away = slideGame.away
                     val home = slideGame.home
                     val a = slideGame.awayScore
                     val h = slideGame.homeScore
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SchoolBadge(mono(away), away ?: "", away == meName, 46.dp, "helmetRight")
-                        Spacer(Modifier.width(11.dp))
-                        GoldNum("$a", 46, if (a >= h) c.ink else c.ink3)
-                        Box(
-                            Modifier
-                                .padding(horizontal = 10.dp)
-                                .width(14.dp)
-                                .height(3.dp)
-                                .background(c.ink3),
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MatchupSide(
+                            away, mono(away), rankOf[slideGame.awayIndex],
+                            recordOf[slideGame.awayIndex], a, won = a >= h,
+                            isUser = away == meName, helmet = "helmetRight",
+                            modifier = Modifier.weight(1f),
                         )
-                        GoldNum("$h", 46, if (h > a) c.ink else c.ink3)
-                        Spacer(Modifier.width(11.dp))
-                        SchoolBadge(mono(home), home ?: "", home == meName, 46.dp, "helmet")
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                        ) {
+                            Label("AT", 10.0, c.ink4, 3.0)
+                            Spacer(Modifier.height(38.dp))
+                            Label(
+                                if (slideGame.played) "FINAL" else "UPCOMING",
+                                9.0, c.accent, 2.5,
+                            )
+                        }
+                        MatchupSide(
+                            home, mono(home), rankOf[slideGame.homeIndex],
+                            recordOf[slideGame.homeIndex], h, won = h > a,
+                            isUser = home == meName, helmet = "helmet",
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
                 slide == FEATURE_HEISMAN && heisman != null -> Row(
@@ -419,9 +439,68 @@ private fun FeatureWell(
                 },
                 12.0, c.ink2,
             )
+            // The game's own particulars, the way a broadcast footer carries
+            // them. Every one is read out of the save; nothing here is filler.
+            if (slideGame != null) {
+                Spacer(Modifier.height(8.dp))
+                MetaText(
+                    listOfNotNull(
+                        SaveLabels.date(slideGame.month, slideGame.day),
+                        SaveLabels.kickoff(slideGame.kickoff),
+                        slideGame.away?.let { a -> slideGame.home?.let { h -> "$a at $h" } },
+                        SaveLabels.weather(slideGame.weather),
+                        slideGame.temperatureF.takeIf { it != 0 }?.let { "$it\u00b0F" },
+                        slideGame.windMph.takeIf { it > 0 }?.let { "$it MPH WIND" },
+                        slideGame.attendance.takeIf { it > 0 }?.let { "%,d".format(it) },
+                    ).joinToString("  \u00b7  ").uppercase(),
+                    c.ink4, 9, maxLines = 2,
+                )
+            }
         }
     }
 
+}
+
+/**
+ * One side of the feature matchup: helmet, rank and name, record, score.
+ *
+ * Stacked rather than strung along a line, because a headline is a picture of a
+ * game and a line of small type is not. The loser's side dims so the result
+ * reads before any of the words do.
+ */
+@Composable
+private fun MatchupSide(
+    team: String?,
+    monogram: String,
+    rank: Int?,
+    record: Pair<Int, Int>?,
+    score: Int,
+    won: Boolean,
+    isUser: Boolean,
+    helmet: String,
+    modifier: Modifier = Modifier,
+) {
+    val c = Dcc.colors
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        SchoolBadge(monogram, team ?: "", isUser, 84.dp, helmet)
+        Spacer(Modifier.height(7.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            if (rank != null && rank <= 25) {
+                Label("#$rank", 11.0, c.ink4, 1.0)
+                Spacer(Modifier.width(4.dp))
+            }
+            Ui(
+                (team ?: "TBD").uppercase(),
+                14.0, if (won) c.ink else c.ink3, FontWeight.Bold, maxLines = 1,
+            )
+        }
+        if (record != null) {
+            Spacer(Modifier.height(2.dp))
+            MetaText("${record.first}-${record.second}", c.ink4, 10)
+        }
+        Spacer(Modifier.height(3.dp))
+        GoldNum("$score", 44, if (won) c.ink else c.ink3)
+    }
 }
 
 /** Your board, as far down it as a glance is worth. */
