@@ -10,6 +10,27 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.70.0] - 2026-09-06
+
+### Fixed
+
+- **DCC reads whose dynasty it is out of the save, instead of only remembering
+  it.** Advancing a week put "Pick your team" in front of a save that names its
+  team plainly, because which team is yours was never read at all — it was a
+  preference kept in DCC's own settings, and anything that lost those lost your
+  team with them.
+
+  The game marks every fixture the user played rather than simulated. On a real
+  week 13 save that is nine games with the same team in all nine and each
+  opponent in exactly one — not a close call, a landslide. So DCC reads it.
+
+  It only ever fills a blank. A team you picked yourself is never overruled, and
+  the rule is strict: two played games at least, because one cannot tell its two
+  sides apart; the leader has to appear in every one of them; and nobody may
+  match it. A dynasty that simulates everything gives nothing to read and still
+  gets the picker, which is the honest outcome rather than a guess at the best
+  team in the country.
+
 ## [0.69.0] - 2026-09-06
 
 ### Fixed

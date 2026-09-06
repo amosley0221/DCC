@@ -32,7 +32,7 @@ import {
 } from './stadiums'
 import type { StadiumCredit, VenueRow } from './stadiums'
 import { TEAM_ID_NAMES } from './teamIds'
-import { currentWeek } from './season'
+import { currentWeek, userTeamOf } from './season'
 import type { WeekGame } from './season'
 import {
   scanInstall, findInstall, readTables, findArtNames, listTocs,
@@ -478,6 +478,18 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       recruitEvents,
       // The game's own recruiting class ranking, school name to place.
       classRanks: readClassRankByName(payload),
+      // Whose dynasty this is, read off the save rather than remembered. The
+      // save marks the games the user played rather than simulated, and their
+      // team is in all of them — see electron/season.ts. Null when a dynasty
+      // has simulated everything, which leaves nothing to read.
+      userTeam: (() => {
+        const name = userTeamOf(games)
+        if (!name) return null
+        const id = Object.keys(TEAM_ID_NAMES)
+          .map(Number)
+          .find((k) => TEAM_ID_NAMES[k] === name)
+        return id === undefined ? null : { id, name }
+      })(),
     }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }

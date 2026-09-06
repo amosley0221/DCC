@@ -62,6 +62,11 @@ export interface SaveState {
      */
     recruitEvents: RecruitEvent[]
     /**
+     * Whose dynasty this is, according to the save itself. DCC's own record of
+     * which team you picked is a preference and can be lost; this cannot.
+     */
+    userTeam: { id: number; name: string } | null
+    /**
      * The game's own recruiting class ranking, school name to place, or null
      * when the save did not hold it in the shape the reader insists on.
      */
@@ -249,6 +254,7 @@ export function rosterPatch(
     rankColumns: res.rankColumns ?? [], heisman: res.heisman ?? [],
     recruitBoard: res.recruitBoard ?? [],
     recruitEvents: res.recruitEvents ?? [],
+    userTeam: res.userTeam ?? null,
     classRanks: res.classRanks ?? null,
   }
 }

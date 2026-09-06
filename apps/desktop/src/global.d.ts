@@ -38,7 +38,9 @@ declare global {
             /** What has changed on that board since the last read, newest first. */
             recruitEvents: RecruitEvent[]
             /** The game's own recruiting class ranking, school name to place. */
-            classRanks: Record<string, number> | null }
+            classRanks: Record<string, number> | null
+            /** Whose dynasty this is, read off the save's own played games. */
+            userTeam: { id: number; name: string } | null }
         | { ok: false; message: string }
       >
       /** Downloads a stadium photograph per school into the art folder. */

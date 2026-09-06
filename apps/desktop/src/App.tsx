@@ -103,6 +103,28 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
 
   const me = state.teamId === null ? null : (state.teamNames[state.teamId] ?? TEAM_ID_NAMES[state.teamId] ?? null)
 
+  /**
+   * Adopt the team the save itself names, when DCC has not been told one.
+   *
+   * Which team is yours was only ever a preference DCC kept in its own
+   * settings, so losing those put "pick your team" in front of a save that says
+   * plainly whose it is — the game marks every fixture the user played rather
+   * than simulated, and one team is in all of them. Reading that is better than
+   * remembering it. It only ever fills a blank: a team you picked yourself is
+   * never overruled, and a dynasty that simulated every game still gets the
+   * picker, because then the save genuinely does not say.
+   */
+  useEffect(() => {
+    if (state.teamId !== null) return
+    const found = save.roster?.userTeam
+    if (!found) return
+    dispatch({ type: 'teamId', id: found.id })
+    dispatch({
+      type: 'log',
+      line: { text: `your team read from the save — ${found.name}`, kind: 'good' },
+    })
+  }, [state.teamId, save.roster, dispatch])
+
   // Publish once the launch read has finished, so the phone is current without
   // anybody remembering to press a button. Once per run of the app: the roster
   // is re-read after every write and republishing on each of those would be a
