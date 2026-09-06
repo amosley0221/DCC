@@ -106,3 +106,59 @@ each**, where CFB bit-packs everything.
 The equivalent of `C27_486_1.gz` for Madden — its schema file from the game
 install — would do for Madden what it did for CFB: name every member of all 92
 stores, without giving away a single offset.
+
+## Two career saves, a week apart
+
+The second Bucs save is what turns one file into a method. What it establishes:
+
+### Everything moves, so nothing may be addressed by offset
+
+Every store in the later save sits **exactly 51,424 bytes** earlier than in the
+first — all 91 of them, by the same amount, and one store
+(`EvaluateCoachOffersRequestStore`) is present in the earlier save and absent
+from the later one. A first attempt at diffing indexed the second save with the
+first save's offsets and reported that every row of every store had changed,
+which was nonsense produced by that shift.
+
+So a Madden reader must locate every store by name in the file it is reading,
+exactly as `storeTable` already does. No offset survives a save.
+
+### What is live state and what is static
+
+Done properly — locating each store in its own file, then comparing row for row
+— **36 of 91 stores changed and 55 are byte-for-byte identical.** That split is
+the most useful thing the second save gives: it says where the league's living
+state is kept and what is fixed reference data not worth decoding.
+
+The largest movers:
+
+| Store | Rows changed | Row size |
+| --- | --- | --- |
+| `HistoryEntryStore` | 62,430 of 62,430 | 24 B |
+| `DraftPickStore` | 672 of 672 | 16 B |
+| `TeamStore` | 34 of 35 | 664 B |
+| `PlayerContractStore` | 612 of 1,280 | 40 B |
+| `PlayerSeasonStatRecordStore` | 32 of 322 | 24 B |
+
+`PlayerSeasonStatRecordStore` moving in exactly **32** rows is worth noting:
+that is the number of teams in the league, not the number of players, and it is
+the same shape of trap as CFB's stat store, which turned out to be an all-time
+record book rather than a leaderboard. It should be treated as suspect until
+proven otherwise.
+
+### The reference tag
+
+`HistoryEntryStore` rows carry four-byte handles with the tag **`0x2118`** —
+the same two-byte-tag, two-byte-index shape as CFB, where the player tag is
+`0x213e`. Its 62,430 rows are all populated and all changed in a single week,
+which is what a rolling log looks like.
+
+### Names are not stored the way CFB stores them
+
+CFB's roster was found because its player records sit at a fixed stride with the
+names inside them. Madden's do not: a sweep for capitalised words at a repeating
+stride finds no run longer than two, and the gaps between name-like strings are
+spread across 43, 26, 62, 18 and 14 bytes with no winner. The names live in a
+variable-length pool, so the technique that opened CFB will not open this. That
+is a finding, not a failure — it says the roster has to be reached through the
+references rather than by reading the strings.
