@@ -77,6 +77,8 @@ export interface SnapshotRecruit extends SnapshotPlayer {
   commitScore: number | null
   totalOffers: number | null
   stage: string | null
+  /** High school, or a junior college — the recruiting class, not the roster's. */
+  recruitClass: string | null
   /** The ten schools recruiting him, strongest first, as the game shows them. */
   topSchools: { school: string; interest: number }[]
 }
@@ -272,6 +274,7 @@ export function buildSnapshot(
         commitScore: board.get(p.index)?.commitScore ?? null,
         totalOffers: board.get(p.index)?.totalOffers ?? null,
         stage: board.get(p.index)?.stage ?? null,
+        recruitClass: board.get(p.index)?.recruitClass ?? null,
         topSchools: board.get(p.index)?.topSchools ?? [],
       })
       continue

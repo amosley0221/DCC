@@ -3,8 +3,8 @@ import { inflateSync, inflateRawSync, gunzipSync } from 'node:zlib'
 import * as zlib from 'node:zlib'
 import { TEAM_ID_NAMES } from './teamIds'
 import {
-  PLAYER_TAG, RECRUIT_FIELDS, RECRUIT_PLAYER_AT, RECRUIT_STAGES, RECRUIT_STRIDE,
-  TOP_SCHOOLS_PER_RECRUIT,
+  PLAYER_TAG, RECRUIT_CLASSES, RECRUIT_FIELDS, RECRUIT_PLAYER_AT, RECRUIT_STAGES,
+  RECRUIT_STRIDE, TOP_SCHOOLS_PER_RECRUIT,
 } from './recruiting'
 
 // Node gained zstd in 22.15 but the bundled type definitions lag behind it, so
@@ -2397,6 +2397,12 @@ export interface RecruitBoard {
   totalOffers: number
   /** Top10 Top5 Top3 Battle SoftCommitted HardCommitted Signed */
   stage: string
+  /**
+   * Where they are coming from: high school, or a junior college. The player
+   * record's class calls every prospect a Freshman, which is what they will be
+   * rather than what they are.
+   */
+  recruitClass: string
 }
 
 /** Reads `w` bits starting at `start`, most-significant first. */
@@ -2482,6 +2488,7 @@ export function readRecruitBoard(
       commitScore: f('commitScore'),
       totalOffers: f('totalOffers'),
       stage: RECRUIT_STAGES[f('stage')] ?? 'Top10',
+      recruitClass: RECRUIT_CLASSES[f('recruitClass')] ?? 'HighSchool',
     })
   }
   return out

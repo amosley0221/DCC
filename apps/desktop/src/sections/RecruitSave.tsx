@@ -3,7 +3,7 @@ import { indexArt, rosterPatch, useSave } from '../saveStore'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab } from '../ui'
 import { useOps, useStore } from '../store'
 import type { RecruitBoard, RosterPlayer } from '../../electron/saveAnalysis'
-import { COMMIT_MAX, INTEREST_MAX, RECRUIT_STAGES, STAGE_LABEL } from '../../electron/recruiting'
+import { CLASS_LABEL, COMMIT_MAX, INTEREST_MAX, RECRUIT_STAGES, STAGE_LABEL } from '../../electron/recruiting'
 
 /**
  * The schools worth showing on a row: the one he picked, or the three still in
@@ -358,7 +358,7 @@ function RecruitRow(
         <div className="col" style={{ gap: 8, padding: '6px 8px 10px 44px' }}>
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
             {([
-              ['CLASS', p.classYear],
+              ['CLASS', board ? CLASS_LABEL[board.recruitClass] ?? board.recruitClass : p.classYear],
               ['DEV', p.devTrait],
               ['HEIGHT', `${Math.floor(p.heightIn / 12)}'${p.heightIn % 12}"`],
               ['WEIGHT', `${p.weightLb} lb`],

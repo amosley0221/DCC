@@ -397,6 +397,7 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
       commitScore: (k * 97) % 1024,
       totalOffers: k % 64,
       stage: ['Top10','Top5','Top3','Battle','SoftCommitted','HardCommitted','Signed'][k % 7],
+      recruitClass: ['HighSchool','JuniorCollege_Sophomore','JuniorCollege_Junior'][k % 3],
     }
     want.push(r)
     body.writeUInt16BE(0x213e, rec * STRIDE + 8)
@@ -405,6 +406,7 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
     put(rec, 100, 13, r.nationalRank)
     put(rec, 136, 12, r.positionRank)
     put(rec, 148, 12, r.stateRank)
+    put(rec, 162, 4, k % 3)
     put(rec, 176, 6, r.totalOffers)
     put(rec, 182, 10, r.commitScore)
   }

@@ -1425,9 +1425,16 @@ bit  96   4   RecruitStage   Top10 Top5 Top3 Battle SoftCommitted HardCommitted 
 bit 100  13   NationalRank
 bit 136  12   PositionRank
 bit 148  12   StateRank
+bit 162   4   Class          HighSchool JuniorCollege_Sophomore JuniorCollege_Junior ...
 bit 176   6   TotalScholarshipOffers
 bit 182  10   CommitScore
 ```
+
+`Class` is the recruiting class, and it is not the same field as the player
+record's. The player record calls every high-school prospect a Freshman — what
+they will be rather than what they are — while this separates a high-school
+signee from a junior-college transfer the way the game's own board does. It
+reads 4,100 of 4,100 exact on three saves.
 
 Verified against the game's own class export on three saves — two of them a week
 apart, one from a different session — at the same bit positions every time. All
@@ -1479,10 +1486,27 @@ the interest table. No other recruit changes.
 ### What is not solved, and what was ruled out
 
 Of the schema's `Recruit` type, `QualityModifier` (gem and bust),
-`ProductionGrade`, `RecruitStageAdvance` and the two alternate positions are
-still unread — they sit in the same 24-byte record, so they are a matter of
-naming the remaining bits rather than of finding anything. What was tried
-before the record was located, so it need not be tried again:
+`ProductionGrade`, `RecruitStageAdvance`, `SurnameAudioID` and the two alternate
+positions are still unread. Assuming they are simply unnamed bits of the same
+record turned out to be wrong for the two that can be checked:
+
+- **Gem and bust is not in the record.** Every bit position was tried at two and
+  three bits wide, on two saves, with the schema's `HIDDEN=3` excused since the
+  game keeps the value back until a prospect is scouted. Nothing beat 87.9%,
+  which is exactly the share of the class that is NORMAL — a constant, not a
+  field. The record's first three bits are zero for all 4,100 whatever the export
+  says, which settles it.
+- **Nor is it in the player record.** The same sweep over all 1,536 bits of the
+  192-byte record reached 89.1% against an 87.9% floor. Not a field either.
+- **"On my board" is not a single bit** of either record. Thirty-five recruits
+  carry it in the export, which is enough to find a flag if one existed.
+
+So those fields live somewhere neither record reaches, and the ones with no
+column in the game's export — `ProductionGrade`, `RecruitStageAdvance`, the
+alternate positions, `SurnameAudioID` — could not be confirmed even if a
+candidate turned up, because there is nothing to check them against.
+
+What was tried before the record was located, so it need not be tried again:
 
 - **Not in the player record.** All 4,100 recruits were tested against every bit
   position and plausible width in the 192-byte player record, scoring by

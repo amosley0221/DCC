@@ -243,6 +243,8 @@ data class SnapshotRecruit(
     val commitScore: Int? = null,
     val totalOffers: Int? = null,
     val stage: String? = null,
+    /** High school, or a junior college — the recruiting class, not the roster's. */
+    val recruitClass: String? = null,
     /** The ten schools recruiting him, strongest first, as the game shows them. */
     val topSchools: List<TopSchool> = emptyList(),
     /**

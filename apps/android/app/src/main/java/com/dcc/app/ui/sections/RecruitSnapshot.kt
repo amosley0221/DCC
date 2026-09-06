@@ -38,6 +38,14 @@ private fun SnapshotRecruit.leaders(): List<String> {
     }
 }
 
+/** Where a recruit is coming from, in the game's own words rather than the roster's. */
+private val CLASS_WORD = mapOf(
+    "HighSchool" to "High school",
+    "JuniorCollege_Sophomore" to "JUCO sophomore",
+    "JuniorCollege_Junior" to "JUCO junior",
+    "JuniorCollege_Senior" to "JUCO senior",
+)
+
 /** The game's own words for how far along a recruitment is. */
 /** The stages, in the order a recruitment moves through them. */
 private val STAGE_ORDER = listOf(
@@ -220,7 +228,7 @@ private fun RecruitRow(
                     SaveLabels.height(r.heightIn).ifEmpty { null },
                     r.weightLb?.let { "$it lb" },
                     r.nilK?.takeIf { it > 0 }?.let { "NIL \$${it}K" },
-                    SaveLabels.year(r.year),
+                    r.recruitClass?.let { CLASS_WORD[it] ?: it } ?: SaveLabels.year(r.year),
                 ).joinToString(" · "),
                 c.ink3, 10, maxLines = 3,
             )

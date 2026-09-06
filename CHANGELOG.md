@@ -10,6 +10,32 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.56.0] - 2026-09-06
+
+### Added
+
+- **A recruit's class, in the game's own words.** High school, JUCO sophomore,
+  JUCO junior — on both apps, wherever a prospect's class was showing.
+
+  It was saying "Freshman" for every high-school prospect. That is not wrong
+  about the roster he will join, but it is the wrong fact about a recruit, and
+  it hid the junior-college transfers entirely. The recruiting class is its own
+  field in his record; it reads 4,100 of 4,100 exact on three saves.
+
+### Fixed
+
+- The docs claimed the rest of the recruit record was "a matter of naming the
+  remaining bits". That was an assumption, and it was wrong — see below.
+
+### Notes
+
+- **Gem and bust is not in the recruit record, and not in the player record
+  either.** Both were swept at every bit position, on two saves, with the
+  schema's HIDDEN value excused. Nothing beat the share of the class that is
+  simply NORMAL — a constant, not a field. "On my board" is not a single bit of
+  either record. Those live somewhere neither record reaches, and the write-up
+  now says so with the evidence instead of promising they are nearly done.
+
 ## [0.55.0] - 2026-09-06
 
 ### Changed
