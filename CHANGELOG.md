@@ -10,6 +10,43 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.69.0] - 2026-09-06
+
+### Fixed
+
+- **Every one of the ninety-seven matches was thrown away.** The query worked —
+  11,197 venues came back and 97 of them were your schools — and then the
+  download kept none of them, because it asked the Commons API for a thumbnail
+  URL first and treated any failure of that call as a reason to skip the
+  picture. The picture and the credit line are two separate things and they now
+  fail separately: the image comes straight from `Special:FilePath`, which
+  renders the size asked for and redirects, so it needs no API call at all. The
+  licence lookup is still made, still recorded, and still excludes anything
+  Commons positively marks as non-free — but a lookup that *fails* says nothing
+  about the terms, and is no longer treated as a refusal.
+- **Thirty-five schools lost to their own names.** "Alabama" is the start of
+  both "Alabama Crimson Tide football" and "Alabama A&M Bulldogs football", so
+  going school by school found two grounds and gave up — and the same happened
+  to every state whose name begins another school's: Arizona, Arkansas,
+  California, Colorado, Florida and thirty more. Rows are now assigned to
+  schools rather than schools to rows, and each row goes to the **longest**
+  school name that prefixes it. A&M's ground goes to Alabama A&M, which is in
+  your save too, and Alabama is left with exactly one.
+
+  What stays reported is the genuine tie: Wikidata writes both Miamis as
+  "Miami …", so nothing is left to tell the Hurricanes' ground from the
+  RedHawks'. A wrong stadium you believe is worse than no stadium.
+
+### Changed
+
+- **A skip says which step lost it.** "97 skipped" was five different failures
+  in one bucket, and when all ninety-seven landed in it there was nothing to
+  work from. Each one now carries its reason — an HTTP status, a content type, a
+  named licence — and the screen shows the distinct ones.
+- **`origin=*` is gone from the Commons request.** It is a browser's CORS
+  handshake, and sending it from a desktop app asks MediaWiki to apply rules
+  written for something else.
+
 ## [0.68.0] - 2026-09-06
 
 ### Fixed

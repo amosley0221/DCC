@@ -27,7 +27,8 @@ import { readRecruitLedger, writeRecruitLedger } from './sidecar'
 import { fileRecruiting, recruitingNews } from './recruitLedger'
 import type { RecruitEvent } from './recruitLedger'
 import {
-  VENUE_QUERIES, commonsUrl, matchVenues, parseCredit, parseVenues, stadiumFileName, thumbFrom,
+  VENUE_QUERIES, commonsTitle, commonsUrl, filePathUrl, matchVenues, parseCredit, parseVenues,
+  stadiumFileName,
 } from './stadiums'
 import type { StadiumCredit, VenueRow } from './stadiums'
 import { TEAM_ID_NAMES } from './teamIds'
@@ -643,30 +644,54 @@ ipcMain.handle('stadiums:fetch', async (
     mkdirSync(dir, { recursive: true })
 
     const credits: StadiumCredit[] = []
-    const skipped: string[] = []
+    // Every skip says which step lost it. The first version put five different
+    // failures in one bucket called "skipped", and when all ninety-seven landed
+    // in it there was nothing to work from.
+    const skipped: { school: string; why: string }[] = []
     let written = 0
     for (const { school, row } of hits) {
+      // The picture first, on its own. It comes from Special:FilePath, which
+      // renders the size asked for and redirects — no API call to fail.
+      let bytes: Buffer
+      let ext = 'jpg'
+      try {
+        const img = await fetch(filePathUrl(row.image), { headers: ua, redirect: 'follow' })
+        if (!img.ok) { skipped.push({ school, why: `image HTTP ${img.status}` }); continue }
+        const type = img.headers.get('content-type') ?? ''
+        if (!type.startsWith('image/')) { skipped.push({ school, why: `not an image (${type})` }); continue }
+        ext = /png/.test(type) ? 'png' : 'jpg'
+        bytes = Buffer.from(await img.arrayBuffer())
+      } catch (err) {
+        skipped.push({ school, why: `image ${String((err as Error)?.message ?? err)}` })
+        continue
+      }
+
+      // Then the credit, which is wanted but is not a gate. A licence lookup
+      // that fails says nothing about the terms; only a licence that comes back
+      // and says non-free excludes the picture.
+      let credit: StadiumCredit = {
+        school, venue: row.venue, file: commonsTitle(row.image),
+        author: 'unknown', licence: 'unknown', page: '',
+      }
       try {
         const meta = await fetch(commonsUrl(row.image), { headers: ua })
-        if (!meta.ok) { skipped.push(school); continue }
-        const body = await meta.json()
-        const credit = parseCredit(school, row.venue, body)
-        // Commons is free content but not unconditionally: anything it marks
-        // as fair use or non-free is left where it is.
-        if (!credit || !credit.free) { skipped.push(school); continue }
-        const url = thumbFrom(body)
-        if (!url) { skipped.push(school); continue }
-        const img = await fetch(url, { headers: ua })
-        if (!img.ok) { skipped.push(school); continue }
-        const ext = /\.png(\?|$)/i.test(url) ? 'png' : 'jpg'
-        writeFileSync(join(dir, stadiumFileName(school, ext)), Buffer.from(await img.arrayBuffer()))
-        const { free: _free, ...keep } = credit
-        credits.push(keep)
-        written++
+        if (meta.ok) {
+          const read = parseCredit(school, row.venue, await meta.json())
+          if (read && !read.free) { skipped.push({ school, why: `non-free (${read.licence})` }); continue }
+          if (read) {
+            const { free: _free, ...keep } = read
+            credit = keep
+          }
+        }
       } catch {
-        skipped.push(school)
+        // The credit stays "unknown", which credits.json says plainly.
       }
+
+      writeFileSync(join(dir, stadiumFileName(school, ext)), bytes)
+      credits.push(credit)
+      written++
     }
+
     // The record of who took each photograph and under what terms, kept beside
     // them. Most of Commons asks for the photographer's name; this is where it
     // is, rather than nowhere.

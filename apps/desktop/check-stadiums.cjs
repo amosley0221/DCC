@@ -21,7 +21,8 @@ const sparql = {
         image: { value: 'http://commons.wikimedia.org/wiki/Special:FilePath/Hard%20Rock.jpg' },
       },
       {
-        teamLabel: { value: 'Miami (OH) RedHawks football' },
+        // Wikidata calls it this, without the "(OH)" the save uses.
+        teamLabel: { value: 'Miami RedHawks football' },
         venueLabel: { value: 'Yager Stadium' },
         image: { value: 'http://commons.wikimedia.org/wiki/Special:FilePath/Yager.jpg' },
       },
@@ -73,16 +74,16 @@ assert.deepEqual(S.parseVenues(null), [])
   const of = (n) => hits.find((h) => h.school === n)?.row.venue
 
   assert.equal(of('Penn State'), 'Beaver Stadium')
-  // The one that matters: "Miami" prefixes "Miami (OH) RedHawks" too, and the
-  // longest school name that fits has to win or the two swap grounds.
-  assert.equal(of('Miami (OH)'), 'Yager Stadium')
-  // And plain "Miami" prefixes BOTH at the same length, so there is no longest
-  // name to decide it. Guessing there is how you end up looking at the wrong
-  // stadium and believing it, so it is reported rather than picked.
+  // The genuinely hard one. Wikidata writes both as "Miami …", so "Miami" is
+  // the longest school name prefixing either and nothing is left to tell the
+  // Hurricanes' ground from the RedHawks'. Guessing is how you end up looking
+  // at the wrong stadium and believing it, so it is reported rather than picked.
   assert.ok(ambiguous.includes('Miami'), 'a tie between two grounds is not broken')
   assert.ok(!hits.some((h) => h.school === 'Miami'))
+  // And Miami (OH) matched nothing at all, which is also reported.
+  assert.ok(missing.includes('Miami (OH)'))
   // Nothing matched at all is reported too, never filled in with the nearest.
-  assert.deepEqual(missing, ['Somewhere Tech'])
+  assert.ok(missing.includes('Somewhere Tech'))
   assert.ok(!hits.some((h) => h.school === 'Somewhere Tech'))
 
   // One school, two rows, same photograph: not a tie, just a duplicate.
@@ -92,6 +93,36 @@ assert.deepEqual(S.parseVenues(null), [])
   ], [{ name: 'Penn State' }])
   assert.equal(dupe.hits.length, 1, 'the same ground twice is still one ground')
   assert.deepEqual(dupe.ambiguous, [])
+}
+
+/* ---------------------------------- a state that is the start of other states */
+{
+  // This is what cost thirty-five schools. Going school-by-school, "Alabama"
+  // prefixes the Crimson Tide AND the A&M Bulldogs, so it saw two grounds and
+  // gave up — and every state whose name starts another school's name went the
+  // same way. Assigning each ROW to the longest school that prefixes it hands
+  // A&M's row to Alabama A&M, and Alabama is left with exactly one.
+  const rows = [
+    { team: 'Alabama Crimson Tide football', venue: 'Bryant-Denny Stadium', image: 'bd.jpg' },
+    { team: 'Alabama A&M Bulldogs football', venue: 'Louis Crews Stadium', image: 'lc.jpg' },
+    { team: 'Alabama State Hornets football', venue: 'ASU Stadium', image: 'asu.jpg' },
+  ]
+  const schools = [{ name: 'Alabama' }, { name: 'Alabama A&M' }, { name: 'Alabama State' }]
+  const { hits, ambiguous, missing } = S.matchVenues(rows, schools)
+  const of = (n) => hits.find((h) => h.school === n)?.row.venue
+
+  assert.deepEqual(ambiguous, [], 'a longer school name in the save settles it')
+  assert.deepEqual(missing, [])
+  assert.equal(of('Alabama'), 'Bryant-Denny Stadium')
+  assert.equal(of('Alabama A&M'), 'Louis Crews Stadium')
+  assert.equal(of('Alabama State'), 'ASU Stadium')
+
+  // And the school that is NOT in the save does not hand its ground to the one
+  // that is: with only "Alabama" present, both rows are still its own, which is
+  // two grounds, which is a tie it refuses.
+  const alone = S.matchVenues(rows, [{ name: 'Alabama' }])
+  assert.deepEqual(alone.hits, [])
+  assert.deepEqual(alone.ambiguous, ['Alabama'])
 }
 
 /* ------------------------------------------------------ licences and thumbs */
@@ -119,8 +150,14 @@ assert.deepEqual(S.parseVenues(null), [])
   assert.equal(c.author, 'Someone', 'the markup around an author is not the author')
   assert.equal(c.page, 'https://commons.wikimedia.org/wiki/File:Beaver_Stadium.jpg')
   assert.equal(c.free, true)
-  assert.equal(S.thumbFrom(body), 'https://upload.wikimedia.org/thumb/beaver/1600px-beaver.jpg',
-    'the rendered size, not the twenty-megabyte original')
+  // The picture is downloaded without the API at all: Special:FilePath renders
+  // the size asked for and redirects. The first version made the download
+  // depend on the metadata call, and when all ninety-seven of those failed the
+  // run wrote nothing while reporting one undifferentiated "skipped".
+  const direct = S.filePathUrl('http://commons.wikimedia.org/wiki/Special:FilePath/Beaver%20Stadium.jpg')
+  assert.ok(direct.startsWith('https://commons.wikimedia.org/wiki/Special:FilePath/'), direct)
+  assert.ok(direct.includes('Beaver%20Stadium.jpg'), direct)
+  assert.ok(direct.endsWith('?width=1600'), direct)
 
   // Anything Commons marks as non-free is not downloaded at all.
   const unfree = JSON.parse(JSON.stringify(body))
@@ -128,7 +165,6 @@ assert.deepEqual(S.parseVenues(null), [])
   assert.equal(S.parseCredit('X', 'Y', unfree).free, false)
 
   assert.equal(S.parseCredit('X', 'Y', {}), null)
-  assert.equal(S.thumbFrom({}), null)
 }
 
 /* --------------------------------------------------------------- file names */
@@ -142,7 +178,10 @@ assert.deepEqual(S.parseVenues(null), [])
   const url = S.commonsUrl('http://commons.wikimedia.org/wiki/Special:FilePath/Beaver%20Stadium.jpg')
   assert.ok(url.includes('titles=File%3ABeaver+Stadium.jpg'), url)
   assert.ok(url.includes('iiurlwidth=1600'), url)
+  // `origin=*` is a browser's CORS handshake and has no business being sent by
+  // a desktop app; it asks MediaWiki to apply rules written for something else.
+  assert.ok(!url.includes('origin='), url)
   assert.ok(S.commonsUrl('File:Already.jpg').includes('titles=File%3AAlready.jpg'))
 }
 
-console.log('check-stadiums: no item ids in any query, the Miami tie, licences, thumbnails and file names')
+console.log('check-stadiums: no item ids in any query, rows claimed by the longest school, the Miami tie, licences and file names')

@@ -51,6 +51,7 @@ export default function ArtFolder() {
   const [stadiums, setStadiums] = useState(false)
   const [stadiumRun, setStadiumRun] = useState<{
     query: string; venues: number; matched: number; missing: string[]; ambiguous: string[]
+    skipped: { school: string; why: string }[]
   } | null>(null)
   const getStadiums = async () => {
     const schools = save.roster?.schools ?? []
@@ -75,7 +76,7 @@ export default function ArtFolder() {
     // without asking for another run.
     setStadiumRun({
       query: res.query, venues: res.venues, matched: res.matched,
-      missing: res.missing, ambiguous: res.ambiguous,
+      missing: res.missing, ambiguous: res.ambiguous, skipped: res.skipped,
     })
     dispatch({ type: 'log', line: { text: msg, kind: res.written ? 'good' : 'bad' } })
     // They are only art once the folder has been read again.
@@ -166,6 +167,12 @@ export default function ArtFolder() {
                   {stadiumRun.ambiguous.length > 6 ? ` and ${stadiumRun.ambiguous.length - 6} more` : ''},
                   so none was taken — a wrong stadium you believe is worse than no stadium.
                   Drop your own in for those.
+                </p>
+              ) : null}
+              {stadiumRun.skipped.length ? (
+                <p className="body-serif" style={{ marginTop: 7 }}>
+                  {stadiumRun.skipped.length} were matched but not kept.{' '}
+                  {[...new Set(stadiumRun.skipped.map((k) => k.why))].slice(0, 4).join('; ')}.
                 </p>
               ) : null}
               {stadiumRun.missing.length ? (

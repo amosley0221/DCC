@@ -169,29 +169,44 @@ export function matchVenues(
   rows: VenueRow[],
   schools: { name: string; fullName?: string | null }[],
 ): { hits: { school: string; row: VenueRow }[]; missing: string[]; ambiguous: string[] } {
+  // Rows are assigned to schools, not schools to rows, and that is the whole
+  // trick. Going the other way, "Alabama" prefixes both "Alabama Crimson Tide
+  // football" and "Alabama A&M Bulldogs football", so it saw two grounds and
+  // gave up — and it did that to thirty-five schools, every one of them a state
+  // whose name is also the start of another school's. Assigning each row to the
+  // LONGEST school name that prefixes it hands the A&M row to Alabama A&M,
+  // which is in the save too, and leaves Alabama with exactly one.
+  const keyed = schools.map((s) => ({
+    school: s.name,
+    keys: [norm(s.name), ...(s.fullName ? [norm(s.fullName)] : [])].filter(Boolean),
+  }))
+  const claimed = new Map<string, VenueRow[]>()
+  for (const row of rows) {
+    const label = norm(row.team)
+    let best: { school: string; len: number } | null = null
+    for (const k of keyed) {
+      for (const key of k.keys) {
+        if (!label.startsWith(key)) continue
+        if (!best || key.length > best.len) best = { school: k.school, len: key.length }
+      }
+    }
+    if (!best) continue
+    const list = claimed.get(best.school)
+    if (list) list.push(row)
+    else claimed.set(best.school, [row])
+  }
+
   const hits: { school: string; row: VenueRow }[] = []
   const missing: string[] = []
   const ambiguous: string[] = []
   for (const s of schools) {
-    const keys = [norm(s.name), ...(s.fullName ? [norm(s.fullName)] : [])].filter(Boolean)
-    let best = 0
-    let picked: VenueRow[] = []
-    for (const row of rows) {
-      const label = norm(row.team)
-      let len = 0
-      for (const k of keys) if (k && label.startsWith(k) && k.length > len) len = k.length
-      if (!len) continue
-      // The longest school name that still prefixes this label wins, so a
-      // school whose name contains another's cannot steal it.
-      if (len > best) { best = len; picked = [row] }
-      else if (len === best) picked.push(row)
-    }
-    if (!best) { missing.push(s.name); continue }
-    // Two different grounds both claiming the same school is not something to
-    // break a tie on. "Miami" prefixes both the Hurricanes and the RedHawks,
-    // and picking whichever came back first is how you end up looking at the
-    // wrong stadium and believing it. Say so instead; a photograph dropped in
-    // by hand fixes it in one file.
+    const picked = claimed.get(s.name)
+    if (!picked?.length) { missing.push(s.name); continue }
+    // Two different grounds still claiming the same school is not something to
+    // break a tie on. "Miami" is the start of both the Hurricanes' and the
+    // RedHawks' names and no school in the save is a longer prefix of either,
+    // so there is nothing left to decide it. Picking whichever came back first
+    // is how you end up looking at the wrong stadium and believing it.
     const venues = new Set(picked.map((r) => r.image))
     if (venues.size > 1) { ambiguous.push(s.name); continue }
     hits.push({ school: s.name, row: picked[0] })
@@ -228,6 +243,9 @@ export function parseCredit(
     author,
     licence,
     page: info.descriptionurl ?? '',
+    // Only a *positive* non-free marking excludes a picture. A lookup that
+    // failed says nothing about the terms, and treating silence as a refusal is
+    // what made the first run keep none of the ninety-seven it had found.
     free: !NON_FREE.test(licence),
   }
 }
@@ -240,26 +258,38 @@ export function parseCredit(
  * wide. Commons renders the size asked for, so nothing here has to resize.
  */
 export function commonsUrl(file: string, width = 1600): string {
-  const title = file.startsWith('File:') ? file : `File:${decodeURIComponent(file.split('/').pop() ?? file)}`
   const q = new URLSearchParams({
-    action: 'query', format: 'json', origin: '*',
+    action: 'query', format: 'json',
     prop: 'imageinfo',
     iiprop: 'url|extmetadata',
     iiurlwidth: String(width),
-    titles: title,
+    titles: commonsTitle(file),
   })
+  // No `origin=*`: that is a browser's CORS handshake, and sending it from a
+  // desktop app asks MediaWiki to treat the request under rules written for
+  // something else.
   return `https://commons.wikimedia.org/w/api.php?${q}`
 }
 
-/** The thumbnail a `commonsUrl` response points at, or the original. */
-export function thumbFrom(body: unknown): string | null {
-  const pages = (body as { query?: { pages?: Record<string, unknown> } })?.query?.pages
-  if (!pages) return null
-  const page = Object.values(pages)[0] as {
-    imageinfo?: { thumburl?: string; url?: string }[]
-  } | undefined
-  const info = page?.imageinfo?.[0]
-  return info?.thumburl ?? info?.url ?? null
+/** "File:Beaver Stadium.jpg", from a P18 value or from a title already. */
+export function commonsTitle(file: string): string {
+  if (file.startsWith('File:')) return file
+  return `File:${decodeURIComponent(file.split('/').pop() ?? file)}`
+}
+
+/**
+ * Where to actually download the picture, without asking the API anything.
+ *
+ * `Special:FilePath` renders and redirects to the size asked for, so the image
+ * arrives whether or not the metadata call worked. The first version made the
+ * download depend on that call: every one of ninety-seven matches went through
+ * it, every one failed, and the run wrote nothing at all while reporting a
+ * single undifferentiated "skipped". A picture and a credit line are two
+ * separate things and they now fail separately.
+ */
+export function filePathUrl(file: string, width = 1600): string {
+  const name = commonsTitle(file).slice('File:'.length)
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(name)}?width=${width}`
 }
 
 /** What the file is called in the art folder: the same shape every other mark uses. */

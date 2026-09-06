@@ -44,7 +44,9 @@ declare global {
       /** Downloads a stadium photograph per school into the art folder. */
       fetchStadiums(schools: { name: string; fullName?: string | null }[]): Promise<
         | {
-            ok: true; written: number; missing: string[]; skipped: string[]
+            ok: true; written: number; missing: string[]
+            /** Each one says which step lost it, not merely that it was lost. */
+            skipped: { school: string; why: string }[]
             ambiguous: string[]; folder: string
             /** What the run saw, so a small number explains itself. */
             query: string; venues: number; matched: number
