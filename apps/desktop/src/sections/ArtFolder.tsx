@@ -20,6 +20,7 @@ export default function ArtFolder() {
   const [note, setNote] = useState<string | null>(null)
   const [look, setLook] = useState('')
   const [found, setFound] = useState<{ hits: string[]; total: number } | null>(null)
+  const [dirs, setDirs] = useState(false)
 
   const pick = async () => {
     if (!save.roster) { setNote('Read your save first — the art is matched against your players.'); return }
@@ -111,9 +112,29 @@ export default function ArtFolder() {
             <Btn onClick={() => void search(look)}>Look</Btn>
           </div>
           <div className="row" style={{ gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
-            {['bowl', 'playoff', 'cfp', 'trophy', 'stadium', 'award'].map((w) => (
-              <Chip key={w} on={look === w} onClick={() => { setLook(w); void search(w) }}>{w}</Chip>
-            ))}
+            {['bowl', 'playoff', 'cfp', 'trophy', 'stadium', 'venue', 'field', 'campus', 'award']
+              .map((w) => (
+                <Chip key={w} on={look === w} onClick={() => { setLook(w); void search(w) }}>{w}</Chip>
+              ))}
+          </div>
+          {/* When a word finds nothing, the folder names are the next question,
+              and they are already in the index — no reason to make anyone go
+              and look in Explorer for them. */}
+          <div style={{ marginTop: 10 }}>
+            <button onClick={() => setDirs((d) => !d)} style={{ all: 'unset', cursor: 'pointer' }}>
+              <Meta size={9} color="var(--accent)">
+                {dirs ? 'HIDE THE FOLDERS' : `WHAT FOLDERS ARE IN HERE (${faces.dirs.length})`}
+              </Meta>
+            </button>
+            {dirs ? (
+              <pre style={{
+                marginTop: 6, maxHeight: 200, overflow: 'auto', fontSize: 11,
+                color: 'var(--ink2)', background: 'var(--surface)',
+                border: '1px solid var(--line)', borderRadius: 6, padding: 10,
+              }}>{faces.dirs
+                .map((d) => `${d.dir || '(root)'}  —  ${d.files.toLocaleString()} files\n    ${d.sample.slice(0, 3).join('  ')}`)
+                .join('\n')}</pre>
+            ) : null}
           </div>
           {found ? (
             <div style={{ marginTop: 10 }}>

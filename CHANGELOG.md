@@ -10,6 +10,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.48.1] - 2026-09-06
+
+### Added
+
+- **The art folder will tell you what is in it.** Searching for "stadium" comes
+  back empty, which means the stadium art is called something else, not that it
+  is missing. The art screen now lists the folders it indexed with a few real
+  filenames from each — the question "what are these called" is answerable from
+  the index DCC already built, rather than from Explorer.
+
 ## [0.48.0] - 2026-09-06
 
 ### Added
