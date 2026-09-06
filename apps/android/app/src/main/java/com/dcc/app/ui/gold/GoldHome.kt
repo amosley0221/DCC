@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,15 +33,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dcc.app.data.ArtPack
 import com.dcc.app.data.League
 import com.dcc.app.data.Persisted
 import com.dcc.app.data.SnapshotGame
 import com.dcc.app.data.SnapshotRecruit
+import com.dcc.app.data.name
 import com.dcc.app.state.SnapshotView
+import com.dcc.app.ui.components.ArtImage
 import com.dcc.app.ui.components.PlayerFace
 import com.dcc.app.ui.components.SchoolBadge
 import com.dcc.app.ui.theme.Dcc
@@ -93,6 +99,14 @@ fun GoldHome(
      * your own game first.
      */
     var ranked by rememberSaveable { mutableStateOf(false) }
+
+    // The feature turns over the way the desktop's does, and for the same
+    // reason: one scoreline is the week's news for about a day, and the phone is
+    // picked up all week. Only stories the snapshot can actually tell are in the
+    // rotation, so it never turns over to an empty card.
+    val heisman = snap.snapshot.heisman.minByOrNull { it.rank }
+    val topCommit = snap.recruits.firstOrNull()
+    val biggest = saturday.firstOrNull { !snap.isUserGame(it) }
     val table = remember(snap) {
         League.build(
             League.visible(snap.snapshot.games, me?.index, snap.holdFrom, false),
@@ -129,14 +143,44 @@ fun GoldHome(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // ── the feature ───────────────────────────────────────────────────
+        val slides = remember(last, biggest, heisman, topCommit) {
+            buildList {
+                if (last != null) add(FEATURE_GAME)
+                if (biggest != null) add(FEATURE_COUNTRY)
+                if (heisman != null) add(FEATURE_HEISMAN)
+                if (topCommit?.nationalRank != null) add(FEATURE_CLASS)
+            }.ifEmpty { listOf(FEATURE_GAME) }
+        }
+        var at by remember(slides) { mutableStateOf(0) }
+        LaunchedEffect(slides) {
+            if (slides.size < 2) return@LaunchedEffect
+            while (true) {
+                delay(FEATURE_TURN_MS)
+                at = (at + 1) % slides.size
+            }
+        }
+        val slide = slides[at.coerceIn(0, slides.lastIndex)]
+        val slideGame = when (slide) {
+            FEATURE_GAME -> last
+            FEATURE_COUNTRY -> biggest
+            else -> null
+        }
+
         Column(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Dcc.shapes.card))
                 .border(1.dp, c.line, RoundedCornerShape(Dcc.shapes.card))
                 .background(c.surface)
-                // The feature is about a game, so it opens that game.
-                .then(if (last != null) Modifier.clickable { onOpenGame(last) } else Modifier),
+                // A story about a game opens that game; the others open where
+                // they belong.
+                .then(
+                    when {
+                        slideGame != null -> Modifier.clickable { onOpenGame(slideGame) }
+                        slide == FEATURE_CLASS -> Modifier.clickable { onOpenBoard() }
+                        else -> Modifier
+                    },
+                ),
         ) {
             Box(
                 Modifier
@@ -145,38 +189,120 @@ fun GoldHome(
                     .background(Brush.linearGradient(listOf(c.surfaceStrong, c.surface))),
                 contentAlignment = Alignment.Center,
             ) {
-                if (last != null) {
-                    val home = last.home == me?.name
-                    val us = if (home) last.homeScore else last.awayScore
-                    val them = if (home) last.awayScore else last.homeScore
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        GoldNum("$us", 46, if (us >= them) c.ink else c.ink3)
-                        Box(
-                            Modifier
-                                .padding(horizontal = 10.dp)
-                                .width(14.dp)
-                                .height(3.dp)
-                                .background(c.ink3),
-                        )
-                        GoldNum("$them", 46, if (them > us) c.ink else c.ink3)
+                // The background is the schools' own marks, dimmed almost out.
+                // The save carries no photographs, and inventing one would be
+                // the only made-up thing on the screen.
+                val wash = when (slide) {
+                    FEATURE_HEISMAN -> listOfNotNull(heisman?.team)
+                    FEATURE_CLASS -> listOfNotNull(topCommit?.topSchools?.maxByOrNull { it.interest }?.school)
+                    else -> listOfNotNull(slideGame?.home, slideGame?.away)
+                }
+                CrestWash(wash)
+
+                when {
+                    slideGame != null -> {
+                        val home = slideGame.home == me?.name
+                        val us = if (home) slideGame.homeScore else slideGame.awayScore
+                        val them = if (home) slideGame.awayScore else slideGame.homeScore
+                        val ours = if (home) slideGame.home else slideGame.away
+                        val theirs = if (home) slideGame.away else slideGame.home
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            SchoolBadge(mono(ours), ours ?: "", false, 30.dp, "helmet")
+                            Spacer(Modifier.width(9.dp))
+                            GoldNum("$us", 46, if (us >= them) c.ink else c.ink3)
+                            Box(
+                                Modifier
+                                    .padding(horizontal = 10.dp)
+                                    .width(14.dp)
+                                    .height(3.dp)
+                                    .background(c.ink3),
+                            )
+                            GoldNum("$them", 46, if (them > us) c.ink else c.ink3)
+                            Spacer(Modifier.width(9.dp))
+                            SchoolBadge(mono(theirs), theirs ?: "", false, 30.dp, "helmet")
+                        }
                     }
-                } else {
-                    Label("NOTHING PLAYED YET", 10.0, c.ink3, 3.0)
+                    slide == FEATURE_HEISMAN && heisman != null -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PlayerFace(
+                            "${heisman.first} ${heisman.last}", null, 52.dp, heisman.team,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        GoldNum("${heisman.overall}", 40, c.ink)
+                    }
+                    slide == FEATURE_CLASS && topCommit != null -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PlayerFace(topCommit.name, topCommit.assetId, 52.dp)
+                        Spacer(Modifier.width(12.dp))
+                        GoldNum("#${topCommit.nationalRank}", 40, c.ink)
+                    }
+                    else -> Label("NOTHING PLAYED YET", 10.0, c.ink3, 3.0)
+                }
+
+                // Which story of the few this is, in the corner, the way the
+                // desktop marks it.
+                if (slides.size > 1) {
+                    Row(
+                        Modifier.align(Alignment.TopEnd).padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        slides.indices.forEach { i ->
+                            Box(
+                                Modifier
+                                    .width(6.dp)
+                                    .height(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (i == at) c.accent else c.ink4),
+                            )
+                        }
+                    }
                 }
             }
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 14.dp)) {
                 Label(
-                    if (last == null) "YOUR PROGRAM" else "FEATURE · WEEK ${last.week}",
+                    when {
+                        slide == FEATURE_HEISMAN -> "HEISMAN WATCH"
+                        slide == FEATURE_CLASS -> "THE CLASS"
+                        slide == FEATURE_COUNTRY && biggest != null -> "AROUND THE COUNTRY · WEEK ${biggest.week}"
+                        last != null -> "FEATURE · WEEK ${last.week}"
+                        else -> "YOUR PROGRAM"
+                    },
                     10.0, c.accent, 2.5,
                 )
                 Spacer(Modifier.height(6.dp))
                 Display(
-                    if (last == null) me?.name ?: "Your dynasty"
-                    else featureHeadline(last, me?.name),
+                    when {
+                        slide == FEATURE_HEISMAN && heisman != null ->
+                            "${heisman.first} ${heisman.last}"
+                        slide == FEATURE_CLASS && topCommit != null -> topCommit.name
+                        slideGame != null && slide == FEATURE_COUNTRY ->
+                            featureHeadline(slideGame, slideGame.home)
+                        slideGame != null -> featureHeadline(slideGame, me?.name)
+                        else -> me?.name ?: "Your dynasty"
+                    },
                     19, c.ink,
                 )
                 Spacer(Modifier.height(6.dp))
-                Ui(featureStandfirst(last, me?.wins, me?.losses), 12.0, c.ink2)
+                Ui(
+                    when {
+                        slide == FEATURE_HEISMAN && heisman != null -> listOfNotNull(
+                            heisman.position.ifBlank { null },
+                            heisman.team,
+                            "leads the watch",
+                        ).joinToString(" · ")
+                        slide == FEATURE_CLASS && topCommit != null -> listOfNotNull(
+                            "No. ${topCommit.nationalRank} in the country",
+                            topCommit.position.ifBlank { null },
+                            topCommit.stage?.let { STAGE_WORD[it] ?: it },
+                        ).joinToString(" · ")
+                        slide == FEATURE_COUNTRY && slideGame != null ->
+                            "The week's biggest result away from your own."
+                        else -> featureStandfirst(last, me?.wins, me?.losses)
+                    },
+                    12.0, c.ink2,
+                )
             }
         }
 
@@ -261,6 +387,48 @@ fun GoldHome(
 }
 
 /** A headline the save's own numbers support, until a written one replaces it. */
+/** The stories the feature turns over, and how long each holds. */
+private const val FEATURE_GAME = "GAME"
+private const val FEATURE_COUNTRY = "COUNTRY"
+private const val FEATURE_HEISMAN = "HEISMAN"
+private const val FEATURE_CLASS = "CLASS"
+private const val FEATURE_TURN_MS = 11_000L
+
+private val STAGE_WORD = mapOf(
+    "Top10" to "top ten", "Top5" to "top five", "Top3" to "top three", "Battle" to "in a battle",
+    "SoftCommitted" to "soft commit", "HardCommitted" to "committed", "Signed" to "signed",
+)
+
+private fun mono(name: String?) = (name ?: "?").take(2).uppercase()
+
+/**
+ * The schools' own marks behind the score, dimmed almost out.
+ *
+ * The save carries no photographs and none were ever found in the game's art, so
+ * a stadium here would be the one invented thing on a screen that is otherwise
+ * all read out of the file. The crests are real and they are the right two.
+ */
+@Composable
+private fun CrestWash(schools: List<String>) {
+    if (schools.isEmpty()) return
+    val context = LocalContext.current
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceBetween) {
+        schools.take(2).forEachIndexed { i, school ->
+            val file = remember(school) { ArtPack.school(context, school, "logoLight") ?: ArtPack.school(context, school, "logo") }
+            ArtImage(
+                file,
+                Modifier
+                    .fillMaxHeight()
+                    .width(150.dp)
+                    .padding(horizontal = 4.dp),
+                ContentScale.Fit,
+                alpha = 0.10f,
+                alignment = if (i == 0) Alignment.CenterStart else Alignment.CenterEnd,
+            )
+        }
+    }
+}
+
 private fun featureHeadline(g: SnapshotGame, me: String?): String {
     val home = g.home == me
     val us = if (home) g.homeScore else g.awayScore

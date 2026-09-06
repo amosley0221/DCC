@@ -10,6 +10,24 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.54.0] - 2026-09-06
+
+### Added
+
+- **The phone's feature turns over, the way the desktop's does.** Your last
+  result, then the week's biggest game elsewhere, then the Heisman watch, then
+  the top of your class — eleven seconds each, with a dot for each story. Only
+  stories your snapshot can actually tell are in the rotation, so it never turns
+  over to an empty card.
+
+- **Helmets either side of the score**, so the feature says who played rather
+  than only what it finished.
+
+- **A background behind the score**: the two schools' own marks, dimmed almost
+  out. The save carries no photographs and none are in the game's art either, so
+  a stadium there would have been the one invented thing on a screen that is
+  otherwise read entirely out of your file.
+
 ## [0.53.0] - 2026-09-06
 
 ### Added
