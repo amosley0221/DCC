@@ -215,3 +215,55 @@ One thing not to trust yet: for 2029 and 2030 the game shows the pick as TBD and
 the slot field holds a value anyway — Tampa Bay's reads 15 for most of 2029 and
 23 for most of 2030, with round 7 disagreeing in both. Those are stale or
 provisional and should not be shown as real pick numbers.
+
+## `TeamStore`: one field found, and why the rest is not worth grinding
+
+35 rows of 664 bytes with **319 members**. Far denser than CFB's team record, and
+this is where having no member names starts to cost real time.
+
+### Found and verified
+
+**Byte 623 is the roster size.** Tampa Bay reads 59 in the later save, matching
+the game's own "ROSTER SIZE 59 / 75", and the three non-team rows read 0 in both
+saves. Across the league it runs 59–77.
+
+It also dates the saves: the league-wide roster total falls from **2,359 to
+2,245** between them, 114 players released, and `CutDayRequestStore` is among
+the stores that changed. The two saves straddle cut day.
+
+### Searched for and not there
+
+**Cap room is not stored.** The screen shows Tampa Bay $63.2M and Chicago
+$9.37M. Searched byte-aligned as 32-bit integers, bit-aligned at every offset
+for widths 20 to 32, and as floats — nothing in the row is $63.2M, and no
+candidate also gives another team $9.37M. Like the player overall in the draft
+class, it is computed at display time from what *is* stored.
+
+**Wins and losses were not found, and the search was wrong-headed.** The test
+was for two byte columns summing to the same games-played total for all 32
+teams. The first version returned 519 pairs, all degenerate: an all-zero column
+plus a constant column sums to a constant. Tightened to require both columns to
+vary and the total to rise between the two weeks, it returned none — because
+these saves are in the **offseason**, where no games are played between them and
+the test has nothing to detect. Wins and losses may well be in the row; this
+just cannot find them from these two files.
+
+### What the diff does say
+
+87 of the 664 byte columns change between the two saves; the other 577 are
+static. The changed bytes cluster in clean four-byte groups — 360–363, 412–415,
+420–423, 456–459, 472–475 — that are neither plain integers nor floats, so they
+are bit-packed fields spanning byte boundaries and need their widths before they
+mean anything.
+
+### The honest recommendation
+
+`TeamStore` is the wrong thing to grind next. 319 anonymous members is exactly
+the shape that a schema makes easy and that trial and error makes slow, and every
+field needs its own answer key. `DraftPickStore` fell in one pass because it has
+five members in sixteen bytes and its structure alone told the story.
+
+The one anchor that would open `TeamStore` cheaply is **a standings screen
+showing all 32 win-loss records**. Thirty-two known values matched against the
+row is the same method that found the recruiting class ranking in CFB, and it
+turns a guess into a search.
