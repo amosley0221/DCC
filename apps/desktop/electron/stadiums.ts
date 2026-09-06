@@ -68,15 +68,72 @@ export interface StadiumCredit {
  * merely host a bowl out of it. Both the FBS item and the older Division I-A
  * item are accepted, because Wikidata uses both.
  */
-export const VENUE_QUERY = `
-SELECT DISTINCT ?team ?teamLabel ?venueLabel ?image WHERE {
-  VALUES ?league { wd:Q5308823 wd:Q1194951 }
-  ?team wdt:P118 ?league ;
-        wdt:P115 ?venue .
+/**
+ * The queries, tried in order until one answers.
+ *
+ * The first attempt at this was one query built on two Wikidata item ids
+ * written from memory — `wd:Q5308823`, `wd:Q1194951`, meant to be the FBS and
+ * Division I-A — and it returned nothing at all, because an item id recalled
+ * rather than looked up is a guess with no way to be nearly right. It is the
+ * same mistake as searching Commons for a school's name, one level further up.
+ *
+ * So none of these name an item id. They are built only from properties, which
+ * are few and stable and which a wrong guess would break loudly rather than
+ * silently:
+ *
+ *   P115  home venue      P18   image
+ *   P641  sport           P466  occupant
+ *
+ * and where an entity has to be identified, it is identified by its English
+ * label, which is a thing that can be read rather than recalled.
+ *
+ * They also get broader as they go. The first asks only that a team have a home
+ * venue with a photograph and the word "football" in its name — that is nearly
+ * every college programme and almost nothing else, and it does not depend on
+ * Wikidata having classified the team at all. Breadth is safe here because the
+ * *matching* is strict: a row only becomes a stadium if its team label begins
+ * with one of your schools' names.
+ */
+export const VENUE_QUERIES: { name: string; sparql: string }[] = [
+  {
+    name: 'football teams with a home venue',
+    sparql: `
+SELECT DISTINCT ?teamLabel ?venueLabel ?image WHERE {
+  ?team wdt:P115 ?venue .
   ?venue wdt:P18 ?image .
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+  ?team rdfs:label ?teamLabel . FILTER(LANG(?teamLabel) = "en")
+  FILTER(CONTAINS(LCASE(?teamLabel), "football"))
+  OPTIONAL { ?venue rdfs:label ?venueLabel . FILTER(LANG(?venueLabel) = "en") }
 }
-`.trim()
+`.trim(),
+  },
+  {
+    name: 'teams whose sport is American football',
+    sparql: `
+SELECT DISTINCT ?teamLabel ?venueLabel ?image WHERE {
+  ?sport rdfs:label "American football"@en .
+  ?team wdt:P641 ?sport ; wdt:P115 ?venue .
+  ?venue wdt:P18 ?image .
+  ?team rdfs:label ?teamLabel . FILTER(LANG(?teamLabel) = "en")
+  OPTIONAL { ?venue rdfs:label ?venueLabel . FILTER(LANG(?venueLabel) = "en") }
+}
+`.trim(),
+  },
+  {
+    name: 'venues by their occupant',
+    sparql: `
+SELECT DISTINCT ?teamLabel ?venueLabel ?image WHERE {
+  ?venue wdt:P466 ?team ; wdt:P18 ?image .
+  ?team rdfs:label ?teamLabel . FILTER(LANG(?teamLabel) = "en")
+  FILTER(CONTAINS(LCASE(?teamLabel), "football"))
+  OPTIONAL { ?venue rdfs:label ?venueLabel . FILTER(LANG(?venueLabel) = "en") }
+}
+`.trim(),
+  },
+]
+
+/** Kept as the first query's text, for anything that wants just one. */
+export const VENUE_QUERY = VENUE_QUERIES[0].sparql
 
 /** Wikidata's SPARQL JSON, reduced to the three fields that matter. */
 export function parseVenues(body: unknown): VenueRow[] {
@@ -86,9 +143,10 @@ export function parseVenues(body: unknown): VenueRow[] {
   const out: VenueRow[] = []
   for (const r of rows) {
     const team = r.teamLabel?.value
-    const venue = r.venueLabel?.value
     const image = r.image?.value
-    if (team && venue && image) out.push({ team, venue, image })
+    // The venue's own name is a nicety — it goes in the credit line. A row
+    // without one is still a photograph of the right ground.
+    if (team && image) out.push({ team, venue: r.venueLabel?.value ?? '', image })
   }
   return out
 }
@@ -110,25 +168,35 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 export function matchVenues(
   rows: VenueRow[],
   schools: { name: string; fullName?: string | null }[],
-): { hits: { school: string; row: VenueRow }[]; missing: string[] } {
+): { hits: { school: string; row: VenueRow }[]; missing: string[]; ambiguous: string[] } {
   const hits: { school: string; row: VenueRow }[] = []
   const missing: string[] = []
+  const ambiguous: string[] = []
   for (const s of schools) {
     const keys = [norm(s.name), ...(s.fullName ? [norm(s.fullName)] : [])].filter(Boolean)
-    let best: { row: VenueRow; len: number } | null = null
+    let best = 0
+    let picked: VenueRow[] = []
     for (const row of rows) {
       const label = norm(row.team)
-      for (const k of keys) {
-        if (!k || !label.startsWith(k)) continue
-        // The longest school name that still prefixes this label wins, so a
-        // school whose name contains another's cannot steal it.
-        if (!best || k.length > best.len) best = { row, len: k.length }
-      }
+      let len = 0
+      for (const k of keys) if (k && label.startsWith(k) && k.length > len) len = k.length
+      if (!len) continue
+      // The longest school name that still prefixes this label wins, so a
+      // school whose name contains another's cannot steal it.
+      if (len > best) { best = len; picked = [row] }
+      else if (len === best) picked.push(row)
     }
-    if (best) hits.push({ school: s.name, row: best.row })
-    else missing.push(s.name)
+    if (!best) { missing.push(s.name); continue }
+    // Two different grounds both claiming the same school is not something to
+    // break a tie on. "Miami" prefixes both the Hurricanes and the RedHawks,
+    // and picking whichever came back first is how you end up looking at the
+    // wrong stadium and believing it. Say so instead; a photograph dropped in
+    // by hand fixes it in one file.
+    const venues = new Set(picked.map((r) => r.image))
+    if (venues.size > 1) { ambiguous.push(s.name); continue }
+    hits.push({ school: s.name, row: picked[0] })
   }
-  return { hits, missing }
+  return { hits, missing, ambiguous }
 }
 
 /** Licences Commons marks as anything other than free. */

@@ -49,6 +49,9 @@ export default function ArtFolder() {
    * else to do.
    */
   const [stadiums, setStadiums] = useState(false)
+  const [stadiumRun, setStadiumRun] = useState<{
+    query: string; venues: number; matched: number; missing: string[]; ambiguous: string[]
+  } | null>(null)
   const getStadiums = async () => {
     const schools = save.roster?.schools ?? []
     if (!schools.length) { setNote('Read your save first — the photographs are matched to your schools.'); return }
@@ -65,8 +68,15 @@ export default function ArtFolder() {
     }
     const msg = `${res.written} stadium photographs into ${res.folder}` +
       (res.missing.length ? `; no venue found for ${res.missing.length}` : '') +
+      (res.ambiguous.length ? `; ${res.ambiguous.length} ambiguous` : '') +
       (res.skipped.length ? `; ${res.skipped.length} skipped` : '')
     setNote(msg)
+    // The counts behind the number, so a disappointing one is explicable
+    // without asking for another run.
+    setStadiumRun({
+      query: res.query, venues: res.venues, matched: res.matched,
+      missing: res.missing, ambiguous: res.ambiguous,
+    })
     dispatch({ type: 'log', line: { text: msg, kind: res.written ? 'good' : 'bad' } })
     // They are only art once the folder has been read again.
     if (state.artPath && save.roster) {
@@ -144,6 +154,29 @@ export default function ArtFolder() {
               {Object.keys(save.schoolArt).filter((k) => k.endsWith('|stadium')).length} IN THE FOLDER
             </Meta>
           </div>
+          {stadiumRun ? (
+            <div style={{ marginTop: 10 }}>
+              <Meta size={9} color="var(--ink4)">
+                {stadiumRun.query.toUpperCase()} · {stadiumRun.venues.toLocaleString()} VENUES ·{' '}
+                {stadiumRun.matched} MATCHED YOUR SCHOOLS
+              </Meta>
+              {stadiumRun.ambiguous.length ? (
+                <p className="body-serif" style={{ marginTop: 7 }}>
+                  Two different grounds claim {stadiumRun.ambiguous.slice(0, 6).join(', ')}
+                  {stadiumRun.ambiguous.length > 6 ? ` and ${stadiumRun.ambiguous.length - 6} more` : ''},
+                  so none was taken — a wrong stadium you believe is worse than no stadium.
+                  Drop your own in for those.
+                </p>
+              ) : null}
+              {stadiumRun.missing.length ? (
+                <p className="body-serif" style={{ marginTop: 7 }}>
+                  No venue at all for {stadiumRun.missing.length} of your schools, including{' '}
+                  {stadiumRun.missing.slice(0, 6).join(', ')}. Those keep the drawn field.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <p className="body-serif" style={{ marginTop: 9 }}>
             Your own pictures work just as well: drop them in the art folder as
             <code> stadium_PennState.jpg</code> and DCC will use them. That is the same name the

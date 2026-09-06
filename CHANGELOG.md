@@ -10,6 +10,39 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.68.0] - 2026-09-06
+
+### Fixed
+
+- **The stadium fetch found nothing, because the query was a guess.** 0.66.0
+  asked Wikidata for teams in two leagues named by their item id —
+  `wd:Q5308823`, `wd:Q1194951` — and both were written from memory rather than
+  looked up. An item id recalled that way is a guess with no way of being nearly
+  right: it matches nothing and says nothing about why. It is the same mistake
+  as searching Commons for a school's name, one level further up the chain.
+
+  **No query names an item id any more.** They are built from properties, which
+  are few and stable — home venue, image, sport, occupant — and anything that
+  has to be identified is identified by its English label, which can be read
+  rather than recalled. There are three of them now, tried in order, and the
+  first asks only that a team have a home venue with a photograph and the word
+  "football" in its name. That is nearly every college programme and almost
+  nothing else, and it does not depend on Wikidata having classified the team at
+  all.
+
+- **A tie between two grounds is no longer broken.** "Miami" is the start of
+  both the Hurricanes' and the RedHawks' names, and the old code took whichever
+  came back first. A wrong stadium you believe is worse than no stadium, so a
+  school claimed by two different grounds is now reported and skipped.
+
+### Changed
+
+- **The fetch says what it saw.** Which query answered, how many venues came
+  back, how many matched your schools, which were ambiguous and which had no
+  venue at all — on the screen, after the run. "Wikidata returned no venues" was
+  everything the old one could tell you about a failure, which is what made the
+  first guess cost a whole release to find.
+
 ## [0.67.0] - 2026-09-06
 
 ### Fixed

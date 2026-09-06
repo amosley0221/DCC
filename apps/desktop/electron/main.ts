@@ -27,9 +27,9 @@ import { readRecruitLedger, writeRecruitLedger } from './sidecar'
 import { fileRecruiting, recruitingNews } from './recruitLedger'
 import type { RecruitEvent } from './recruitLedger'
 import {
-  VENUE_QUERY, commonsUrl, matchVenues, parseCredit, parseVenues, stadiumFileName, thumbFrom,
+  VENUE_QUERIES, commonsUrl, matchVenues, parseCredit, parseVenues, stadiumFileName, thumbFrom,
 } from './stadiums'
-import type { StadiumCredit } from './stadiums'
+import type { StadiumCredit, VenueRow } from './stadiums'
 import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
 import type { WeekGame } from './season'
@@ -607,15 +607,39 @@ ipcMain.handle('stadiums:fetch', async (
   const dir = join(faceRoot, 'stadiums')
   try {
     const ua = { 'User-Agent': `DCC/${app.getVersion()} (dynasty companion; personal use)` }
-    const res = await fetch(
-      `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(VENUE_QUERY)}`,
-      { headers: { ...ua, Accept: 'application/sparql-results+json' } },
-    )
-    if (!res.ok) return { ok: false as const, message: `Wikidata answered ${res.status}.` }
-    const rows = parseVenues(await res.json())
-    if (!rows.length) return { ok: false as const, message: 'Wikidata returned no venues.' }
 
-    const { hits, missing } = matchVenues(rows, schools)
+    // The queries are tried in order and the first that answers wins. The first
+    // version of this was one query naming two Wikidata item ids written from
+    // memory; it returned nothing, and "no venues" was all it could say about
+    // why. Every step now reports what it saw, so a failure names itself
+    // instead of needing another guess to find out.
+    const tried: { query: string; rows: number; error?: string }[] = []
+    let rows: VenueRow[] = []
+    let answered = ''
+    for (const q of VENUE_QUERIES) {
+      try {
+        const res = await fetch(
+          `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(q.sparql)}`,
+          { headers: { ...ua, Accept: 'application/sparql-results+json' } },
+        )
+        if (!res.ok) { tried.push({ query: q.name, rows: 0, error: `HTTP ${res.status}` }); continue }
+        const got = parseVenues(await res.json())
+        tried.push({ query: q.name, rows: got.length })
+        if (got.length) { rows = got; answered = q.name; break }
+      } catch (err) {
+        tried.push({ query: q.name, rows: 0, error: String((err as Error)?.message ?? err) })
+      }
+    }
+    if (!rows.length) {
+      return {
+        ok: false as const,
+        message: 'Wikidata answered nothing usable. ' +
+          tried.map((t) => `${t.query}: ${t.error ?? `${t.rows} rows`}`).join('; '),
+        tried,
+      }
+    }
+
+    const { hits, missing, ambiguous } = matchVenues(rows, schools)
     mkdirSync(dir, { recursive: true })
 
     const credits: StadiumCredit[] = []
@@ -647,7 +671,13 @@ ipcMain.handle('stadiums:fetch', async (
     // them. Most of Commons asks for the photographer's name; this is where it
     // is, rather than nowhere.
     writeFileSync(join(dir, 'credits.json'), JSON.stringify(credits, null, 2))
-    return { ok: true as const, written, missing, skipped, folder: dir }
+    return {
+      ok: true as const,
+      written, missing, skipped, ambiguous, folder: dir,
+      // What the run actually saw, so a disappointing number is explicable
+      // without another round trip.
+      query: answered, venues: rows.length, matched: hits.length, tried,
+    }
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }

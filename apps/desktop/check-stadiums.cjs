@@ -33,11 +33,31 @@ const sparql = {
 
 const rows = S.parseVenues(sparql)
 assert.equal(rows.length, 3, 'a venue with no image is not a venue DCC can use')
+
+/* ------------------------------------------------------------ the queries */
+// The first version of this named two Wikidata item ids written from memory and
+// returned nothing at all. An item id recalled rather than looked up is a guess
+// with no way of being nearly right, so none of these carry one: they are built
+// from properties, and anything that must be identified is identified by its
+// English label.
+assert.ok(S.VENUE_QUERIES.length >= 2, 'one query that might fail is not a plan')
+for (const q of S.VENUE_QUERIES) {
+  assert.ok(q.name && q.sparql, 'every query says what it is')
+  assert.ok(!/\bwd:Q\d+/.test(q.sparql), `${q.name} names a Wikidata item id: ${q.sparql}`)
+  assert.ok(/\?teamLabel/.test(q.sparql) && /\?image/.test(q.sparql),
+    `${q.name} must return the two fields the matcher needs`)
+}
 assert.deepEqual(rows[0], {
   team: 'Penn State Nittany Lions football',
   venue: 'Beaver Stadium',
   image: 'http://commons.wikimedia.org/wiki/Special:FilePath/Beaver%20Stadium.jpg',
 })
+// A venue with no English label is still the right photograph.
+assert.equal(
+  S.parseVenues({ results: { bindings: [
+    { teamLabel: { value: 'Nameless State football' }, image: { value: 'x.jpg' } },
+  ] } }).length, 1, 'a missing venue name does not lose the picture')
+
 assert.deepEqual(S.parseVenues({}), [], 'a response that is not one is not a venue list')
 assert.deepEqual(S.parseVenues(null), [])
 
@@ -49,17 +69,29 @@ assert.deepEqual(S.parseVenues(null), [])
     { name: 'Miami (OH)' },
     { name: 'Somewhere Tech' },
   ]
-  const { hits, missing } = S.matchVenues(rows, schools)
+  const { hits, missing, ambiguous } = S.matchVenues(rows, schools)
   const of = (n) => hits.find((h) => h.school === n)?.row.venue
 
   assert.equal(of('Penn State'), 'Beaver Stadium')
   // The one that matters: "Miami" prefixes "Miami (OH) RedHawks" too, and the
   // longest school name that fits has to win or the two swap grounds.
-  assert.equal(of('Miami'), 'Hard Rock Stadium')
   assert.equal(of('Miami (OH)'), 'Yager Stadium')
-  // Nothing matched is reported, never filled in with the nearest thing.
+  // And plain "Miami" prefixes BOTH at the same length, so there is no longest
+  // name to decide it. Guessing there is how you end up looking at the wrong
+  // stadium and believing it, so it is reported rather than picked.
+  assert.ok(ambiguous.includes('Miami'), 'a tie between two grounds is not broken')
+  assert.ok(!hits.some((h) => h.school === 'Miami'))
+  // Nothing matched at all is reported too, never filled in with the nearest.
   assert.deepEqual(missing, ['Somewhere Tech'])
   assert.ok(!hits.some((h) => h.school === 'Somewhere Tech'))
+
+  // One school, two rows, same photograph: not a tie, just a duplicate.
+  const dupe = S.matchVenues([
+    rows[0],
+    { team: 'Penn State Nittany Lions', venue: 'Beaver Stadium', image: rows[0].image },
+  ], [{ name: 'Penn State' }])
+  assert.equal(dupe.hits.length, 1, 'the same ground twice is still one ground')
+  assert.deepEqual(dupe.ambiguous, [])
 }
 
 /* ------------------------------------------------------ licences and thumbs */
@@ -113,4 +145,4 @@ assert.deepEqual(S.parseVenues(null), [])
   assert.ok(S.commonsUrl('File:Already.jpg').includes('titles=File%3AAlready.jpg'))
 }
 
-console.log('check-stadiums: the Wikidata join, the Miami problem, licences, thumbnails and file names')
+console.log('check-stadiums: no item ids in any query, the Miami tie, licences, thumbnails and file names')

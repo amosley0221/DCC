@@ -43,8 +43,14 @@ declare global {
       >
       /** Downloads a stadium photograph per school into the art folder. */
       fetchStadiums(schools: { name: string; fullName?: string | null }[]): Promise<
-        | { ok: true; written: number; missing: string[]; skipped: string[]; folder: string }
-        | { ok: false; message: string }
+        | {
+            ok: true; written: number; missing: string[]; skipped: string[]
+            ambiguous: string[]; folder: string
+            /** What the run saw, so a small number explains itself. */
+            query: string; venues: number; matched: number
+            tried: { query: string; rows: number; error?: string }[]
+          }
+        | { ok: false; message: string; tried?: { query: string; rows: number; error?: string }[] }
       >
       transfers(): Promise<TransferView>
       setTransferYear(year: number | null): Promise<{ ok: true }>
