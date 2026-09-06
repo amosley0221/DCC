@@ -10,6 +10,33 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.53.0] - 2026-09-06
+
+### Added
+
+- **The phone can change your save now.** Set a recruit's commitment stage from
+  the Board, queue it, and send it to the Windows app over Wi-Fi. Player
+  overalls go the same way.
+
+  The phone never touches the file. It says what it wants changed; the desktop's
+  own writer makes the change, with the same refusals it uses when you edit on
+  the PC — nothing outside the edited bits may move, the rebuilt save must read
+  back byte for byte, and a copy is kept first. A bad edit is refused on the PC
+  and comes back in the desktop's own words rather than being trusted on the
+  phone.
+
+  Nothing is marked done on a promise: an item only leaves the queue when the
+  desktop says it wrote it, and the snapshot is re-read straight after so the
+  screens show the save rather than what was asked for.
+
+  The queue says what it can do. Without a desktop address it says so. Items
+  raised against the sample dynasty name no row in a real save and stay on the
+  phone rather than being sent as nonsense.
+
+- **The relay accepts recruiting edits.** It handled games and players; the
+  recruiting writer added in 0.51.0 was not wired to it, so the phone could not
+  have used it even once it asked.
+
 ## [0.52.0] - 2026-09-06
 
 ### Added

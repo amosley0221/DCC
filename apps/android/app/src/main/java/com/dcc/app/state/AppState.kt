@@ -277,6 +277,72 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         bringIn("wifi") { accept(SnapshotFetch.overWifi(url, token)) }
     }
 
+    /**
+     * Sends every held edit that names a real row to the desktop.
+     *
+     * The phone cannot write a save and should not try: the writer that refuses
+     * unless an edit lands exactly on its own bits lives on the PC, and this
+     * asks it to do the work. Items raised against the sample dynasty carry no
+     * row and are left where they are rather than sent as nonsense.
+     *
+     * Nothing is marked done on a promise. An item only leaves HELD when the
+     * desktop says it wrote it, and the snapshot is re-read afterwards so the
+     * screens show the save rather than what was asked for.
+     */
+    fun sendQueue() {
+        val s = _state.value
+        if (s.relayUrl.isBlank() || s.relayToken.isBlank()) {
+            update { it.copy(log = it.log("no desktop address saved — fetch over Wi-Fi once first", "bad")) }
+            return
+        }
+        val sending = s.queue.filter { it.state == "HELD" && it.applyIndex != null && it.applyKind != "noop" }
+        if (sending.isEmpty()) {
+            update { it.copy(log = it.log("nothing queued that names a row in the save", "warn")) }
+            return
+        }
+
+        val players = sending.filter { it.applyKind == "ovr" && it.applyOvr != null }
+            .joinToString(",") { """{"index":${it.applyIndex},"overall":${it.applyOvr}}""" }
+        val recruits = sending.filter { it.applyKind == "stage" }.joinToString(",") { q ->
+            val parts = mutableListOf("\"playerIndex\":${q.applyIndex}")
+            q.applyStage?.let { parts += "\"stage\":\"$it\"" }
+            q.applyCommit?.let { parts += "\"commitScore\":$it" }
+            "{" + parts.joinToString(",") + "}"
+        }
+        val body = buildString {
+            append("{")
+            if (players.isNotEmpty()) append("\"players\":[").append(players).append("],\"playerCount\":")
+                .append(_snapshot.value?.snapshot?.meta?.playerCount ?: 0)
+                .append(",")
+            if (recruits.isNotEmpty()) append("\"recruits\":[").append(recruits).append("],")
+            if (endsWith(",")) setLength(length - 1)
+            append("}")
+        }
+
+        viewModelScope.launch {
+            _busy.value = "send"
+            val res = withContext(Dispatchers.IO) { SnapshotFetch.sendEdits(s.relayUrl, s.relayToken, body) }
+            when (res) {
+                is SnapshotFetch.Fetched.Ok -> {
+                    val ids = sending.map { it.id }.toSet()
+                    update { st ->
+                        st.copy(
+                            queue = st.queue.map { if (it.id in ids) it.copy(state = "APPLIED") else it },
+                            log = st.log(
+                                "the PC wrote ${sending.size} edit" + if (sending.size == 1) "" else "s",
+                                "good",
+                            ),
+                        )
+                    }
+                    refreshSnapshot()
+                }
+                is SnapshotFetch.Fetched.Failed ->
+                    update { it.copy(log = it.log("the PC refused: " + res.message, "bad")) }
+            }
+            _busy.value = null
+        }
+    }
+
     /** Reads the snapshot the desktop published, for when the phone is not at home. */
     fun fetchFromGitHub(repo: String, token: String) {
         update { it.copy(githubRepo = repo, githubToken = token) }
@@ -466,6 +532,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         applyKind: String = "noop",
         applyPlayerId: String? = null,
         applyOvr: Int? = null,
+        applyIndex: Int? = null,
+        applyCommit: Int? = null,
         applyProspectId: String? = null,
         applyStage: String? = null,
         applyTeamId: String? = null,
@@ -476,6 +544,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             id = nextId(), type = type, title = title, detail = detail,
             at = System.currentTimeMillis(), needsConfirm = needsConfirm,
             applyKind = applyKind, applyPlayerId = applyPlayerId, applyOvr = applyOvr,
+            applyIndex = applyIndex, applyCommit = applyCommit,
             applyProspectId = applyProspectId, applyStage = applyStage,
             applyTeamId = applyTeamId, applyPos = applyPos, applyOrder = applyOrder,
         )

@@ -39,6 +39,11 @@ private fun SnapshotRecruit.leaders(): List<String> {
 }
 
 /** The game's own words for how far along a recruitment is. */
+/** The stages, in the order a recruitment moves through them. */
+private val STAGE_ORDER = listOf(
+    "Top10", "Top5", "Top3", "Battle", "SoftCommitted", "HardCommitted", "Signed",
+)
+
 private val STAGE_LABEL = mapOf(
     "Top10" to "TOP 10", "Top5" to "TOP 5", "Top3" to "TOP 3", "Battle" to "BATTLE",
     "SoftCommitted" to "SOFT COMMIT", "HardCommitted" to "COMMITTED", "Signed" to "SIGNED",
@@ -131,9 +136,19 @@ fun RecruitSnapshotSection(vm: AppViewModel, state: Persisted, view: SnapshotVie
                     expanded == r.index,
                     state.revealAllRecruits || r.playerId in revealed,
                     onScout = { vm.toggleRecruitReveal(r.playerId) },
-                ) {
-                    expanded = if (expanded == r.index) null else r.index
-                }
+                    onToggle = { expanded = if (expanded == r.index) null else r.index },
+                    onStage = { stage ->
+                        vm.enqueue(
+                            type = "RECRUIT",
+                            title = r.name,
+                            detail = "commitment stage to ${STAGE_LABEL[stage] ?: stage}",
+                            applyKind = "stage",
+                            applyProspectId = r.playerId.toString(),
+                            applyStage = stage,
+                            applyIndex = r.index,
+                        )
+                    },
+                )
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
@@ -147,6 +162,7 @@ private fun RecruitRow(
     revealed: Boolean,
     onScout: () -> Unit,
     onToggle: () -> Unit,
+    onStage: (String) -> Unit,
 ) {
     val c = Dcc.colors
     DccCard(onClick = onToggle) {
@@ -245,6 +261,21 @@ private fun RecruitRow(
                         NumText("${s.interest}", c.ink3, 10)
                     }
                 }
+            }
+            // Changing a recruitment is a save write, and the phone does not do
+            // those — it queues the ask and the Windows app makes the change.
+            if (r.stage != null) {
+                Spacer(Modifier.height(11.dp))
+                MonoLabel("COMMITMENT STAGE", c.ink3, 9)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    STAGE_ORDER.forEach { stage ->
+                        DccChip(STAGE_LABEL[stage] ?: stage, stage == r.stage) { onStage(stage) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                }
+                Spacer(Modifier.height(5.dp))
+                MetaText("QUEUES A WRITE FOR THE WINDOWS APP — NOTHING CHANGES ON THE PHONE", c.ink4, 9)
             }
             if (revealed) {
                 Spacer(Modifier.height(11.dp))

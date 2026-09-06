@@ -18,8 +18,8 @@ import { createReadStream } from 'node:fs'
 import { readSavePayload } from './saveAnalysis'
 import { buildSnapshot } from './snapshot'
 import { readPack, snapshotExtras } from './sidecar'
-import { writeGameEdits, writePlayerEdits } from './saveWrite'
-import type { GameEdit, PlayerEdit } from './saveWrite'
+import { writeGameEdits, writePlayerEdits, writeRecruitEdits } from './saveWrite'
+import type { GameEdit, PlayerEdit, RecruitEdit } from './saveWrite'
 
 export const DEFAULT_PORT = 7327
 
@@ -138,7 +138,7 @@ function handle(ctx: RelayContext, req: IncomingMessage, res: ServerResponse) {
     void (async () => {
       try {
         const body = JSON.parse(await readBody(req)) as {
-          games?: GameEdit[]; players?: PlayerEdit[]; playerCount?: number
+          games?: GameEdit[]; players?: PlayerEdit[]; recruits?: RecruitEdit[]; playerCount?: number
         }
         const results: unknown[] = []
         if (body.games?.length) results.push(writeGameEdits(path, body.games))
@@ -146,6 +146,9 @@ function handle(ctx: RelayContext, req: IncomingMessage, res: ServerResponse) {
           if (!body.playerCount) { send(400, { ok: false, message: 'playerCount is required with player edits' }); return }
           results.push(writePlayerEdits(path, body.players, body.playerCount))
         }
+        // Recruiting edits go through the same writer the desktop uses, so the
+        // phone gets the same refusals rather than a looser path of its own.
+        if (body.recruits?.length) results.push(writeRecruitEdits(path, body.recruits))
         if (!results.length) { send(400, { ok: false, message: 'nothing to change' }); return }
         ctx.onWrite?.()
         send(200, { ok: results.every((r) => (r as { ok: boolean }).ok), results })

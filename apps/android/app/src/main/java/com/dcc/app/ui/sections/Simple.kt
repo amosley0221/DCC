@@ -242,13 +242,41 @@ fun QueueSection(vm: AppViewModel, state: Persisted) {
     val held = state.queue.count { it.state == "HELD" }
 
     Column(Modifier.fillMaxSize()) {
+        val sendable = state.queue.count { it.state == "HELD" && it.applyIndex != null && it.applyKind != "noop" }
+        val linked = state.relayUrl.isNotBlank() && state.relayToken.isNotBlank()
+
         SectionHeader(
             title = "Queue",
             sub = {
-                // No agent exists yet, so nothing can actually drain this queue.
-                MetaText("NO PC AGENT CONNECTED — NOTHING CAN BE APPLIED YET", c.warn)
+                MetaText(
+                    when {
+                        !linked -> "NO DESKTOP ADDRESS — FETCH OVER WI-FI ONCE AND THIS CAN SEND"
+                        sendable > 0 -> "$sendable READY TO SEND TO THE PC"
+                        held > 0 -> "NOTHING HERE NAMES A ROW IN YOUR SAVE"
+                        else -> "NOTHING WAITING"
+                    },
+                    if (sendable > 0) c.good else c.warn,
+                )
             },
         )
+
+        if (linked && sendable > 0) {
+            DccCard {
+                BodySerif(
+                    "The phone never writes your save. These go to the Windows app, which " +
+                        "makes the change with the same writer — and the same refusals — it " +
+                        "uses when you edit there, and keeps a copy of the save first.",
+                )
+                Spacer(Modifier.height(9.dp))
+                DccButton(
+                    "Send $sendable to the PC",
+                    Modifier.fillMaxWidth(),
+                    BtnStyle.PRIMARY,
+                    enabled = vm.busy.collectAsState().value == null,
+                ) { vm.sendQueue() }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
 
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.queue.isEmpty()) item {

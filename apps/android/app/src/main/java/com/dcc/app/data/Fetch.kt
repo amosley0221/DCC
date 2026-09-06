@@ -104,6 +104,38 @@ object SnapshotFetch {
     // ── from GitHub ──────────────────────────────────────────────────────────
 
     /**
+     * Sends queued edits to the desktop, which is the only thing allowed to
+     * write a save.
+     *
+     * The phone never touches the file. It says what it wants changed and the
+     * desktop's own writer decides — the same writer, with the same refusals,
+     * that the Windows app uses when you edit there. So a bad edit is refused on
+     * the PC rather than trusted here, and the answer comes back as the
+     * desktop's own words.
+     */
+    suspend fun sendEdits(base: String, token: String, body: String): Fetched =
+        withContext(Dispatchers.IO) {
+            val root = baseUrl(base) ?: return@withContext Fetched.Failed(
+                "that does not look like an address — it should read like http://192.168.1.42:7327",
+            )
+            try {
+                val conn = open("$root/edits", "application/json")
+                conn.requestMethod = "POST"
+                conn.doOutput = true
+                conn.setRequestProperty("authorization", "Bearer $token")
+                conn.setRequestProperty("content-type", "application/json")
+                conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                val code = conn.responseCode
+                val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                    ?.bufferedReader()?.use { it.readText() } ?: ""
+                if (code in 200..299) Fetched.Ok(text)
+                else Fetched.Failed(explained(conn, code).ifBlank { "the PC answered $code" })
+            } catch (e: IOException) {
+                Fetched.Failed(e.message ?: "the PC could not be reached")
+            }
+        }
+
+    /**
      * Reads the snapshot the desktop published. The token is the user's own and
      * needs repo access to that one repository, which is usually private.
      */

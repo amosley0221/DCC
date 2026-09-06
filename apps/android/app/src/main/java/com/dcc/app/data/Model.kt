@@ -190,6 +190,14 @@ data class QueueItem(
     @SerialName("applyKind") val applyKind: String = "noop",
     val applyPlayerId: String? = null,
     val applyOvr: Int? = null,
+    /**
+     * The row this edit names in the save itself, which is the only thing the
+     * desktop can act on. Null on an item raised against the sample dynasty, and
+     * those stay on the phone.
+     */
+    val applyIndex: Int? = null,
+    /** 0..1023, for a recruiting edit. */
+    val applyCommit: Int? = null,
     val applyProspectId: String? = null,
     val applyStage: String? = null,
     val applyTeamId: String? = null,
