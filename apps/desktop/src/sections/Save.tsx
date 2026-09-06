@@ -403,7 +403,10 @@ export default function Save() {
       <div className="col" style={{ gap: 12, maxWidth: 860 }}>
         <ArtFolder />
 
-        {save.roster ? <Found roster={save.roster} me={myTeam} path={path} /> : null}
+        {save.roster ? (
+          <Found roster={save.roster} me={myTeam} path={path}
+            onApplied={() => { if (path) void readRoster(path) }} />
+        ) : null}
         {report?.stores?.length ? <Stores stores={report.stores} path={path} /> : null}
 
         <Card className="card-pad">
@@ -916,8 +919,9 @@ function Stores({ stores, path }: {
  * match the game's is a column that means something else, and the only way to
  * tell is to look at the top of it beside the real thing.
  */
-function Found({ roster, me, path }: {
+function Found({ roster, me, path, onApplied }: {
   roster: NonNullable<SaveState['roster']>; me: string | null; path: string | null
+  onApplied: () => void
 }) {
   const columns = roster.rankColumns ?? []
   const all = roster.heisman ?? []
@@ -939,7 +943,7 @@ function Found({ roster, me, path }: {
         rejects a plain counter, which is a perfect ordering by accident.
       </p>
 
-      <PollFinder me={me} path={path} />
+      <PollFinder me={me} path={path} onApplied={onApplied} />
 
       {columns.length === 0 ? (
         <Meta size={9} color="var(--warn)">NOTHING FOUND BY SHAPE ALONE — POINT AT A RANK INSTEAD</Meta>
@@ -1032,10 +1036,15 @@ function Found({ roster, me, path }: {
  * team holds its own row number, is the poll. Name a second school and it is
  * beyond argument.
  */
-function PollFinder({ me, path }: { me: string | null; path: string | null }) {
-  const [rank, setRank] = useState('')
-  const [other, setOther] = useState('')
-  const [otherRank, setOtherRank] = useState('')
+function PollFinder({ me, path, onApplied }: {
+  me: string | null; path: string | null; onApplied: () => void
+}) {
+  // Kept in the browser's own storage: leaving this screen used to throw the
+  // search away, and a screen that forgets what you just typed reads as one
+  // that forgot what you just chose.
+  const [rank, setRank] = useState(() => localStorage.getItem('dcc.poll.rank') ?? '')
+  const [other, setOther] = useState(() => localStorage.getItem('dcc.poll.other') ?? '')
+  const [otherRank, setOtherRank] = useState(() => localStorage.getItem('dcc.poll.otherRank') ?? '')
   const [found, setFound] = useState<PollCandidate[] | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -1044,6 +1053,13 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
   const [rankFields, setRankFields] = useState<string[]>([])
 
   useEffect(() => { void window.dcc.savedPolls().then((r) => setSaved(r.polls)) }, [])
+
+  // Coming back to the screen picks up where it was left, rather than showing
+  // an empty box beside polls that are already kept.
+  useEffect(() => {
+    if (path && me && rank.trim() && !found) void look()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, me])
 
   // What the game's own schema says a team carries, so the number of orderings
   // a search turns up can be recognised rather than wondered at.
@@ -1056,6 +1072,9 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
   const look = async () => {
     if (!path || !me || !rank.trim()) return
     setBusy(true); setNote(null); setFound(null)
+    localStorage.setItem('dcc.poll.rank', rank)
+    localStorage.setItem('dcc.poll.other', other)
+    localStorage.setItem('dcc.poll.otherRank', otherRank)
     const known = [{ team: me, rank: Number(rank) }]
     if (other.trim() && otherRank.trim()) known.push({ team: other.trim(), rank: Number(otherRank) })
     const res = await window.dcc.findPoll(path, known)
@@ -1070,7 +1089,11 @@ function PollFinder({ me, path }: { me: string | null; path: string | null }) {
   const use = async (c: PollCandidate, name: string) => {
     const res = await window.dcc.usePoll({ name, at: c.at, width: c.width, base: c.base })
     setSaved(res.polls)
-    setNote(`${name} remembered — read the roster again and it appears in League`)
+    // Applied here rather than asking for a step that does not exist: there is
+    // no "read the roster" button once the roster has been read, and telling
+    // someone to press one is how a working setting looked like a lost one.
+    onApplied()
+    setNote(`${name} kept — it is in League now`)
   }
 
   const forget = async (name: string) => {

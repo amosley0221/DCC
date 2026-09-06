@@ -10,6 +10,28 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.49.1] - 2026-09-06
+
+### Fixed
+
+- **A ranking you chose was gone by the next screen.** Not lost on restart —
+  lost on the next keystroke anywhere in the app. The renderer saves its whole
+  state to the settings file whenever anything changes, and it wrote *over* the
+  file rather than into it, so the keys the main process keeps there — the polls
+  found in your save above all — were wiped by an unrelated click.
+
+  Settings are merged now, and the smoke test writes one key from each side and
+  fails if either disappears. It fails on the old code, which is the only way to
+  know a test for this is worth having.
+
+- **"Read the roster again" asked for a button that does not exist.** Once the
+  roster is read there is nothing to press. Choosing a poll now applies it on
+  the spot: the save is re-read and it is in League immediately.
+
+- **The finder started over every time you left the screen.** The ranks you
+  typed are remembered, and the search runs itself when you come back, rather
+  than showing an empty box beside polls that are already kept.
+
 ## [0.49.0] - 2026-09-06
 
 ### Added

@@ -207,8 +207,17 @@ ipcMain.handle('app:info', () => ({
 }))
 ipcMain.handle('app:dynasty', () => loadDynasty())
 ipcMain.handle('settings:get', () => readSettings())
+/**
+ * The renderer's settings, merged rather than written over the top.
+ *
+ * The renderer sends its whole state on every change, and it does not know
+ * about the keys the main process keeps — the polls found in the save, above
+ * all. Replacing the file wiped them, which is why a ranking chosen on one
+ * screen was gone by the next: not lost on restart, lost on the next keystroke
+ * anywhere in the app.
+ */
 ipcMain.handle('settings:set', (_e, next: Record<string, unknown>) => {
-  writeSettings(next)
+  writeSettings({ ...readSettings(), ...next })
   return true
 })
 ipcMain.handle('app:openExternal', (_e, url: string) => shell.openExternal(url))

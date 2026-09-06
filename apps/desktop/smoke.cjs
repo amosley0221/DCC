@@ -288,6 +288,29 @@ app.whenReady().then(async () => {
   console.log('LEAGUE TAB: ' + (leagueIsLeague ?? 'is the league, not the roster'))
   if (leagueIsLeague) { console.log('SMOKE FAIL: ' + leagueIsLeague); app.exit(1); return }
 
+  // Settings are written by the renderer as its whole state, and the main
+  // process keeps keys of its own in the same file — the polls found in a save
+  // above all. Replacing the file wiped them on the next keystroke anywhere in
+  // the app, which read as a setting that would not save. Write one of each and
+  // check both survive.
+  const settingsMerge = await (async () => {
+    const before = await win.webContents.executeJavaScript(`(async () => {
+      await window.dcc.usePoll({ name: 'SMOKE', at: 123, width: 8, base: 1 })
+      await window.dcc.setSettings({ smokeRendererKey: 'yes' })
+      const polls = await window.dcc.savedPolls()
+      const all = await window.dcc.getSettings()
+      return { polls: polls.polls, rendererKey: all.smokeRendererKey }
+    })()`)
+    if (before.rendererKey !== 'yes') return 'the renderer key was not written'
+    if (!before.polls.some((p) => p.name === 'SMOKE')) {
+      return 'a poll kept by the main process was wiped by the renderer writing settings'
+    }
+    await win.webContents.executeJavaScript(`window.dcc.forgetPoll('SMOKE')`)
+    return null
+  })()
+  console.log('SETTINGS MERGE: ' + (settingsMerge ?? 'main-process keys survive a renderer write'))
+  if (settingsMerge) { console.log('SMOKE FAIL: ' + settingsMerge); app.exit(1); return }
+
   console.log('NAV: ' + r.nav.join(' · '))
   console.log('SECTIONS:')
   visited.forEach((v) => console.log('  ' + v))
