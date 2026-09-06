@@ -5,7 +5,7 @@ import type {
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { SchemaMember } from '../electron/schema'
-import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
+import type { GameEdit, PlayerEdit, PlayerWriteResult, RecruitEdit, RecruitWriteResult, WriteResult } from '../electron/saveWrite'
 import type { PressRequest, PressStory } from '../electron/press'
 import type { RelayState } from '../electron/relay'
 import type { TamperThreadView, TransferView } from '../electron/preload'
@@ -71,6 +71,7 @@ declare global {
       }>
       writeGames(path: string, edits: GameEdit[]): Promise<WriteResult>
       writePlayers(path: string, edits: PlayerEdit[], playerCount: number): Promise<PlayerWriteResult>
+      writeRecruits(path: string, edits: RecruitEdit[]): Promise<RecruitWriteResult>
       publishSnapshot(path: string, teamId: number | null, repo: string): Promise<
         { ok: boolean; message: string; assetUrl?: string; bytes?: number }
       >

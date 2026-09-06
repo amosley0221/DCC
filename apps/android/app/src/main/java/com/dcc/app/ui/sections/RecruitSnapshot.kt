@@ -191,6 +191,33 @@ private fun RecruitRow(
                     ).joinToString("  ·  "),
                 )
             }
+            // Who is recruiting him, and how hard. The interest number means
+            // nothing alone — what matters is who leads and by how much — so it
+            // reads against the leader rather than as a bare figure.
+            if (r.topSchools.isNotEmpty()) {
+                Spacer(Modifier.height(11.dp))
+                MonoLabel("WHO IS RECRUITING HIM", c.ink3, 9)
+                Spacer(Modifier.height(6.dp))
+                val top = r.topSchools.maxOf { it.interest }.coerceAtLeast(1)
+                r.topSchools.forEach { s ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SchoolBadge(s.school.take(2).uppercase(), s.school, isUser = false, size = 14.dp)
+                        Spacer(Modifier.width(7.dp))
+                        MetaText(s.school, c.ink2, 10, Modifier.weight(1f), maxLines = 1)
+                        Box(Modifier.width(70.dp)) {
+                            DccTrack(
+                                (s.interest * 100 / top).coerceIn(0, 100),
+                                color = if (s.interest == top) c.accent else c.ink4,
+                            )
+                        }
+                        Spacer(Modifier.width(7.dp))
+                        NumText("${s.interest}", c.ink3, 10)
+                    }
+                }
+            }
             if (revealed) {
                 Spacer(Modifier.height(11.dp))
                 // Recruit ratings only arrived with a later desktop build, so an

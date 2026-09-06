@@ -65,7 +65,6 @@ __export(saveAnalysis_exports, {
   RECORD_BASE: () => RECORD_BASE,
   RECORD_STRIDE: () => RECORD_STRIDE,
   RECRUIT_BIT: () => RECRUIT_BIT,
-  RECRUIT_STAGES: () => RECRUIT_STAGES,
   REDSHIRT_BIT: () => REDSHIRT_BIT,
   SEASON_GAME_ROW: () => SEASON_GAME_ROW,
   STARS_BIT: () => STARS_BIT,
@@ -99,12 +98,180 @@ __export(saveAnalysis_exports, {
   seasonGameTable: () => seasonGameTable,
   storeTable: () => storeTable,
   teamTableOrder: () => teamTableOrder,
+  topSchools: () => topSchools,
   zstdSupported: () => zstdSupported
 });
 module.exports = __toCommonJS(saveAnalysis_exports);
 var import_node_crypto = require("node:crypto");
 var import_node_zlib = require("node:zlib");
 var zlib = __toESM(require("node:zlib"), 1);
+
+// electron/teamIds.ts
+var TEAM_ID_NAMES = [
+  "Air Force",
+  "Akron",
+  "Alabama",
+  "Arizona",
+  "Arizona State",
+  "Arkansas",
+  "Arkansas State",
+  "Army",
+  "Auburn",
+  "Ball State",
+  "Baylor",
+  "Boise State",
+  "Boston College",
+  "Bowling Green",
+  "Buffalo",
+  "BYU",
+  "California",
+  "UCF",
+  "C. Michigan",
+  "Cincinnati",
+  "Clemson",
+  "Colorado",
+  "Colorado State",
+  "Duke",
+  "East Carolina",
+  "E. Michigan",
+  "Florida",
+  "Florida State",
+  "Fresno State",
+  "Georgia",
+  "Georgia Tech",
+  "Hawai'i",
+  "Houston",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Iowa State",
+  "Kansas",
+  "Kansas State",
+  "Kent State",
+  "Kentucky",
+  "Louisiana Tech",
+  "Louisville",
+  "LSU",
+  "Marshall",
+  "Maryland",
+  "Memphis",
+  "Miami",
+  "Miami (OH)",
+  "Michigan",
+  "Michigan State",
+  "MTSU",
+  "Minnesota",
+  "Mississippi St",
+  "Missouri",
+  "Navy",
+  "Nebraska",
+  "Nevada",
+  "New Mexico",
+  "New Mexico St.",
+  "North Carolina",
+  "NC State",
+  "North Texas",
+  "UL Monroe",
+  "NIU",
+  "Northwestern",
+  "Notre Dame",
+  "Ohio",
+  "Ohio State",
+  "Oklahoma",
+  "Oklahoma State",
+  "Ole Miss",
+  "Oregon",
+  "Oregon State",
+  "Penn State",
+  "Pittsburgh",
+  "Purdue",
+  "Rice",
+  "Rutgers",
+  "San Diego St.",
+  "San Jose State",
+  "SMU",
+  "South Carolina",
+  "Southern Miss",
+  "Louisiana",
+  "Stanford",
+  "Syracuse",
+  "TCU",
+  "Temple",
+  "Tennessee",
+  "Texas",
+  "Texas A&M",
+  "Texas Tech",
+  "Toledo",
+  "Tulane",
+  "Tulsa",
+  "UAB",
+  "UCLA",
+  "UConn",
+  "UNLV",
+  "USC",
+  "Utah",
+  "Utah State",
+  "UTEP",
+  "Vanderbilt",
+  "Virginia",
+  "Virginia Tech",
+  "Wake Forest",
+  "Washington",
+  "Washington St.",
+  "West Virginia",
+  "W. Michigan",
+  "Wisconsin",
+  "Wyoming",
+  "FLA Atlantic",
+  "FIU",
+  "Georgia State",
+  "UTSA",
+  "Old Dominion",
+  "UMass",
+  "South Alabama",
+  "USF",
+  "Troy",
+  "W. Kentucky",
+  "Texas State",
+  "App St.",
+  "Charlotte",
+  "C. Carolina",
+  "Ga Southern",
+  "Jax State",
+  "James Madison",
+  "Liberty",
+  "Sam Houston",
+  "Kennesaw St.",
+  "Delaware",
+  "Missouri State",
+  "NDSU",
+  "Sac State"
+];
+
+// electron/recruiting.ts
+var RECRUIT_STAGES = [
+  "Top10",
+  "Top5",
+  "Top3",
+  "Battle",
+  "SoftCommitted",
+  "HardCommitted",
+  "Signed"
+];
+var PLAYER_TAG = 8510;
+var RECRUIT_STRIDE = 24;
+var RECRUIT_PLAYER_AT = 8;
+var RECRUIT_FIELDS = {
+  stage: [96, 4],
+  nationalRank: [100, 13],
+  positionRank: [136, 12],
+  stateRank: [148, 12],
+  totalOffers: [176, 6],
+  commitScore: [182, 10]
+};
+var TOP_SCHOOLS_PER_RECRUIT = 10;
+
+// electron/saveAnalysis.ts
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
 
@@ -1544,26 +1711,6 @@ function findRankColumns(payload, known, limit = 12) {
   }
   return out;
 }
-var RECRUIT_STAGES = [
-  "Top10",
-  "Top5",
-  "Top3",
-  "Battle",
-  "SoftCommitted",
-  "HardCommitted",
-  "Signed"
-];
-var PLAYER_TAG = 8510;
-var RECRUIT_STRIDE = 24;
-var RECRUIT_PLAYER_AT = 8;
-var RECRUIT_FIELDS = {
-  stage: [96, 4],
-  nationalRank: [100, 13],
-  positionRank: [136, 12],
-  stateRank: [148, 12],
-  totalOffers: [176, 6],
-  commitScore: [182, 10]
-};
 function bitsFrom(payload, base, start, w) {
   const b = base + (start >> 3);
   if (b + 4 > payload.length) return 0;
@@ -1601,15 +1748,33 @@ function readRecruitBoard(payload, players) {
     }
     miss = 0;
     const f = (k) => bitsFrom(payload, o, RECRUIT_FIELDS[k][0], RECRUIT_FIELDS[k][1]);
+    const nationalRank = f("nationalRank");
     out.push({
+      at: o,
       playerIndex: payload.readUInt16BE(o + RECRUIT_PLAYER_AT + 2),
-      nationalRank: f("nationalRank"),
+      topSchools: topSchools(payload, nationalRank),
+      nationalRank,
       positionRank: f("positionRank"),
       stateRank: f("stateRank"),
       commitScore: f("commitScore"),
       totalOffers: f("totalOffers"),
       stage: RECRUIT_STAGES[f("stage")] ?? "Top10"
     });
+  }
+  return out;
+}
+function topSchools(payload, nationalRank) {
+  const t = storeTable(payload, "HighSchoolProspectTopSchoolsStore");
+  if (!t || t.rowBytes !== 4 || nationalRank < 1) return [];
+  const start = (nationalRank - 1) * TOP_SCHOOLS_PER_RECRUIT + 1;
+  if (start + TOP_SCHOOLS_PER_RECRUIT > t.rows) return [];
+  const out = [];
+  for (let k = 0; k < TOP_SCHOOLS_PER_RECRUIT; k++) {
+    const o = t.data + (start + k) * 4;
+    if (o + 4 > payload.length) break;
+    const school = TEAM_ID_NAMES[payload.readUInt16BE(o)];
+    if (!school) continue;
+    out.push({ school, interest: payload.readUInt16BE(o + 2) });
   }
   return out;
 }
@@ -1650,7 +1815,6 @@ function readRecruitBoard(payload, players) {
   RECORD_BASE,
   RECORD_STRIDE,
   RECRUIT_BIT,
-  RECRUIT_STAGES,
   REDSHIRT_BIT,
   SEASON_GAME_ROW,
   STARS_BIT,
@@ -1684,5 +1848,6 @@ function readRecruitBoard(payload, players) {
   seasonGameTable,
   storeTable,
   teamTableOrder,
+  topSchools,
   zstdSupported
 });

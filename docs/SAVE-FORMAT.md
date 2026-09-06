@@ -1454,6 +1454,28 @@ and the rank comes from their own record — which is school interest, solved en
 to end. And the array is located by its contents rather than by an address, so
 it survives the array moving between saves.
 
+### School interest, joined to a name
+
+The interest table was decoded before the recruit record was, and until it was
+there was no way to say whose list any block belonged to. With the rank coming
+out of the recruit's own record the two join, and DCC shows a prospect's ten
+schools with the interest each has built — the same list, in the same order, as
+the game's own screen.
+
+### Writing it back
+
+Commit score, stage and a school's interest can be written. The record shares
+its twenty-four bytes with fields DCC has not named, so the writer refuses on
+three grounds rather than trusting the bit positions: no byte outside the edited
+bits may differ, the rebuilt file must inflate back byte for byte, and every
+field must read back as the value asked for — including the ranks and the offer
+count, which are never edits and whose moving would mean the write landed in the
+wrong place. A copy of the save is taken first.
+
+On a real save, changing one recruit's stage, commit score and one school's
+interest moves five bytes in thirty megabytes: three in his record and two in
+the interest table. No other recruit changes.
+
 ### What is not solved, and what was ruled out
 
 Of the schema's `Recruit` type, `QualityModifier` (gem and bust),

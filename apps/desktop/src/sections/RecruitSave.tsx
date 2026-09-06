@@ -3,12 +3,7 @@ import { indexArt, rosterPatch, useSave } from '../saveStore'
 import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SectionHeader, Tab } from '../ui'
 import { useOps, useStore } from '../store'
 import type { RecruitBoard, RosterPlayer } from '../../electron/saveAnalysis'
-
-/** The game's own words for how far along a recruitment is. */
-const STAGE_LABEL: Record<string, string> = {
-  Top10: 'Top 10', Top5: 'Top 5', Top3: 'Top 3', Battle: 'Battle',
-  SoftCommitted: 'Soft commit', HardCommitted: 'Committed', Signed: 'Signed',
-}
+import { COMMIT_MAX, INTEREST_MAX, RECRUIT_STAGES, STAGE_LABEL } from '../../electron/recruiting'
 
 /**
  * The recruiting pool, read from the save.
@@ -221,6 +216,7 @@ export default function RecruitSave() {
         {shown.slice(0, 300).map((p) => (
           <RecruitRow key={p.index} p={p} open={open === p.index}
             board={board.get(p.index) ?? null}
+            onSaved={() => void load()}
             ratingNames={save.roster!.ratingNames}
             face={save.facePaths[p.assetId]}
             shown={isShown(p)}
@@ -289,11 +285,11 @@ export default function RecruitSave() {
 }
 
 function RecruitRow(
-  { p, board, open, onClick, ratingNames, face, shown, onReveal }:
+  { p, board, open, onClick, ratingNames, face, shown, onReveal, onSaved }:
   {
     p: RosterPlayer; board: RecruitBoard | null
     open: boolean; onClick: () => void; ratingNames: string[]; face?: string
-    shown: boolean; onReveal: () => void
+    shown: boolean; onReveal: () => void; onSaved: () => void
   },
 ) {
   return (
@@ -354,6 +350,9 @@ function RecruitRow(
               </Chip>
             ))}
           </div>
+          {board?.topSchools.length ? (
+            <RecruitBoardPanel p={p} board={board} onSaved={onSaved} />
+          ) : null}
           {shown ? (
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
               {ratingNames.map((n) => {
@@ -376,6 +375,115 @@ function RecruitRow(
           ) : null}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The game's own board for one recruit: who is recruiting him, how hard, and
+ * how close he is to signing — with the three of those DCC can write back.
+ *
+ * The ten schools are the list. A school can be moved up or down it, but not
+ * added to it: the game decides who is on a recruit's list, and writing an
+ * eleventh would mean pushing one off, which is its business rather than DCC's.
+ */
+function RecruitBoardPanel(
+  { p, board, onSaved }: { p: RosterPlayer; board: RecruitBoard; onSaved: () => void },
+) {
+  const { save } = useSave()
+  const { dispatch } = useStore()
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [commit, setCommit] = useState<number | null>(null)
+  const [stage, setStage] = useState<string | null>(null)
+  const [interest, setInterest] = useState<Record<string, number>>({})
+
+  const top = Math.max(1, ...board.topSchools.map((s) => s.interest))
+  const dirty = (commit === null ? 0 : 1) + (stage === null ? 0 : 1) + Object.keys(interest).length
+
+  const write = async () => {
+    if (!save.path) return
+    setBusy(true)
+    const res = await window.dcc.writeRecruits(save.path, [{
+      playerIndex: p.index,
+      ...(commit === null ? {} : { commitScore: commit }),
+      ...(stage === null ? {} : { stage }),
+      ...(Object.keys(interest).length ? { interest } : {}),
+    }])
+    setBusy(false)
+    dispatch({ type: 'log', line: { text: res.message, kind: res.ok ? 'good' : 'bad' } })
+    if (res.ok) { setCommit(null); setStage(null); setInterest({}); setEditing(false); onSaved() }
+  }
+
+  return (
+    <div className="col" style={{ gap: 6, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+      <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+        <Meta size={9} color="var(--ink4)">WHO IS RECRUITING HIM</Meta>
+        <span style={{ marginLeft: 'auto' }}>
+          <Btn size="sm" onClick={() => setEditing(!editing)}>
+            {editing ? 'Done' : 'Change his recruitment'}
+          </Btn>
+        </span>
+      </div>
+
+      {/* Interest as a bar against the leader, because the raw number means
+          nothing on its own — what matters is who is ahead and by how far. */}
+      <div className="col" style={{ gap: 3 }}>
+        {board.topSchools.map((s) => {
+          const value = interest[s.school] ?? s.interest
+          return (
+            <div key={s.school} className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <span style={{ width: 150, fontSize: 12, color: 'var(--ink2)' }}>{s.school}</span>
+              <span style={{ flex: 1, height: 6, background: 'var(--rule)', borderRadius: 3 }}>
+                <span style={{
+                  display: 'block', height: '100%', borderRadius: 3,
+                  width: `${Math.round(100 * Math.min(1, value / top))}%`,
+                  background: value === top ? 'var(--accent)' : 'var(--ink4)',
+                }} />
+              </span>
+              {editing ? (
+                <span style={{ width: 74 }}>
+                  <Input value={String(value)} inputMode="numeric"
+                    onChange={(e) => setInterest({
+                      ...interest,
+                      [s.school]: Math.max(0, Math.min(INTEREST_MAX, Number(e.target.value.replace(/[^0-9]/g, '')) || 0)),
+                    })} />
+                </span>
+              ) : (
+                <span style={{ width: 54, textAlign: 'right', fontSize: 12, color: 'var(--ink3)' }}>{s.interest}</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {editing ? (
+        <div className="col" style={{ gap: 8, marginTop: 4 }}>
+          <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Meta size={9}>STAGE</Meta>
+            {RECRUIT_STAGES.map((n) => (
+              <Chip key={n} on={(stage ?? board.stage) === n} onClick={() => setStage(n)}>
+                {STAGE_LABEL[n] ?? n}
+              </Chip>
+            ))}
+          </div>
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <Meta size={9}>COMMITMENT 0–{COMMIT_MAX}</Meta>
+            <span style={{ width: 84 }}>
+              <Input value={String(commit ?? board.commitScore)} inputMode="numeric"
+                onChange={(e) => setCommit(
+                  Math.max(0, Math.min(COMMIT_MAX, Number(e.target.value.replace(/[^0-9]/g, '')) || 0)),
+                )} />
+            </span>
+            <Btn size="sm" variant="primary" disabled={busy || !dirty} onClick={() => void write()}>
+              {busy ? 'Writing…' : `Write ${dirty} change${dirty === 1 ? '' : 's'} to the save`}
+            </Btn>
+          </div>
+          <Meta size={9} color="var(--ink4)">
+            A COPY OF THE SAVE IS KEPT FIRST, AND THE WRITE IS REFUSED UNLESS NOTHING BUT THESE FIELDS MOVED
+          </Meta>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -24,21 +24,191 @@ __export(saveWrite_exports, {
   applyDepthEdits: () => applyDepthEdits,
   applyGameEdits: () => applyGameEdits,
   applyPlayerEdits: () => applyPlayerEdits,
+  applyRecruitEdits: () => applyRecruitEdits,
   backupPath: () => backupPath,
   checkEdits: () => checkEdits,
   checkPlayerEdits: () => checkPlayerEdits,
+  checkRecruitEdits: () => checkRecruitEdits,
   packContainer: () => packContainer,
   readContainer: () => readContainer,
   readGameConditions: () => readGameConditions,
   readPlayerNumbers: () => readPlayerNumbers,
   writeDepthEdits: () => writeDepthEdits,
   writeGameEdits: () => writeGameEdits,
-  writePlayerEdits: () => writePlayerEdits
+  writePlayerEdits: () => writePlayerEdits,
+  writeRecruitEdits: () => writeRecruitEdits
 });
 module.exports = __toCommonJS(saveWrite_exports);
 var import_node_fs = require("node:fs");
 var import_node_path = require("node:path");
 var import_node_zlib = require("node:zlib");
+
+// electron/teamIds.ts
+var TEAM_ID_NAMES = [
+  "Air Force",
+  "Akron",
+  "Alabama",
+  "Arizona",
+  "Arizona State",
+  "Arkansas",
+  "Arkansas State",
+  "Army",
+  "Auburn",
+  "Ball State",
+  "Baylor",
+  "Boise State",
+  "Boston College",
+  "Bowling Green",
+  "Buffalo",
+  "BYU",
+  "California",
+  "UCF",
+  "C. Michigan",
+  "Cincinnati",
+  "Clemson",
+  "Colorado",
+  "Colorado State",
+  "Duke",
+  "East Carolina",
+  "E. Michigan",
+  "Florida",
+  "Florida State",
+  "Fresno State",
+  "Georgia",
+  "Georgia Tech",
+  "Hawai'i",
+  "Houston",
+  "Illinois",
+  "Indiana",
+  "Iowa",
+  "Iowa State",
+  "Kansas",
+  "Kansas State",
+  "Kent State",
+  "Kentucky",
+  "Louisiana Tech",
+  "Louisville",
+  "LSU",
+  "Marshall",
+  "Maryland",
+  "Memphis",
+  "Miami",
+  "Miami (OH)",
+  "Michigan",
+  "Michigan State",
+  "MTSU",
+  "Minnesota",
+  "Mississippi St",
+  "Missouri",
+  "Navy",
+  "Nebraska",
+  "Nevada",
+  "New Mexico",
+  "New Mexico St.",
+  "North Carolina",
+  "NC State",
+  "North Texas",
+  "UL Monroe",
+  "NIU",
+  "Northwestern",
+  "Notre Dame",
+  "Ohio",
+  "Ohio State",
+  "Oklahoma",
+  "Oklahoma State",
+  "Ole Miss",
+  "Oregon",
+  "Oregon State",
+  "Penn State",
+  "Pittsburgh",
+  "Purdue",
+  "Rice",
+  "Rutgers",
+  "San Diego St.",
+  "San Jose State",
+  "SMU",
+  "South Carolina",
+  "Southern Miss",
+  "Louisiana",
+  "Stanford",
+  "Syracuse",
+  "TCU",
+  "Temple",
+  "Tennessee",
+  "Texas",
+  "Texas A&M",
+  "Texas Tech",
+  "Toledo",
+  "Tulane",
+  "Tulsa",
+  "UAB",
+  "UCLA",
+  "UConn",
+  "UNLV",
+  "USC",
+  "Utah",
+  "Utah State",
+  "UTEP",
+  "Vanderbilt",
+  "Virginia",
+  "Virginia Tech",
+  "Wake Forest",
+  "Washington",
+  "Washington St.",
+  "West Virginia",
+  "W. Michigan",
+  "Wisconsin",
+  "Wyoming",
+  "FLA Atlantic",
+  "FIU",
+  "Georgia State",
+  "UTSA",
+  "Old Dominion",
+  "UMass",
+  "South Alabama",
+  "USF",
+  "Troy",
+  "W. Kentucky",
+  "Texas State",
+  "App St.",
+  "Charlotte",
+  "C. Carolina",
+  "Ga Southern",
+  "Jax State",
+  "James Madison",
+  "Liberty",
+  "Sam Houston",
+  "Kennesaw St.",
+  "Delaware",
+  "Missouri State",
+  "NDSU",
+  "Sac State"
+];
+
+// electron/recruiting.ts
+var RECRUIT_STAGES = [
+  "Top10",
+  "Top5",
+  "Top3",
+  "Battle",
+  "SoftCommitted",
+  "HardCommitted",
+  "Signed"
+];
+var PLAYER_TAG = 8510;
+var RECRUIT_STRIDE = 24;
+var RECRUIT_PLAYER_AT = 8;
+var RECRUIT_FIELDS = {
+  stage: [96, 4],
+  nationalRank: [100, 13],
+  positionRank: [136, 12],
+  stateRank: [148, 12],
+  totalOffers: [176, 6],
+  commitScore: [182, 10]
+};
+var TOP_SCHOOLS_PER_RECRUIT = 10;
+var COMMIT_MAX = 1023;
+var INTEREST_MAX = 65535;
 
 // electron/positions.ts
 var POSITIONS = [
@@ -159,6 +329,7 @@ var POSITION_BIT = 1010;
 var OVERALL_BIT = 561;
 var TEAM_BIT = 431;
 var TEAM_WIDTH = 8;
+var TEAM_UNASSIGNED = 255;
 var RATING_BITS = {
   Speed: 849,
   Acceleration: 504,
@@ -418,6 +589,73 @@ function locateTable(payload, name) {
     rowBytes: payload.readUInt32BE(bsft + 12) * 4,
     memberBits
   };
+}
+function bitsFrom(payload, base, start, w) {
+  const b = base + (start >> 3);
+  if (b + 4 > payload.length) return 0;
+  const v = (payload[b] << 24 | payload[b + 1] << 16 | payload[b + 2] << 8 | payload[b + 3]) >>> 0;
+  return v >>> 32 - (start & 7) - w & (1 << w) - 1;
+}
+function readRecruitBoard(payload, players) {
+  const prospects = /* @__PURE__ */ new Set();
+  for (const p of players) if (p.recruitFlag && p.team === TEAM_UNASSIGNED) prospects.add(p.index);
+  if (prospects.size < 100) return [];
+  const points = (at) => at + 4 <= payload.length && payload.readUInt16BE(at) === PLAYER_TAG && prospects.has(payload.readUInt16BE(at + 2));
+  let anchor = -1;
+  for (let i = 0; i + RECRUIT_STRIDE * 8 <= payload.length; i += 4) {
+    if (!points(i)) continue;
+    let n = 1;
+    while (n < 8 && points(i + n * RECRUIT_STRIDE)) n++;
+    if (n === 8) {
+      anchor = i;
+      break;
+    }
+  }
+  if (anchor < 0) return [];
+  const GAP = 400;
+  let base = anchor - RECRUIT_PLAYER_AT;
+  for (let miss = 0; base - RECRUIT_STRIDE >= 0 && miss < GAP; ) {
+    base -= RECRUIT_STRIDE;
+    miss = points(base + RECRUIT_PLAYER_AT) ? 0 : miss + 1;
+  }
+  while (base < anchor && !points(base + RECRUIT_PLAYER_AT)) base += RECRUIT_STRIDE;
+  const out = [];
+  for (let o = base, miss = 0; o + RECRUIT_STRIDE <= payload.length && miss < GAP; o += RECRUIT_STRIDE) {
+    if (!points(o + RECRUIT_PLAYER_AT)) {
+      miss++;
+      continue;
+    }
+    miss = 0;
+    const f = (k) => bitsFrom(payload, o, RECRUIT_FIELDS[k][0], RECRUIT_FIELDS[k][1]);
+    const nationalRank = f("nationalRank");
+    out.push({
+      at: o,
+      playerIndex: payload.readUInt16BE(o + RECRUIT_PLAYER_AT + 2),
+      topSchools: topSchools(payload, nationalRank),
+      nationalRank,
+      positionRank: f("positionRank"),
+      stateRank: f("stateRank"),
+      commitScore: f("commitScore"),
+      totalOffers: f("totalOffers"),
+      stage: RECRUIT_STAGES[f("stage")] ?? "Top10"
+    });
+  }
+  return out;
+}
+function topSchools(payload, nationalRank) {
+  const t = storeTable(payload, "HighSchoolProspectTopSchoolsStore");
+  if (!t || t.rowBytes !== 4 || nationalRank < 1) return [];
+  const start = (nationalRank - 1) * TOP_SCHOOLS_PER_RECRUIT + 1;
+  if (start + TOP_SCHOOLS_PER_RECRUIT > t.rows) return [];
+  const out = [];
+  for (let k = 0; k < TOP_SCHOOLS_PER_RECRUIT; k++) {
+    const o = t.data + (start + k) * 4;
+    if (o + 4 > payload.length) break;
+    const school = TEAM_ID_NAMES[payload.readUInt16BE(o)];
+    if (!school) continue;
+    out.push({ school, interest: payload.readUInt16BE(o + 2) });
+  }
+  return out;
 }
 
 // electron/gameEnums.ts
@@ -840,20 +1078,165 @@ function writeDepthEdits(path, edits) {
   }
   return { ok: true, message: `reordered ${changed.length} slot${changed.length === 1 ? "" : "s"}`, backup, changed };
 }
+function checkRecruitEdits(edits, board) {
+  const out = [];
+  const byIndex = new Map(board.map((b) => [b.playerIndex, b]));
+  for (const e of edits) {
+    const rec = byIndex.get(e.playerIndex);
+    if (!rec) {
+      out.push({ row: e.playerIndex, field: "recruit", message: "this save has no recruiting record for them" });
+      continue;
+    }
+    if (e.commitScore !== void 0 && (!Number.isInteger(e.commitScore) || e.commitScore < 0 || e.commitScore > COMMIT_MAX)) {
+      out.push({ row: e.playerIndex, field: "commitScore", message: `must be a whole number from 0 to ${COMMIT_MAX}` });
+    }
+    if (e.stage !== void 0 && !RECRUIT_STAGES.includes(e.stage)) {
+      out.push({ row: e.playerIndex, field: "stage", message: `must be one of ${RECRUIT_STAGES.join(", ")}` });
+    }
+    for (const [school, v] of Object.entries(e.interest ?? {})) {
+      if (!rec.topSchools.some((t) => t.school === school)) {
+        out.push({ row: e.playerIndex, field: "interest", message: `${school} is not on their list` });
+      } else if (!Number.isInteger(v) || v < 0 || v > INTEREST_MAX) {
+        out.push({ row: e.playerIndex, field: "interest", message: `${school} must be from 0 to ${INTEREST_MAX}` });
+      }
+    }
+  }
+  return out;
+}
+var [RECRUIT_STAGE_BIT, RECRUIT_STAGE_WIDTH] = RECRUIT_FIELDS.stage;
+var [RECRUIT_COMMIT_BIT, RECRUIT_COMMIT_WIDTH] = RECRUIT_FIELDS.commitScore;
+function applyRecruitEdits(payload, edits, board) {
+  const next = Buffer.from(payload);
+  const touched = /* @__PURE__ */ new Set();
+  const byIndex = new Map(board.map((b) => [b.playerIndex, b]));
+  const schools = storeTable(payload, "HighSchoolProspectTopSchoolsStore");
+  for (const e of edits) {
+    const rec = byIndex.get(e.playerIndex);
+    if (!rec) continue;
+    const mark = (bit, width) => {
+      for (let b = bit; b < bit + width; b++) touched.add(rec.at + (b >> 3));
+    };
+    if (e.commitScore !== void 0) {
+      putBits(next, rec.at, RECRUIT_COMMIT_BIT, RECRUIT_COMMIT_WIDTH, e.commitScore);
+      mark(RECRUIT_COMMIT_BIT, RECRUIT_COMMIT_WIDTH);
+    }
+    if (e.stage !== void 0) {
+      putBits(
+        next,
+        rec.at,
+        RECRUIT_STAGE_BIT,
+        RECRUIT_STAGE_WIDTH,
+        RECRUIT_STAGES.indexOf(e.stage)
+      );
+      mark(RECRUIT_STAGE_BIT, RECRUIT_STAGE_WIDTH);
+    }
+    if (e.interest && schools && schools.rowBytes === 4) {
+      const start = (rec.nationalRank - 1) * TOP_SCHOOLS_PER_RECRUIT + 1;
+      for (const [school, v] of Object.entries(e.interest)) {
+        const k = rec.topSchools.findIndex((t) => t.school === school);
+        if (k < 0) continue;
+        const o = schools.data + (start + k) * 4 + 2;
+        next.writeUInt16BE(v, o);
+        touched.add(o);
+        touched.add(o + 1);
+      }
+    }
+  }
+  return { next, touched };
+}
+function writeRecruitEdits(path, edits) {
+  if (!edits.length) return { ok: false, message: "nothing to change" };
+  const file = (0, import_node_fs.readFileSync)(path);
+  const c = readContainer(file);
+  if (!c) return { ok: false, message: "this file is not a save DCC can read" };
+  const players = readRoster(c.payload);
+  const board = readRecruitBoard(c.payload, players);
+  if (!board.length) return { ok: false, message: "this save has no recruiting board DCC can find" };
+  const problems = checkRecruitEdits(edits, board);
+  if (problems.length) return { ok: false, message: problems.map((p) => `${p.field}: ${p.message}`).join("; ") };
+  const { next, touched } = applyRecruitEdits(c.payload, edits, board);
+  if (next.length !== c.payload.length) return { ok: false, message: "the edit changed the payload size" };
+  for (let i = 0; i < next.length; i++) {
+    if (next[i] !== c.payload[i] && !touched.has(i)) {
+      return { ok: false, message: `refusing to write: byte 0x${i.toString(16)} changed and should not have` };
+    }
+  }
+  const rebuilt = packContainer(c, next);
+  if (!rebuilt) return { ok: false, message: "the edited save does not compress small enough to fit its file" };
+  const check = readContainer(rebuilt);
+  if (!check || !check.payload.equals(next)) {
+    return { ok: false, message: "the rebuilt save did not read back identically; nothing was written" };
+  }
+  const after = new Map(readRecruitBoard(check.payload, readRoster(check.payload)).map((b) => [b.playerIndex, b]));
+  const before = new Map(board.map((b) => [b.playerIndex, b]));
+  const changed = [];
+  for (const e of edits) {
+    const was = before.get(e.playerIndex), now = after.get(e.playerIndex);
+    if (!was || !now) return { ok: false, message: `could not read recruit ${e.playerIndex} back` };
+    const note = (field, b, a) => {
+      if (String(b) !== String(a)) changed.push({ playerIndex: e.playerIndex, field, before: String(b), after: String(a) });
+    };
+    if (e.commitScore !== void 0) {
+      if (now.commitScore !== e.commitScore) {
+        return { ok: false, message: `recruit ${e.playerIndex}: commit score read back as ${now.commitScore}, not ${e.commitScore}; nothing was written` };
+      }
+      note("commitScore", was.commitScore, now.commitScore);
+    } else if (was.commitScore !== now.commitScore) {
+      return { ok: false, message: `recruit ${e.playerIndex}: commit score changed without being asked to; nothing was written` };
+    }
+    if (e.stage !== void 0) {
+      if (now.stage !== e.stage) {
+        return { ok: false, message: `recruit ${e.playerIndex}: stage read back as ${now.stage}, not ${e.stage}; nothing was written` };
+      }
+      note("stage", was.stage, now.stage);
+    } else if (was.stage !== now.stage) {
+      return { ok: false, message: `recruit ${e.playerIndex}: stage changed without being asked to; nothing was written` };
+    }
+    for (const [school, v] of Object.entries(e.interest ?? {})) {
+      const got = now.topSchools.find((t) => t.school === school)?.interest;
+      if (got !== v) {
+        return { ok: false, message: `recruit ${e.playerIndex}: ${school} read back as ${got}, not ${v}; nothing was written` };
+      }
+      note(`interest:${school}`, was.topSchools.find((t) => t.school === school)?.interest ?? 0, got);
+    }
+    for (const k of ["nationalRank", "positionRank", "stateRank", "totalOffers"]) {
+      if (was[k] !== now[k]) {
+        return { ok: false, message: `recruit ${e.playerIndex}: ${k} changed without being asked to; nothing was written` };
+      }
+    }
+  }
+  const backup = backupPath(path);
+  (0, import_node_fs.copyFileSync)(path, backup);
+  const tmp = (0, import_node_path.join)((0, import_node_path.dirname)(path), `.dcc-${Date.now()}.tmp`);
+  try {
+    (0, import_node_fs.writeFileSync)(tmp, rebuilt);
+    (0, import_node_fs.renameSync)(tmp, path);
+  } catch (err) {
+    try {
+      (0, import_node_fs.unlinkSync)(tmp);
+    } catch {
+    }
+    return { ok: false, message: `could not replace the save: ${String(err?.message ?? err)}` };
+  }
+  return { ok: true, message: `${changed.length} change${changed.length === 1 ? "" : "s"} written`, backup, changed };
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   KICKOFF_SLOTS,
   applyDepthEdits,
   applyGameEdits,
   applyPlayerEdits,
+  applyRecruitEdits,
   backupPath,
   checkEdits,
   checkPlayerEdits,
+  checkRecruitEdits,
   packContainer,
   readContainer,
   readGameConditions,
   readPlayerNumbers,
   writeDepthEdits,
   writeGameEdits,
-  writePlayerEdits
+  writePlayerEdits,
+  writeRecruitEdits
 });

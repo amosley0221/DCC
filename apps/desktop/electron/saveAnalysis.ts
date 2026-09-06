@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto'
 import { inflateSync, inflateRawSync, gunzipSync } from 'node:zlib'
 import * as zlib from 'node:zlib'
+import { TEAM_ID_NAMES } from './teamIds'
+import {
+  PLAYER_TAG, RECRUIT_FIELDS, RECRUIT_PLAYER_AT, RECRUIT_STAGES, RECRUIT_STRIDE,
+  TOP_SCHOOLS_PER_RECRUIT,
+} from './recruiting'
 
 // Node gained zstd in 22.15 but the bundled type definitions lag behind it, so
 // the function is reached through a narrow local signature.
@@ -2375,8 +2380,15 @@ export interface SavedPollView {
  * are.
  */
 export interface RecruitBoard {
+  /** Where the 24-byte record starts, so an edit can find it again. */
+  at: number
   /** The player this record belongs to, as a row in `readRoster`. */
   playerIndex: number
+  /**
+   * The ten schools recruiting them, strongest interest first, as the game
+   * shows them. Empty when the save has no block for that rank.
+   */
+  topSchools: { school: string; interest: number }[]
   nationalRank: number
   positionRank: number
   stateRank: number
@@ -2386,22 +2398,6 @@ export interface RecruitBoard {
   /** Top10 Top5 Top3 Battle SoftCommitted HardCommitted Signed */
   stage: string
 }
-
-export const RECRUIT_STAGES = [
-  'Top10', 'Top5', 'Top3', 'Battle', 'SoftCommitted', 'HardCommitted', 'Signed',
-] as const
-
-/** A player, where one record points at another. Read off the Heisman table. */
-const PLAYER_TAG = 0x213e
-
-const RECRUIT_STRIDE = 24
-/** Byte offset of the player reference inside the record. */
-const RECRUIT_PLAYER_AT = 8
-/** Bit positions inside the 24-byte record, first bit of each field. */
-const RECRUIT_FIELDS = {
-  stage: [96, 4], nationalRank: [100, 13], positionRank: [136, 12],
-  stateRank: [148, 12], totalOffers: [176, 6], commitScore: [182, 10],
-} as const
 
 /** Reads `w` bits starting at `start`, most-significant first. */
 function bitsFrom(payload: Buffer, base: number, start: number, w: number): number {
@@ -2475,15 +2471,48 @@ export function readRecruitBoard(
     miss = 0
     const f = (k: keyof typeof RECRUIT_FIELDS) =>
       bitsFrom(payload, o, RECRUIT_FIELDS[k][0], RECRUIT_FIELDS[k][1])
+    const nationalRank = f('nationalRank')
     out.push({
+      at: o,
       playerIndex: payload.readUInt16BE(o + RECRUIT_PLAYER_AT + 2),
-      nationalRank: f('nationalRank'),
+      topSchools: topSchools(payload, nationalRank),
+      nationalRank,
       positionRank: f('positionRank'),
       stateRank: f('stateRank'),
       commitScore: f('commitScore'),
       totalOffers: f('totalOffers'),
       stage: RECRUIT_STAGES[f('stage')] ?? 'Top10',
     })
+  }
+  return out
+}
+
+/**
+ * The ten schools on a recruit's list, with the interest each has built.
+ *
+ * `HighSchoolProspectTopSchoolsStore` is a flat table of four-byte rows — a
+ * 16-bit team id and a 16-bit influence, matching the schema's
+ * `ProspectTargetSchool` — grouped ten to a prospect and ordered by national
+ * rank, so a recruit's block starts at row `(rank - 1) * 10 + 1`. That was
+ * checked against the game's own class export: for all 4,100 recruits the ten
+ * schools and their ten influence values match, as a set, in the save's own
+ * order.
+ *
+ * The rank comes from the recruit's own record, which is what makes this usable
+ * — the block says which schools, and never which recruit.
+ */
+export function topSchools(payload: Buffer, nationalRank: number): { school: string; interest: number }[] {
+  const t = storeTable(payload, 'HighSchoolProspectTopSchoolsStore')
+  if (!t || t.rowBytes !== 4 || nationalRank < 1) return []
+  const start = (nationalRank - 1) * TOP_SCHOOLS_PER_RECRUIT + 1
+  if (start + TOP_SCHOOLS_PER_RECRUIT > t.rows) return []
+  const out: { school: string; interest: number }[] = []
+  for (let k = 0; k < TOP_SCHOOLS_PER_RECRUIT; k++) {
+    const o = t.data + (start + k) * 4
+    if (o + 4 > payload.length) break
+    const school = TEAM_ID_NAMES[payload.readUInt16BE(o)]
+    if (!school) continue
+    out.push({ school, interest: payload.readUInt16BE(o + 2) })
   }
   return out
 }

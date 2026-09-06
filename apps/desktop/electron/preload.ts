@@ -93,6 +93,8 @@ const api = {
     ipcRenderer.invoke('relay:state', ctx),
   writePlayers: (path: string, edits: unknown[], playerCount: number) =>
     ipcRenderer.invoke('save:writePlayers', { path, edits, playerCount }),
+  writeRecruits: (path: string, edits: unknown[]) =>
+    ipcRenderer.invoke('save:writeRecruits', { path, edits }),
   writePress: (req: unknown) => ipcRenderer.invoke('press:write', req),
   snapshot: (path: string, teamId: number | null) =>
     ipcRenderer.invoke('save:snapshot', { path, teamId }),

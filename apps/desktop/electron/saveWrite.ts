@@ -20,8 +20,12 @@ import { deflateSync, inflateSync } from 'node:zlib'
 import {
   DEPTH_REF_TAG, DEPTH_SLOT_BYTES, DEPTH_SLOT_FIELDS, DEPTH_SLOTS_PER_TEAM,
   GAME_BITS, NIL_BIT, OVERALL_BIT, RATING_BITS, RECORD_BASE, RECORD_STRIDE, REDSHIRT_BIT,
-  readDepthCharts, readRoster, seasonGameTable,
+  readDepthCharts, readRecruitBoard, readRoster, seasonGameTable, storeTable,
 } from './saveAnalysis'
+import {
+  COMMIT_MAX, INTEREST_MAX, RECRUIT_FIELDS, RECRUIT_STAGES, TOP_SCHOOLS_PER_RECRUIT,
+} from './recruiting'
+import type { RecruitBoard } from './saveAnalysis'
 import { WEATHER } from './gameEnums'
 
 /** Where the chunk record keeps the compressed length, and where the stream starts. */
@@ -599,4 +603,189 @@ export function writeDepthEdits(path: string, edits: DepthEdit[]): DepthWriteRes
     return { ok: false, message: `could not write the save: ${String((err as Error)?.message ?? err)}`, backup }
   }
   return { ok: true, message: `reordered ${changed.length} slot${changed.length === 1 ? '' : 's'}`, backup, changed }
+}
+
+/* ------------------------------------------------------ recruiting edits */
+
+export interface RecruitEdit {
+  /** The prospect, as a row in `readRoster`. */
+  playerIndex: number
+  /** 0..1023. How close they are to committing. */
+  commitScore?: number
+  /** One of RECRUIT_STAGES. */
+  stage?: string
+  /**
+   * School interest, by school name. Only schools already on the recruit's
+   * list can be set: the ten slots are the list, and adding an eleventh would
+   * mean moving a school off it, which the game does on its own terms.
+   */
+  interest?: Record<string, number>
+}
+
+export function checkRecruitEdits(edits: RecruitEdit[], board: RecruitBoard[]): EditProblem[] {
+  const out: EditProblem[] = []
+  const byIndex = new Map(board.map((b) => [b.playerIndex, b]))
+  for (const e of edits) {
+    const rec = byIndex.get(e.playerIndex)
+    if (!rec) {
+      out.push({ row: e.playerIndex, field: 'recruit', message: 'this save has no recruiting record for them' })
+      continue
+    }
+    if (e.commitScore !== undefined &&
+        (!Number.isInteger(e.commitScore) || e.commitScore < 0 || e.commitScore > COMMIT_MAX)) {
+      out.push({ row: e.playerIndex, field: 'commitScore', message: `must be a whole number from 0 to ${COMMIT_MAX}` })
+    }
+    if (e.stage !== undefined && !RECRUIT_STAGES.includes(e.stage as typeof RECRUIT_STAGES[number])) {
+      out.push({ row: e.playerIndex, field: 'stage', message: `must be one of ${RECRUIT_STAGES.join(', ')}` })
+    }
+    for (const [school, v] of Object.entries(e.interest ?? {})) {
+      if (!rec.topSchools.some((t) => t.school === school)) {
+        out.push({ row: e.playerIndex, field: 'interest', message: `${school} is not on their list` })
+      } else if (!Number.isInteger(v) || v < 0 || v > INTEREST_MAX) {
+        out.push({ row: e.playerIndex, field: 'interest', message: `${school} must be from 0 to ${INTEREST_MAX}` })
+      }
+    }
+  }
+  return out
+}
+
+const [RECRUIT_STAGE_BIT, RECRUIT_STAGE_WIDTH] = RECRUIT_FIELDS.stage
+const [RECRUIT_COMMIT_BIT, RECRUIT_COMMIT_WIDTH] = RECRUIT_FIELDS.commitScore
+
+export function applyRecruitEdits(
+  payload: Buffer, edits: RecruitEdit[], board: RecruitBoard[],
+): { next: Buffer; touched: Set<number> } {
+  const next = Buffer.from(payload)
+  const touched = new Set<number>()
+  const byIndex = new Map(board.map((b) => [b.playerIndex, b]))
+  const schools = storeTable(payload, 'HighSchoolProspectTopSchoolsStore')
+
+  for (const e of edits) {
+    const rec = byIndex.get(e.playerIndex)
+    if (!rec) continue
+    const mark = (bit: number, width: number) => {
+      for (let b = bit; b < bit + width; b++) touched.add(rec.at + (b >> 3))
+    }
+    if (e.commitScore !== undefined) {
+      putBits(next, rec.at, RECRUIT_COMMIT_BIT, RECRUIT_COMMIT_WIDTH, e.commitScore)
+      mark(RECRUIT_COMMIT_BIT, RECRUIT_COMMIT_WIDTH)
+    }
+    if (e.stage !== undefined) {
+      putBits(next, rec.at, RECRUIT_STAGE_BIT, RECRUIT_STAGE_WIDTH,
+        RECRUIT_STAGES.indexOf(e.stage as typeof RECRUIT_STAGES[number]))
+      mark(RECRUIT_STAGE_BIT, RECRUIT_STAGE_WIDTH)
+    }
+    if (e.interest && schools && schools.rowBytes === 4) {
+      const start = (rec.nationalRank - 1) * TOP_SCHOOLS_PER_RECRUIT + 1
+      for (const [school, v] of Object.entries(e.interest)) {
+        const k = rec.topSchools.findIndex((t) => t.school === school)
+        if (k < 0) continue
+        const o = schools.data + (start + k) * 4 + 2
+        next.writeUInt16BE(v, o)
+        touched.add(o)
+        touched.add(o + 1)
+      }
+    }
+  }
+  return { next, touched }
+}
+
+export interface RecruitWriteResult {
+  ok: boolean
+  message: string
+  backup?: string
+  changed?: { playerIndex: number; field: string; before: string; after: string }[]
+}
+
+/**
+ * Writes recruiting edits, refusing on the same three grounds the player writer
+ * uses: nothing outside the edited bits may move, the rebuilt file must read
+ * back byte for byte, and every field must come back as the value asked for.
+ *
+ * The record shares its twenty-four bytes with fields DCC has not named — gem
+ * and bust, production grade, the alternate positions — so "nothing else moved"
+ * is doing real work: a wrong bit position lands in one of those and is refused
+ * rather than written into your dynasty.
+ */
+export function writeRecruitEdits(path: string, edits: RecruitEdit[]): RecruitWriteResult {
+  if (!edits.length) return { ok: false, message: 'nothing to change' }
+  const file = readFileSync(path)
+  const c = readContainer(file)
+  if (!c) return { ok: false, message: 'this file is not a save DCC can read' }
+
+  const players = readRoster(c.payload)
+  const board = readRecruitBoard(c.payload, players)
+  if (!board.length) return { ok: false, message: 'this save has no recruiting board DCC can find' }
+
+  const problems = checkRecruitEdits(edits, board)
+  if (problems.length) return { ok: false, message: problems.map((p) => `${p.field}: ${p.message}`).join('; ') }
+
+  const { next, touched } = applyRecruitEdits(c.payload, edits, board)
+  if (next.length !== c.payload.length) return { ok: false, message: 'the edit changed the payload size' }
+  for (let i = 0; i < next.length; i++) {
+    if (next[i] !== c.payload[i] && !touched.has(i)) {
+      return { ok: false, message: `refusing to write: byte 0x${i.toString(16)} changed and should not have` }
+    }
+  }
+
+  const rebuilt = packContainer(c, next)
+  if (!rebuilt) return { ok: false, message: 'the edited save does not compress small enough to fit its file' }
+  const check = readContainer(rebuilt)
+  if (!check || !check.payload.equals(next)) {
+    return { ok: false, message: 'the rebuilt save did not read back identically; nothing was written' }
+  }
+
+  // Read the board back out of the rebuilt save and hold it to the ask.
+  const after = new Map(readRecruitBoard(check.payload, readRoster(check.payload)).map((b) => [b.playerIndex, b]))
+  const before = new Map(board.map((b) => [b.playerIndex, b]))
+  const changed: { playerIndex: number; field: string; before: string; after: string }[] = []
+  for (const e of edits) {
+    const was = before.get(e.playerIndex), now = after.get(e.playerIndex)
+    if (!was || !now) return { ok: false, message: `could not read recruit ${e.playerIndex} back` }
+    const note = (field: string, b: string | number, a: string | number) => {
+      if (String(b) !== String(a)) changed.push({ playerIndex: e.playerIndex, field, before: String(b), after: String(a) })
+    }
+    if (e.commitScore !== undefined) {
+      if (now.commitScore !== e.commitScore) {
+        return { ok: false, message: `recruit ${e.playerIndex}: commit score read back as ${now.commitScore}, not ${e.commitScore}; nothing was written` }
+      }
+      note('commitScore', was.commitScore, now.commitScore)
+    } else if (was.commitScore !== now.commitScore) {
+      return { ok: false, message: `recruit ${e.playerIndex}: commit score changed without being asked to; nothing was written` }
+    }
+    if (e.stage !== undefined) {
+      if (now.stage !== e.stage) {
+        return { ok: false, message: `recruit ${e.playerIndex}: stage read back as ${now.stage}, not ${e.stage}; nothing was written` }
+      }
+      note('stage', was.stage, now.stage)
+    } else if (was.stage !== now.stage) {
+      return { ok: false, message: `recruit ${e.playerIndex}: stage changed without being asked to; nothing was written` }
+    }
+    for (const [school, v] of Object.entries(e.interest ?? {})) {
+      const got = now.topSchools.find((t) => t.school === school)?.interest
+      if (got !== v) {
+        return { ok: false, message: `recruit ${e.playerIndex}: ${school} read back as ${got}, not ${v}; nothing was written` }
+      }
+      note(`interest:${school}`, was.topSchools.find((t) => t.school === school)?.interest ?? 0, got)
+    }
+    // The ranks are the game's own and are never an edit; if one moved, the
+    // write landed somewhere it should not have.
+    for (const k of ['nationalRank', 'positionRank', 'stateRank', 'totalOffers'] as const) {
+      if (was[k] !== now[k]) {
+        return { ok: false, message: `recruit ${e.playerIndex}: ${k} changed without being asked to; nothing was written` }
+      }
+    }
+  }
+
+  const backup = backupPath(path)
+  copyFileSync(path, backup)
+  const tmp = join(dirname(path), `.dcc-${Date.now()}.tmp`)
+  try {
+    writeFileSync(tmp, rebuilt)
+    renameSync(tmp, path)
+  } catch (err) {
+    try { unlinkSync(tmp) } catch { /* the temp file may already be gone */ }
+    return { ok: false, message: `could not replace the save: ${String((err as Error)?.message ?? err)}` }
+  }
+  return { ok: true, message: `${changed.length} change${changed.length === 1 ? '' : 's'} written`, backup, changed }
 }

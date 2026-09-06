@@ -120,5 +120,106 @@ assert.ok(moved > 0 && moved <= 12, `expected a handful of changed bytes, got ${
   assert.equal(W.checkPlayerEdits([{ index, overall: 50, ratings: { Speed: 99 } }], index + 1).length, 0)
 }
 
+/* ------------------------------------------- recruiting edits are refused
+   unless they land exactly where they were aimed */
+{
+  const STRIDE = 24, PLAYER_AT = 8, TAG = 0x213e
+  const SCHOOL_ROWS = 4000
+  const players = []
+  for (let i = 0; i < 500; i++) {
+    players.push({ index: i, team: i < 200 ? 12 : 255, recruitFlag: i >= 150 })
+  }
+  const pool = players.filter((p) => p.recruitFlag && p.team === 255).map((p) => p.index)
+
+  const N = 30
+  const body = Buffer.alloc((6 + N + 6) * STRIDE)
+  const put = (rec, start, w, v) => {
+    for (let b = 0; b < w; b++) {
+      const bit = start + b
+      const at = rec * STRIDE + (bit >> 3)
+      const mask = 1 << (7 - (bit & 7))
+      if ((v >> (w - 1 - b)) & 1) body[at] |= mask
+      else body[at] &= ~mask
+    }
+  }
+  // Every unedited bit of the record is set, so a write that strays anywhere
+  // outside its field clears one and the "nothing else moved" check bites.
+  body.fill(0xff)
+  for (let k = 0; k < N; k++) {
+    const rec = 6 + k
+    body.writeUInt16BE(TAG, rec * STRIDE + PLAYER_AT)
+    body.writeUInt16BE(pool[k], rec * STRIDE + PLAYER_AT + 2)
+    put(rec, 96, 4, k % 7)          // stage
+    put(rec, 100, 13, k + 1)        // national rank
+    put(rec, 136, 12, 100 + k)
+    put(rec, 148, 12, 200 + k)
+    put(rec, 176, 6, k % 64)
+    put(rec, 182, 10, (k * 37) % 1024)
+  }
+
+  // The interest table: ten four-byte rows per recruit, from row 1.
+  const sname = Buffer.from('HighSchoolProspectTopSchoolsStore', 'latin1')
+  const shead = Buffer.concat([
+    Buffer.from('SPBF', 'latin1'), u32(486), u32(1), u32(0), u32(sname.length), sname,
+    u32(0x40), u32(0), u32(SCHOOL_ROWS),
+    Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(1), u32(SCHOOL_ROWS), u32(2), u32(0),
+    Buffer.alloc(8),
+  ])
+  const srows = Buffer.alloc(SCHOOL_ROWS * 4)
+  // Team ids the reader will resolve to names; 2 and 5 are real schools.
+  for (let k = 0; k < N; k++) {
+    const start = k * 10 + 1
+    for (let j = 0; j < 10; j++) srows.writeUInt16BE(j + 2, (start + j) * 4)
+    for (let j = 0; j < 10; j++) srows.writeUInt16BE(500 - j * 10, (start + j) * 4 + 2)
+  }
+
+  const payload = Buffer.concat([Buffer.alloc(2048), body, Buffer.alloc(512), shead, srows, Buffer.alloc(512)])
+  const board = S.readRecruitBoard(payload, players)
+  assert.equal(board.length, N, `the fixture board reads: ${board.length}`)
+  const one = board.find((b) => b.nationalRank === 4)
+  assert.ok(one, 'rank four is on the board')
+  assert.equal(one.topSchools.length, 10, 'ten schools hang off the rank')
+
+  // Out-of-range and off-list edits never reach the writer.
+  assert.equal(W.checkRecruitEdits([{ playerIndex: one.playerIndex, commitScore: 1024 }], board).length, 1)
+  assert.equal(W.checkRecruitEdits([{ playerIndex: one.playerIndex, stage: 'Nonsense' }], board).length, 1)
+  assert.equal(W.checkRecruitEdits([{ playerIndex: 99999, commitScore: 1 }], board).length, 1)
+  assert.equal(
+    W.checkRecruitEdits([{ playerIndex: one.playerIndex, interest: { 'Not A School': 5 } }], board).length, 1,
+    'a school the recruit has never heard of is refused',
+  )
+  assert.equal(
+    W.checkRecruitEdits([{ playerIndex: one.playerIndex, commitScore: 1023, stage: 'Signed' }], board).length, 0,
+    'a legal edit passes the check',
+  )
+
+  // The edit lands, and only where it was aimed.
+  const school = one.topSchools[3].school
+  const { next, touched } = W.applyRecruitEdits(
+    payload, [{ playerIndex: one.playerIndex, commitScore: 777, stage: 'Battle', interest: { [school]: 4242 } }], board,
+  )
+  for (let i = 0; i < next.length; i++) {
+    assert.ok(next[i] === payload[i] || touched.has(i),
+      `byte ${i} moved without being claimed by the edit`)
+  }
+  const after = S.readRecruitBoard(next, players)
+  const got = after.find((b) => b.playerIndex === one.playerIndex)
+  assert.equal(got.commitScore, 777)
+  assert.equal(got.stage, 'Battle')
+  assert.equal(got.topSchools.find((t) => t.school === school).interest, 4242)
+  // Its neighbours in the same record are untouched.
+  assert.equal(got.nationalRank, one.nationalRank, 'the rank did not move')
+  assert.equal(got.positionRank, one.positionRank, 'the position rank did not move')
+  assert.equal(got.stateRank, one.stateRank, 'the state rank did not move')
+  assert.equal(got.totalOffers, one.totalOffers, 'the offer count did not move')
+  // And so is every other recruit.
+  const wasBy = new Map(board.map((b) => [b.playerIndex, JSON.stringify(b)]))
+  for (const b of after) {
+    if (b.playerIndex === one.playerIndex) continue
+    assert.equal(JSON.stringify(b), wasBy.get(b.playerIndex), `recruit ${b.playerIndex} moved`)
+  }
+}
+
 fs.rmSync(dir, { recursive: true, force: true })
-console.log(`check-write: container round-trips, edit applied, ${moved} bytes changed, neighbours intact, player fields read from the field end`)
+console.log(`check-write: container round-trips, edit applied, ${moved} bytes changed, neighbours intact,`)
+console.log('            player fields read from the field end, and a recruiting edit lands on its own bits')

@@ -10,6 +10,42 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.51.0] - 2026-09-06
+
+### Added
+
+- **A recruit's ten schools, with the interest each has built.** The thing the
+  game shows on its own board, on both apps. It reads against the leader rather
+  than as a bare number, because 244 means nothing until you can see that
+  somebody else is on 976.
+
+  This was decoded a while ago and never wired up — the interest table says
+  which schools without ever saying which recruit. The recruit's own record
+  supplies the rank, which is the join, so the list finally has a name on it.
+
+- **Editing a recruitment.** Stage, commitment and any school's interest can be
+  written back to the save, the same way a player's ratings can.
+
+  The record shares its twenty-four bytes with fields DCC has not named, so the
+  writer refuses rather than trusting itself: no byte outside the edited bits may
+  differ, the rebuilt save must inflate back byte for byte, and every field must
+  read back as the value asked for — including the three ranks and the offer
+  count, which are never edits, and whose moving would mean the write went
+  somewhere it should not have. A copy of the save is kept first.
+
+  On a real save, changing one recruit's stage, commitment and one school's
+  interest moves five bytes in thirty megabytes: three in his record, two in the
+  interest table, and nothing at all for the other 4,099 recruits.
+
+  A school can be moved up or down the list but not added to it. The game
+  decides who is on a recruit's list, and writing an eleventh would mean pushing
+  one off.
+
+### Changed
+
+- The stage names and the record's bit positions now live in one place instead
+  of being written out again in the reader, the writer and the screen.
+
 ## [0.50.0] - 2026-09-06
 
 ### Added

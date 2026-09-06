@@ -203,6 +203,13 @@ data class SnapshotPlayer(
     val ratings: Map<String, Int>? = null,
 )
 
+/** One school on a recruit's list, with the interest it has built. */
+@Serializable
+data class TopSchool(
+    val school: String = "",
+    val interest: Int = 0,
+)
+
 @Serializable
 data class SnapshotRecruit(
     val index: Int,
@@ -236,6 +243,8 @@ data class SnapshotRecruit(
     val commitScore: Int? = null,
     val totalOffers: Int? = null,
     val stage: String? = null,
+    /** The ten schools recruiting him, strongest first, as the game shows them. */
+    val topSchools: List<TopSchool> = emptyList(),
     /**
      * The same fifty-two ratings a roster row carries, so scouting a recruit has
      * something to give up beyond the overall. Snapshots written before the

@@ -41,7 +41,8 @@ import { packManifest, zipChunk, zipDirectory } from './artPack'
 import type { ZipRecord } from './artPack'
 import { rememberHeisman, rememberPack, rememberRanks } from './sidecar'
 import { relayState, startRelay, stopRelay } from './relay'
-import { writeGameEdits, writePlayerEdits, writeDepthEdits } from './saveWrite'
+import { writeGameEdits, writePlayerEdits, writeDepthEdits, writeRecruitEdits } from './saveWrite'
+import type { RecruitEdit } from './saveWrite'
 import type { GameEdit, PlayerEdit, DepthEdit } from './saveWrite'
 
 const isDev = !app.isPackaged
@@ -602,6 +603,14 @@ ipcMain.handle('save:writePlayers', (_e, { path, edits, playerCount }: {
 }) => {
   try {
     return writePlayerEdits(path, edits, playerCount)
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+ipcMain.handle('save:writeRecruits', (_e, { path, edits }: { path: string; edits: RecruitEdit[] }) => {
+  try {
+    return writeRecruitEdits(path, edits)
   } catch (err) {
     return { ok: false as const, message: String((err as Error)?.message ?? err) }
   }
