@@ -267,3 +267,50 @@ The one anchor that would open `TeamStore` cheaply is **a standings screen
 showing all 32 win-loss records**. Thirty-two known values matched against the
 row is the same method that found the recruiting class ranking in CFB, and it
 turns a guess into a search.
+
+## `HistoryEntryStore`, and the wall behind it
+
+62,430 rows of 24 bytes — six words per row. What each word holds, across the
+whole store:
+
+| Word | Bytes | What it looks like |
+| --- | --- | --- |
+| 0 | 0–3 | 97 distinct values in the later save, 4 in the earlier — a date or season stamp |
+| 1 | 4–7 | thousands of distinct values; high half `0x8000` on 34,429 rows |
+| 2 | 8–11 | **a player reference, tag `0x2118`, on 48,176 rows**; zero on 12,010 |
+| 3 | 12–15 | zero on 30,805 rows — a second, optional reference |
+| 4 | 16–19 | 81 distinct values, `0xfc0c8064` on 53,227 rows — a category |
+| 5 | 20–23 | 354 distinct values, high half `0x0637` on 54,295 — another category |
+
+It is **not** a rolling log. Not one of the 62,430 rows in the later save appears
+anywhere in the earlier one, and all 62,430 are distinct within each save. It
+also fills up enormously between the two files — roughly 2,300 populated rows in
+the earlier save against some 53,000 in the later — so these two saves straddle a
+season rollover rather than a quiet week.
+
+### The wall: there is no player table yet
+
+Every history row worth reading points at a player, and a player reference is a
+number until there is a table to resolve it against. There is no such table yet,
+and three ways of finding one are now ruled out:
+
+1. **Not in the stores.** All 91 were listed; the widest row in the entire store
+   system is `TeamStore` at 664 bytes and nothing has anything like enough rows.
+   Madden keeps players outside the `SPBF` system, as CFB does.
+2. **Not at a fixed stride.** A sweep for capitalised words at a repeating stride
+   finds no run longer than two. CFB's roster was found exactly this way and it
+   does not transfer.
+3. **Not in the draft-class record format.** The career save contains zero
+   `genericHeadName` blobs, so the 5,876-byte record decoded earlier — names at
+   +5632, ratings at +5718 — is a draft-class format only.
+
+What is known about the target: history rows reference **2,187 distinct players
+with indices from 0 to 3,527**, and the league holds 2,245 players by the roster
+counts in `TeamStore`. So somewhere in the 20 MB payload there is a player table
+of about **3,528 slots**, roughly two thirds of them filled. The tag `0x2118`
+appears 72,575 times across the save.
+
+Finding that table is the single thing standing between here and every
+player-facing Madden feature — news, trades, contracts, stats, the lot. It is
+worth doing before anything else, and it should not be attempted by guessing at
+strides again.
