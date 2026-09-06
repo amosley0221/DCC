@@ -106,6 +106,16 @@ const api = {
   findArt: (root: string) => ipcRenderer.invoke('assets:findArt', root),
   searchArt: (query: string) => ipcRenderer.invoke('assets:searchArt', query),
   choosePoll: (index: number) => ipcRenderer.invoke('poll:choose', index) as Promise<{ ok: true }>,
+  findPoll: (path: string, known: { team: string; rank: number }[]) =>
+    ipcRenderer.invoke('poll:find', { path, known }) as Promise<
+      | { ok: true; found: {
+          at: number; width: number; base: 0 | 1; ranked: number
+          top: { name: string; rank: number }[]
+        }[] }
+      | { ok: false; message: string }
+    >,
+  usePoll: (column: { at: number; width: number; base: 0 | 1 } | null) =>
+    ipcRenderer.invoke('poll:use', column) as Promise<{ ok: true }>,
   dumpStore: (path: string, name: string, rows?: number) =>
     ipcRenderer.invoke('save:dumpStore', { path, name, rows }),
   backupSave: (path: string) => ipcRenderer.invoke('save:backup', path),

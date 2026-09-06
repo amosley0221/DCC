@@ -2208,3 +2208,102 @@ export interface HeismanView {
   team: number | null
   words: number[]
 }
+
+/* ------------------------------------------- a ranking you can point at */
+
+/**
+ * The values one bit field holds across every team, in team-table order.
+ *
+ * The unit is bits because the save is bit-packed: a rank needing eight bits
+ * sits wherever the field before it ended, not on a byte boundary.
+ */
+export function readRankField(payload: Buffer, at: number, width: number): number[] {
+  const t = storeTable(payload, 'TeamStore')
+  if (!t || !t.rows) return []
+  const out: number[] = []
+  for (let r = 0; r < t.rows; r++) {
+    const base = t.data + r * t.rowBytes
+    const i = base + (at >> 3)
+    if (i + 3 > payload.length) return []
+    const shift = at & 7
+    const v = (payload[i] << 16) | (payload[i + 1] << 8) | payload[i + 2]
+    out.push((v >>> (24 - shift - width)) & ((1 << width) - 1))
+  }
+  return out
+}
+
+/** A field that might be the ranking, with enough about it to recognise. */
+export interface RankCandidate {
+  at: number
+  width: number
+  /** 1 when the best team holds 1; 0 when it holds 0 and everything shifts. */
+  base: 0 | 1
+  /** How many teams hold a place. */
+  ranked: number
+  /** Team-table index to rank, always written 1-based. */
+  ranks: Record<number, number>
+}
+
+/**
+ * Every field of `TeamStore` where a team you can name holds the rank you know.
+ *
+ * This is the method that has worked on every field decoded here: take a value
+ * you already have, find it in the payload, and confirm the stride. Sweeping
+ * for the shape of a ranking alone found nothing in a real save — a poll leaves
+ * the unranked holding whatever they held before, so it is not the clean
+ * permutation the shape test wanted. One rank you can read off the screen is
+ * worth more than any amount of guessing at the shape.
+ *
+ * A candidate has to place the teams you named exactly, rank at least ten
+ * programs, and give each of them a different place. A field where every team
+ * holds its own row number is a counter and is thrown out.
+ */
+export function findRankColumns(
+  payload: Buffer,
+  known: { teamIndex: number; rank: number }[],
+  limit = 12,
+): RankCandidate[] {
+  const t = storeTable(payload, 'TeamStore')
+  if (!t || t.rows < 8 || !known.length) return []
+  const rows = t.rows
+  const rowBits = t.rowBytes * 8
+  const out: RankCandidate[] = []
+
+  for (let width = 5; width <= 12 && out.length < limit; width++) {
+    for (let at = 0; at + width <= rowBits && out.length < limit; at++) {
+      const vals = readRankField(payload, at, width)
+      if (vals.length !== rows) break
+
+      for (const base of [1, 0] as const) {
+        if (!known.every((k) => vals[k.teamIndex] === k.rank - (1 - base))) continue
+        // A counter places every team, in row order, and means nothing.
+        if (vals.every((v, i) => v === i + base)) continue
+
+        const ranks: Record<number, number> = {}
+        const seen = new Set<number>()
+        let clash = false
+        for (let i = 0; i < rows; i++) {
+          const v = vals[i]
+          const place = v + (1 - base)
+          if (place < 1 || place > rows) continue
+          if (seen.has(place)) { clash = true; break }
+          seen.add(place)
+          ranks[i] = place
+        }
+        if (clash || seen.size < 10) continue
+        out.push({ at, width, base, ranked: seen.size, ranks })
+        break
+      }
+    }
+  }
+  return out
+}
+
+/** A candidate ranking field as the screens receive it, with school names. */
+export interface PollCandidate {
+  at: number
+  width: number
+  base: 0 | 1
+  ranked: number
+  top: { name: string; rank: number }[]
+}

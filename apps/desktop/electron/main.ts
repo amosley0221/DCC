@@ -13,6 +13,7 @@ import {
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
   readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman,
+  findRankColumns, readRankField,
 } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
 import {
@@ -315,6 +316,22 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
         Object.entries(c.ranks).map(([i, rank]) => [order[Number(i)]?.name ?? `Team ${i}`, rank]),
       ),
     }))
+    // A column the user found by pointing at a rank they could read off the
+    // game leads the list, because it is the one with an answer key behind it.
+    const saved = readSettings().pollColumn as { at: number; width: number; base: 0 | 1 } | undefined
+    if (saved && Number.isFinite(saved.at) && Number.isFinite(saved.width)) {
+      const vals = readRankField(payload, saved.at, saved.width)
+      const ranks: Record<string, number> = {}
+      vals.forEach((v, i) => {
+        const place = v + (1 - saved.base)
+        const name = order[i]?.name
+        if (name && place >= 1 && place <= vals.length) ranks[name] = place
+      })
+      if (Object.keys(ranks).length >= 10) {
+        rankColumns.unshift({ at: saved.at, width: saved.width, kind: 'top25', ranks })
+      }
+    }
+
     lastRankColumns = rankColumns
     // One column and there is nothing to choose between; more than one and the
     // user picks in League → Rankings, because nothing in the file says which
@@ -395,6 +412,52 @@ let pollChoice = -1
 
 const chosenRanks = (columns: { ranks: Record<string, number> }[]) =>
   (pollChoice >= 0 && pollChoice < columns.length ? columns[pollChoice].ranks : {})
+
+/**
+ * Fields of the team table where the ranks you named actually appear.
+ *
+ * Sweeping for the shape of a ranking found nothing in a real save, which is
+ * evidence rather than failure: a poll leaves the unranked holding whatever
+ * they held last week, so it is not a clean permutation. One rank read off the
+ * game's own screen is a better key than any shape.
+ */
+ipcMain.handle('poll:find', (_e, { path, known }: {
+  path: string
+  known: { team: string; rank: number }[]
+}) => {
+  try {
+    const payload = readSavePayload(path)
+    if (!payload) return { ok: false as const, message: 'That file does not contain a readable payload.' }
+    const order = teamTableOrder(readTeamNames(payload))
+    const byName = new Map<string, number>()
+    order.forEach((t, i) => { if (t?.name) byName.set(t.name, i) })
+
+    const asked = known
+      .map((k) => ({ teamIndex: byName.get(k.team) ?? -1, rank: Math.round(k.rank) }))
+      .filter((k) => k.teamIndex >= 0 && k.rank >= 1)
+    if (!asked.length) return { ok: false as const, message: 'DCC does not know that school by that name.' }
+
+    const found = findRankColumns(payload, asked).map((c) => ({
+      at: c.at, width: c.width, base: c.base, ranked: c.ranked,
+      top: Object.entries(c.ranks)
+        .map(([i, rank]) => ({ name: order[Number(i)]?.name ?? `Team ${i}`, rank }))
+        .sort((a, b) => a.rank - b.rank)
+        .slice(0, 12),
+    }))
+    return { ok: true as const, found }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
+
+/** Remember the field the user recognised, so every read uses it from now on. */
+ipcMain.handle('poll:use', (_e, column: { at: number; width: number; base: 0 | 1 } | null) => {
+  const next = { ...readSettings() }
+  if (column) next.pollColumn = column
+  else delete next.pollColumn
+  writeSettings(next)
+  return { ok: true as const }
+})
 
 ipcMain.handle('poll:choose', (_e, index: number) => {
   pollChoice = Number.isFinite(index) ? Number(index) : -1

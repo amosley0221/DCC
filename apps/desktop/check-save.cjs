@@ -160,6 +160,72 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
     'a counter is not a ranking, whatever bit it starts at')
 }
 
+/* --------------------------------------------- a ranking you can point at */
+{
+  // Sweeping for the shape of a ranking found nothing in a real save, because a
+  // poll leaves the unranked holding whatever they held last week. One rank read
+  // off the game's own screen is the key that works, so this builds a table
+  // shaped like the real thing: twenty-five ranked, everyone else holding stale
+  // numbers rather than one tidy value.
+  const TEAMS = 40, TROW = 24, TMEMBERS = 6
+  const tname = Buffer.from('TeamStore', 'latin1')
+  const thead = Buffer.concat([
+    Buffer.from('SPBF', 'latin1'), u32(486), u32(1), u32(0), u32(tname.length), tname,
+    u32(0x40), u32(0), u32(TEAMS),
+    Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(TROW / 4), u32(TEAMS), u32(TMEMBERS), u32(0),
+    Buffer.alloc(TMEMBERS * 4),
+  ])
+  const trows = Buffer.alloc(TROW * TEAMS)
+  const putBits = (row, start, w, v) => {
+    for (let b = 0; b < w; b++) {
+      const bit = start + b
+      const mask = 1 << (7 - (bit & 7))
+      const at = row * TROW + (bit >> 3)
+      if ((v >> (w - 1 - b)) & 1) trows[at] |= mask
+      else trows[at] &= ~mask
+    }
+  }
+  // Team 7 is first, team 3 is second, and the rest of the poll is scattered.
+  const POLL_AT = 37, POLL_W = 8
+  const poll = new Array(TEAMS).fill(0)
+  const placed = [7, 3, 19, 0, 25, 11, 30, 2, 14, 38, 5, 21]
+  placed.forEach((team, i) => { poll[team] = i + 1 })
+  for (let r = 0; r < TEAMS; r++) {
+    // Everyone unranked holds a stale number, which is why the shape test fails
+    // on a real poll and pointing at a rank does not.
+    putBits(r, POLL_AT, POLL_W, poll[r] || 200 + (r % 7))
+    putBits(r, 60, 8, r + 1)   // a counter, still not a ranking
+  }
+  const tpayload = Buffer.concat([Buffer.alloc(64), thead, trows, Buffer.alloc(64)])
+
+  const one = S.findRankColumns(tpayload, [{ teamIndex: 7, rank: 1 }])
+  assert.ok(one.length, 'one rank you can read off the screen finds the field')
+  const hit = one.find((c) => c.at === POLL_AT && c.width === POLL_W)
+  assert.ok(hit, 'and it is the field the poll was written into: ' +
+    one.map((c) => `${c.at}/${c.width}`).join(' '))
+  assert.equal(hit.base, 1)
+  assert.equal(hit.ranked, placed.length, 'only the ranked teams hold a place')
+  assert.equal(hit.ranks[3], 2, 'the second team is second')
+
+  // Naming a second school narrows it rather than breaking it.
+  const two = S.findRankColumns(tpayload, [{ teamIndex: 7, rank: 1 }, { teamIndex: 3, rank: 2 }])
+  assert.ok(two.some((c) => c.at === POLL_AT && c.width === POLL_W))
+  assert.ok(two.length <= one.length, 'a second key cannot widen the answer')
+
+  // A rank nobody holds finds nothing, rather than the nearest thing.
+  assert.deepEqual(S.findRankColumns(tpayload, [{ teamIndex: 7, rank: 9 }])
+    .filter((c) => c.at === POLL_AT && c.width === POLL_W), [])
+
+  // And the counter is never offered, however well it fits a lucky key.
+  const counterKey = S.findRankColumns(tpayload, [{ teamIndex: 0, rank: 1 }])
+  assert.ok(!counterKey.some((c) => c.at === 60 && c.width === 8),
+    'a field holding every team its own row number is a counter')
+
+  // Reading the field back is what every later read does.
+  assert.deepEqual(S.readRankField(tpayload, POLL_AT, POLL_W).slice(0, 8),
+    [4, 200 + 1, 8, 2, 200 + 4, 11, 200 + 6, 1])
+}
+
 /* ---------------------------------------------------------- the Heisman five */
 {
   // Five rows of four members, and which member is the player is not written
@@ -230,4 +296,5 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
 console.log('check-save: game table decodes 2/2 synthetic rows, team order verified,')
 console.log('            champions read per season and unplayed seasons name nobody,')
 console.log('            rankings found in TeamStore without mistaking a counter for one,')
+console.log('            a poll is found by pointing at one rank you can read,')
 console.log('            and the Heisman five resolve to real roster rows')

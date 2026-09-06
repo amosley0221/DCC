@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { rosterPatch, useSave } from '../saveStore'
 import type { SaveState } from '../saveStore'
+import type { PollCandidate } from '../../electron/saveAnalysis'
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { Btn, Card, Empty, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
 import ArtFolder from './ArtFolder'
@@ -402,7 +403,7 @@ export default function Save() {
       <div className="col" style={{ gap: 12, maxWidth: 860 }}>
         <ArtFolder />
 
-        {save.roster ? <Found roster={save.roster} me={myTeam} /> : null}
+        {save.roster ? <Found roster={save.roster} me={myTeam} path={path} /> : null}
         {report?.stores?.length ? <Stores stores={report.stores} path={path} /> : null}
 
         <Card className="card-pad">
@@ -875,7 +876,9 @@ function Stores({ stores, path }: {
  * match the game's is a column that means something else, and the only way to
  * tell is to look at the top of it beside the real thing.
  */
-function Found({ roster, me }: { roster: NonNullable<SaveState['roster']>; me: string | null }) {
+function Found({ roster, me, path }: {
+  roster: NonNullable<SaveState['roster']>; me: string | null; path: string | null
+}) {
   const columns = roster.rankColumns ?? []
   const all = roster.heisman ?? []
   const heisman = all.filter((h) => h.index >= 0)
@@ -896,8 +899,10 @@ function Found({ roster, me }: { roster: NonNullable<SaveState['roster']>; me: s
         rejects a plain counter, which is a perfect ordering by accident.
       </p>
 
+      <PollFinder me={me} path={path} />
+
       {columns.length === 0 ? (
-        <Meta size={9} color="var(--warn)">NOTHING IN THIS SAVE READS AS A RANKING</Meta>
+        <Meta size={9} color="var(--warn)">NOTHING FOUND BY SHAPE ALONE — POINT AT A RANK INSTEAD</Meta>
       ) : (
         <div className="col" style={{ gap: 10, marginTop: 10 }}>
           {columns.map((c, i) => {
@@ -971,5 +976,98 @@ function Found({ roster, me }: { roster: NonNullable<SaveState['roster']>; me: s
         )}
       </div>
     </Card>
+  )
+}
+
+/**
+ * Finding the poll by pointing at a rank you can read off the game.
+ *
+ * Sweeping the team table for the shape of a ranking found nothing in a real
+ * save, and that is a finding rather than a failure: a poll leaves the unranked
+ * teams holding whatever they held last week, so it is not the clean
+ * permutation the shape test was looking for.
+ *
+ * One number settles it. You know where the game ranks you; a field where your
+ * team holds that number, ten other programs hold ten different places, and no
+ * team holds its own row number, is the poll. Name a second school and it is
+ * beyond argument.
+ */
+function PollFinder({ me, path }: { me: string | null; path: string | null }) {
+  const [rank, setRank] = useState('')
+  const [other, setOther] = useState('')
+  const [otherRank, setOtherRank] = useState('')
+  const [found, setFound] = useState<PollCandidate[] | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const look = async () => {
+    if (!path || !me || !rank.trim()) return
+    setBusy(true); setNote(null); setFound(null)
+    const known = [{ team: me, rank: Number(rank) }]
+    if (other.trim() && otherRank.trim()) known.push({ team: other.trim(), rank: Number(otherRank) })
+    const res = await window.dcc.findPoll(path, known)
+    setBusy(false)
+    if (!res.ok) { setNote(res.message); return }
+    setFound(res.found)
+    if (!res.found.length) {
+      setNote('nothing in the team table holds those ranks — check the numbers, or the poll is somewhere else')
+    }
+  }
+
+  const use = async (c: PollCandidate) => {
+    await window.dcc.usePoll({ at: c.at, width: c.width, base: c.base })
+    setNote('remembered — read the roster again and it becomes the ranking everywhere')
+  }
+
+  if (!me) return <Meta size={9} color="var(--ink4)">PICK YOUR TEAM FIRST</Meta>
+
+  return (
+    <div style={{ marginTop: 12, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+      <Kicker>Point at a rank you know</Kicker>
+      <p className="body-serif" style={{ marginTop: 7 }}>
+        Open the game and read where it ranks you. Put that number in and DCC will find the field
+        holding it — one number is usually enough, and naming a second school makes it certain.
+      </p>
+      <div className="row" style={{ gap: 8, marginTop: 9, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Meta size={9}>{me.toUpperCase()} IS NO.</Meta>
+        <span style={{ width: 70 }}>
+          <Input value={rank} placeholder="1" inputMode="numeric"
+            onChange={(e) => setRank(e.target.value.replace(/[^0-9]/g, ''))} />
+        </span>
+        <Meta size={9}>AND</Meta>
+        <span style={{ width: 170 }}>
+          <Input value={other} placeholder="another school (optional)"
+            onChange={(e) => setOther(e.target.value)} />
+        </span>
+        <Meta size={9}>IS NO.</Meta>
+        <span style={{ width: 70 }}>
+          <Input value={otherRank} placeholder="2" inputMode="numeric"
+            onChange={(e) => setOtherRank(e.target.value.replace(/[^0-9]/g, ''))} />
+        </span>
+        <Btn variant="primary" disabled={busy || !rank.trim() || !path} onClick={() => void look()}>
+          {busy ? 'Looking…' : 'Find it'}
+        </Btn>
+      </div>
+
+      {found?.length ? (
+        <div className="col" style={{ gap: 8, marginTop: 12 }}>
+          {found.map((c) => (
+            <div key={`${c.at}-${c.width}`} style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+              <div className="row" style={{ gap: 10, alignItems: 'baseline' }}>
+                <Meta size={9} color="var(--good)">{c.ranked} RANKED</Meta>
+                <Meta size={9} color="var(--ink4)">
+                  BIT {c.at} · {c.width} WIDE{c.base === 0 ? ' · COUNTS FROM ZERO' : ''}
+                </Meta>
+                <button className="gs-close" onClick={() => void use(c)}>Use this one</button>
+              </div>
+              <div style={{ marginTop: 5, fontSize: 12, color: 'var(--ink2)' }}>
+                {c.top.map((t) => `${t.rank}. ${t.name}`).join('  ·  ')}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {note ? <div style={{ marginTop: 9 }}><Meta size={9}>{note.toUpperCase()}</Meta></div> : null}
+    </div>
   )
 }

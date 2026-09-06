@@ -1002,6 +1002,21 @@ coincidence; one that works for three is, which is why the test also checks that
 a roster knowing none of them leaves the column unfound rather than pointing at
 whichever bytes looked plausible.
 
+### The shape test was not enough for the poll
+
+Sweeping the team table for the shape of a ranking found **nothing** in a real
+save, and that is a finding rather than a failure. A poll does not leave the
+unranked teams on one tidy value: they hold whatever they held last week, so the
+column is not the clean permutation the shape test was looking for.
+
+One number settles it instead, and it is the method that has worked on every
+other field here: read a rank off the game's own screen, find the field holding
+it, confirm the stride. `findRankColumns` takes the ranks the user can name and
+keeps the fields where those teams hold exactly those places, at least ten
+programs hold ten different places, and no team holds its own row number. Naming
+a second school makes it certain. The field is remembered by bit offset and
+width, so every later read uses it without being asked again.
+
 What is still not decoded is the *case* for each name — the season statistics
 behind them — and which of several ranking columns is the AP and which the
 coaches'. Nothing in the file says, so the app shows the top of each and lets

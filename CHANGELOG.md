@@ -10,6 +10,32 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.47.0] - 2026-09-06
+
+### Added
+
+- **Find the poll by pointing at a rank you can read.** Sweeping the team table
+  for the shape of a ranking came back empty on a real save, and that is a
+  finding rather than a failure: a poll does not leave the unranked teams on one
+  tidy value, it leaves them holding whatever they held last week, so it is not
+  the clean permutation the shape test wanted.
+
+  One number settles it. Open the game, read where it ranks you, and put that in
+  on the Save screen. DCC keeps the fields where your team holds exactly that
+  place, at least ten programs hold ten different places, and no team holds its
+  own row number — which is a counter, not a ranking. Name a second school and
+  it is beyond argument.
+
+  The field is remembered by its bit offset and width, so every later read uses
+  it without being asked again, and it travels to the phone in the snapshot.
+
+### Fixed
+
+- **The rankings card no longer implies the save has nothing.** It said "nothing
+  in this save reads as a ranking", which was the shape test's opinion rather
+  than the truth. It now says what it means: nothing was found by shape alone,
+  so point at a rank instead.
+
 ## [0.46.0] - 2026-09-06
 
 ### Fixed

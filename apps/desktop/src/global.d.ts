@@ -1,7 +1,7 @@
 import type { UpdateStatus } from './updates'
 import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
-  RankColumnView, HeismanView,
+  RankColumnView, HeismanView, PollCandidate,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { GameEdit, PlayerEdit, PlayerWriteResult, WriteResult } from '../electron/saveWrite'
@@ -87,6 +87,13 @@ declare global {
       searchArt(query: string): Promise<{ ok: true; hits: string[]; total: number }>
       /** Which of the save's rankings the snapshot should carry to the phone. */
       choosePoll(index: number): Promise<{ ok: true }>
+      /** Fields of the team table where the ranks you named actually appear. */
+      findPoll(path: string, known: { team: string; rank: number }[]): Promise<
+        | { ok: true; found: PollCandidate[] }
+        | { ok: false; message: string }
+      >
+      /** Remember the field you recognised, so every read uses it from now on. */
+      usePoll(column: { at: number; width: number; base: 0 | 1 } | null): Promise<{ ok: true }>
       /** One store's rows, written to a file — the instrument the remaining decodes need. */
       dumpStore(path: string, name: string, rows?: number): Promise<
         { ok: true; file: string; rows: number; rowBytes: number } | { ok: false; message: string }
