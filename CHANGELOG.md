@@ -10,6 +10,34 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.46.0] - 2026-09-06
+
+### Fixed
+
+- **The Heisman table was found and then rejected for having a spare row.** The
+  game shows four names; `HeismanRankingStore` holds five rows. The check
+  insisted every row resolve to a player, so the fifth — unused — failed it and
+  the whole table was thrown away. Three rows agreeing is the test now, and the
+  rows that do not resolve are the end of the list rather than a failure.
+
+  Two things were added while the answer key was to hand. A candidate is only
+  accepted if every player it names is **on a roster** — which alone would have
+  caught the receiver on no team that topped the first attempt — and the game's
+  own player id is tried alongside the save row, since a reference could be
+  either.
+
+### Changed
+
+- **A ranking no longer has to be exactly twenty-five deep.** A poll that has
+  not filled out, or a top ten, has the same shape: places one to N once each
+  with everyone else on one shared value. The search accepts any N from ten up,
+  and reports at most a dozen candidates so a relaxed test cannot bury the real
+  one in noise.
+
+- **Each candidate ranking shows where your own team sits in it.** You already
+  know whether you are No. 1, so that is the fastest way to recognise your
+  poll among several.
+
 ## [0.45.0] - 2026-09-05
 
 ### Fixed

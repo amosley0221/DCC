@@ -2053,6 +2053,9 @@ export function findTeamRanks(payload: Buffer): TeamRankColumn[] {
       const key = vals.join(',')
       if (seen.has(key)) continue
       seen.add(key)
+      // A relaxed test can match more than one field. A dozen is enough to
+      // choose from; more than that is noise rather than evidence.
+      if (out.length >= 12) return out
 
       const ranks: Record<number, number> = {}
       vals.forEach((v, i) => { if (v >= 1 && v <= rows) ranks[i] = v })
@@ -2068,17 +2071,25 @@ export function findTeamRanks(payload: Buffer): TeamRankColumn[] {
   return out
 }
 
-/** Whether a column of values is a full ordering, a top 25, or neither. */
+/**
+ * Whether a column of values is a ranking, and which sort.
+ *
+ * A full ordering holds every place from one to the number of teams. A poll
+ * holds one to N once each with everyone else on a single shared value —
+ * usually twenty-five, but a poll that has not filled out yet, or a top ten,
+ * is the same shape and worth catching.
+ */
 function rankKind(vals: number[], rows: number): 'full' | 'top25' | null {
+  if (vals.length !== rows) return null
   const sorted = [...vals].sort((a, b) => a - b)
   if (sorted.every((v, i) => v === i + 1)) return 'full'
 
-  // A poll: 1 to 25 once each, everyone else sharing one value.
-  const ranked = vals.filter((v) => v >= 1 && v <= 25).sort((a, b) => a - b)
-  if (ranked.length !== 25 || !ranked.every((v, i) => v === i + 1)) return null
-  const rest = new Set(vals.filter((v) => v < 1 || v > 25))
+  const ranked = vals.filter((v) => v >= 1 && v <= 40).sort((a, b) => a - b)
+  if (ranked.length < 10) return null
+  if (!ranked.every((v, i) => v === i + 1)) return null
+  // Everyone outside the ranking shares one value, whatever it is.
+  const rest = new Set(vals.filter((v) => v < 1 || v > ranked.length))
   if (rest.size !== 1) return null
-  if (vals.length !== rows) return null
   return 'top25'
 }
 
@@ -2099,7 +2110,10 @@ export interface HeismanEntry {
   words: number[]
 }
 
-export function readHeisman(payload: Buffer, playerRows: Set<number>): HeismanEntry[] {
+export function readHeisman(
+  payload: Buffer,
+  roster: { index: number; playerId: number; team: number }[],
+): HeismanEntry[] {
   const t = storeTable(payload, 'HeismanRankingStore')
   if (!t || !t.rows || t.rowBytes < 4) return []
 
@@ -2113,45 +2127,60 @@ export function readHeisman(payload: Buffer, playerRows: Set<number>): HeismanEn
     rows.push(words)
   }
 
+  // Only players on a roster. This is the check that would have caught the
+  // first attempt on its own: it put a receiver on no team at the top of the
+  // watch, and nobody unrostered is in the running for anything.
+  const byRow = new Map<number, number>()
+  const byId = new Map<number, number>()
+  for (const p of roster) {
+    if (p.team === TEAM_UNASSIGNED) continue
+    byRow.set(p.index, p.index)
+    byId.set(p.playerId, p.index)
+  }
+
   /*
    * Which column is the player.
    *
-   * The first attempt asked only that the value be a roster row, and a save
-   * holds sixteen thousand of those — so a column counting 0, 1, 2, 3, 4
-   * passed, and the watch list came out as the first five players in the table:
-   * alphabetical, sixty-eight overall, one of them on no team at all.
+   * The table has five rows and the game shows four names, so the last row is
+   * spare — which is why insisting that every row resolve found nothing. Three
+   * rows agreeing is the test, and the rows that do not are the end of the list
+   * rather than a failure.
    *
-   * A reference in this format is a two-byte type tag and a two-byte index, so
-   * the tag is the thing worth insisting on. It must be the same in all five
-   * rows, and large enough to be a type id rather than a small number that
-   * happens to sit there. The indices must also be five different players, and
-   * not the first five in the table — which is what a counter looks like.
+   * A reference is a two-byte type tag and a two-byte index, so the tag carries
+   * the information: identical across the rows that resolve, and large enough
+   * to be a type id rather than a small number that happens to sit there. The
+   * indices must be distinct, must not run 0, 1, 2, 3 — which is what a counter
+   * looks like, and is what fooled the first version of this — and must all
+   * belong to players on a roster.
    */
-  let playerAt = -1
-  for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
-    const tag = payload.readUInt16BE(rowAt(0) + a)
-    if (tag < 0x0100 || tag === 0xffff) continue
-    const idx: number[] = []
-    let all = true
-    for (let r = 0; r < t.rows; r++) {
-      const o = rowAt(r) + a
-      if (payload.readUInt16BE(o) !== tag) { all = false; break }
-      const i = payload.readUInt16BE(o + 2)
-      if (!playerRows.has(i)) { all = false; break }
-      idx.push(i)
+  let best: { at: number; ids: boolean; resolved: number[] } | null = null
+  for (const ids of [false, true]) {
+    const table = ids ? byId : byRow
+    for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
+      const tag = payload.readUInt16BE(rowAt(0) + a)
+      if (tag < 0x0100 || tag === 0xffff) continue
+      const resolved: number[] = []
+      for (let r = 0; r < t.rows; r++) {
+        const o = rowAt(r) + a
+        if (payload.readUInt16BE(o) !== tag) break
+        const hit = table.get(payload.readUInt16BE(o + 2))
+        if (hit === undefined) break
+        resolved.push(hit)
+      }
+      if (resolved.length < 3) continue
+      if (new Set(resolved).size !== resolved.length) continue
+      if (resolved.every((v, i) => v === i) || resolved.every((v, i) => v === i + 1)) continue
+      // The longest list wins, and a tie goes to the row index over the game id,
+      // which is the reference the rest of the save uses.
+      if (!best || resolved.length > best.resolved.length) best = { at: a, ids, resolved }
     }
-    if (!all) continue
-    if (new Set(idx).size !== idx.length) continue
-    if (idx.every((v, i) => v === i) || idx.every((v, i) => v === i + 1)) continue
-    playerAt = a
-    break
   }
 
   return rows.map((words, r) => ({
     rank: r + 1,
-    playerIndex: playerAt >= 0 ? payload.readUInt16BE(rowAt(r) + playerAt + 2) : -1,
+    playerIndex: best && r < best.resolved.length ? best.resolved[r] : -1,
     words,
-  }))
+  })).filter((_, r) => best === null || r < best.resolved.length)
 }
 
 /**

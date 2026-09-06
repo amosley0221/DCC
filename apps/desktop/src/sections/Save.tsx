@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { rosterPatch, useSave } from '../saveStore'
 import type { SaveState } from '../saveStore'
+import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { Btn, Card, Empty, Input, Kicker, Meta, SectionHeader, Track } from '../ui'
 import ArtFolder from './ArtFolder'
 
@@ -14,6 +15,9 @@ import ArtFolder from './ArtFolder'
  */
 export default function Save() {
   const { state, dispatch } = useStore()
+  const myTeam = state.teamId === null
+    ? null
+    : state.teamNames[state.teamId] ?? TEAM_ID_NAMES[state.teamId] ?? null
   const { save, patch } = useSave()
   const { path, report, busy, error, backup, diff, diffing, scan, scanning, dict, dictResult, restoring } = save
   const { install, installBusy, installNote, tables, art } = save
@@ -398,7 +402,7 @@ export default function Save() {
       <div className="col" style={{ gap: 12, maxWidth: 860 }}>
         <ArtFolder />
 
-        {save.roster ? <Found roster={save.roster} /> : null}
+        {save.roster ? <Found roster={save.roster} me={myTeam} /> : null}
         {report?.stores?.length ? <Stores stores={report.stores} path={path} /> : null}
 
         <Card className="card-pad">
@@ -871,7 +875,7 @@ function Stores({ stores, path }: {
  * match the game's is a column that means something else, and the only way to
  * tell is to look at the top of it beside the real thing.
  */
-function Found({ roster }: { roster: NonNullable<SaveState['roster']> }) {
+function Found({ roster, me }: { roster: NonNullable<SaveState['roster']>; me: string | null }) {
   const columns = roster.rankColumns ?? []
   const all = roster.heisman ?? []
   const heisman = all.filter((h) => h.index >= 0)
@@ -908,6 +912,13 @@ function Found({ roster }: { roster: NonNullable<SaveState['roster']> }) {
                   <Meta size={9} color="var(--ink4)">
                     BIT {c.at} · {c.width} WIDE
                   </Meta>
+                  {/* The fastest way to recognise your own poll: you already
+                      know where your team sits in it. */}
+                  {me ? (
+                    <Meta size={9} color={c.ranks[me] ? 'var(--good)' : 'var(--ink4)'}>
+                      {me.toUpperCase()}: {c.ranks[me] ? `NO. ${c.ranks[me]}` : 'UNRANKED'}
+                    </Meta>
+                  ) : null}
                 </div>
                 <div style={{ marginTop: 5, fontSize: 12, color: 'var(--ink2)' }}>
                   {top.map(([name, rank]) => `${rank}. ${name}`).join('  ·  ')}

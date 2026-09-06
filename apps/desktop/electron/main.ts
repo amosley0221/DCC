@@ -321,9 +321,8 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
     // of them is the AP and which is the coaches'.
     rememberRanks(rankColumns.length === 1 ? rankColumns[0].ranks : chosenRanks(rankColumns))
 
-    const rows = new Set(players.map((p) => p.index))
     const byRow = new Map(players.map((p) => [p.index, p]))
-    const heismanRows = readHeisman(payload, rows)
+    const heismanRows = readHeisman(payload, players)
     const heisman = heismanRows.map((h) => {
       const p = byRow.get(h.playerIndex)
       return {

@@ -172,8 +172,11 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
     Buffer.from('BSFT', 'latin1'), u32(0), u32(0), u32(HROW / 4), u32(HROWS), u32(HMEMBERS), u32(0),
     Buffer.alloc(HMEMBERS * 4),
   ])
+  // The game shows four names and the table has five rows, so the last one is
+  // spare. Insisting that every row resolve is what found nothing on a real
+  // save; three agreeing is the test, and the rest are the end of the list.
   const hrows = Buffer.alloc(HROW * HROWS)
-  const players = [811, 47, 1290, 305, 96]
+  const players = [811, 47, 1290, 305]
   players.forEach((idx, r) => {
     const o = r * HROW
     hrows.writeUInt32BE(9000 - r * 37, o + 0)   // points, or something like it
@@ -183,18 +186,29 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
   })
   const hpayload = Buffer.concat([Buffer.alloc(64), hhead, hrows, Buffer.alloc(64)])
 
-  const roster = new Set(players)
+  // Everyone on a roster, plus one who is not: nobody unrostered is in the
+  // running for anything, and the first version of this put exactly such a
+  // player at the top of the watch.
+  const roster = players.map((index, i) => ({ index, playerId: 5000 + i, team: 12 }))
+  roster.push({ index: 4242, playerId: 9999, team: 255 })
+
   const watch = S.readHeisman(hpayload, roster)
-  assert.equal(watch.length, 5)
-  assert.deepEqual(watch.map((w) => w.rank), [1, 2, 3, 4, 5])
+  assert.equal(watch.length, 4, 'the spare row is not a name')
+  assert.deepEqual(watch.map((w) => w.rank), [1, 2, 3, 4])
   assert.deepEqual(watch.map((w) => w.playerIndex), players,
-    'the player column is the one that resolves in every row')
+    'the player column is the one that resolves across the rows that are filled')
   assert.equal(watch[0].words.length, HROW / 4, 'the rest of the row is kept as words')
 
   // A roster that knows none of them leaves the column unfound rather than
   // pointing at whichever bytes happened to look plausible.
-  const blind = S.readHeisman(hpayload, new Set([1, 2, 3]))
-  assert.deepEqual(blind.map((w) => w.playerIndex), [-1, -1, -1, -1, -1])
+  const blind = S.readHeisman(hpayload, [{ index: 1, playerId: 1, team: 3 }])
+  assert.ok(blind.every((w) => w.playerIndex === -1), 'no column, no names')
+
+  // And an unrostered player is never a candidate, however well the bytes fit.
+  const unrostered = S.readHeisman(hpayload,
+    players.map((index, i) => ({ index, playerId: 5000 + i, team: 255 })))
+  assert.ok(unrostered.every((w) => w.playerIndex === -1),
+    'a player on nobody\'s roster is not in the running')
 
   // The failure that shipped: a save holds sixteen thousand roster rows, so
   // "this value is a roster row" is no test at all. A column counting 0..4 read
@@ -207,9 +221,9 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
     crows.writeUInt32BE(0, r * HROW + 12)
   }
   const cpayload = Buffer.concat([Buffer.alloc(64), hhead, crows, Buffer.alloc(64)])
-  const everyone = new Set(Array.from({ length: 16000 }, (_, i) => i))
+  const everyone = Array.from({ length: 16000 }, (_, i) => ({ index: i, playerId: i, team: 12 }))
   const counted = S.readHeisman(cpayload, everyone)
-  assert.deepEqual(counted.map((w) => w.playerIndex), [-1, -1, -1, -1, -1],
+  assert.ok(counted.every((w) => w.playerIndex === -1),
     'a counter is not a player reference, however valid its values look')
 }
 
