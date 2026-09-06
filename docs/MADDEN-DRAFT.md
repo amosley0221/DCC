@@ -162,3 +162,56 @@ spread across 43, 26, 62, 18 and 14 bytes with no winner. The names live in a
 variable-length pool, so the technique that opened CFB will not open this. That
 is a finding, not a failure — it says the roster has to be reached through the
 references rather than by reading the strings.
+
+## `DraftPickStore`, decoded
+
+672 rows of 16 bytes: **3 future drafts × 7 rounds × 32 teams**. Each row is one
+unexercised pick, and the player slot is empty in all 672 — this is pick
+*inventory*, not draft results. Asking for a list of drafted players would not
+have helped, which is worth recording because it was the obvious thing to ask
+for.
+
+| Bytes | Field |
+| --- | --- |
+| 0–1 | Draft year tag: **16 = 2028, 24 = 2029, 32 = 2030** |
+| 2–3 | `round × 2080 + slot`, so round is `⌊lo / 2080⌋ + 1` and the slot is `lo % 2080` |
+| 4–7 | The selected player. **Zero in every row** — a pick that has been used leaves this store |
+| 8–11 | Original team, tag `0x2e5c` |
+| 12–15 | Current owner, tag `0x2e5c` |
+
+Rows are grouped by team, not by pick order. A first attempt assumed the 224
+rows of a draft ran in overall-pick order and looked up slots 23, 55, 87 and so
+on; the owners that came back were unrelated, which is what said the assumption
+was wrong.
+
+The overall pick number is `slot + 1 + (round − 1) × 32`.
+
+### Verified against the game's own screen
+
+The user's draft-capital screen lists Tampa Bay holding 2028 picks 23, 55, 87,
+119, 151, 183 and 215, and seven more in each of 2029 and 2030. Read back out of
+the save:
+
+```
+2028 Round 1 Pick 23    2028 Round 5 Pick 151
+2028 Round 2 Pick 55    2028 Round 6 Pick 183
+2028 Round 3 Pick 87    2028 Round 7 Pick 215
+2028 Round 4 Pick 119
+```
+
+**Seven of seven, and 21 picks owned in total**, matching the screen exactly.
+
+### What this anchors
+
+- **Tampa Bay is team 6.** The user's team, which every other read hangs off.
+- **`0x2e5c` is the team tag**, and team indices run 0–34 with 8, 9 and 18
+  missing — 32 real teams in a 35-row `TeamStore`, the same shape as CFB's team
+  table carrying non-school rows.
+- **Trades are visible.** A pick whose two team references differ has been
+  traded: 54 such picks in the earlier save, **73 in the later one**. A week of
+  trading, readable without decoding a single trade record.
+
+One thing not to trust yet: for 2029 and 2030 the game shows the pick as TBD and
+the slot field holds a value anyway — Tampa Bay's reads 15 for most of 2029 and
+23 for most of 2030, with round 7 disagreeing in both. Those are stale or
+provisional and should not be shown as real pick numbers.
