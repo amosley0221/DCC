@@ -347,14 +347,51 @@ ids, `HistoryEntryStore` references player indices 0 to 3,527, and `TeamStore`'s
 roster bytes total 2,245 players in the league — an allocation of about 3,528
 slots, roughly two thirds filled.
 
-### What is not decoded yet
+### The record is 131 bytes, and it is all strings
 
-**Team, position, ratings and the rest.** Every attempt to read them at a fixed
-offset from the id fails, and the test that says so is a good one: no byte
-offset from −104 to +60 groups the records into 32 teams whose sizes match
-`TeamStore`'s roster counts. The records are variable-length, so those fields
-need the record's own format parsed rather than an offset guessed at.
+Consecutive player ids are **exactly 131 bytes apart** — verified across 24
+players named off the roster screen, with no exception. The record is fixed, not
+variable-length as the earlier drifting strides suggested; what varies is only
+which fields happen to be empty.
 
-**The link from a history reference to a row of this table.** The counts agree,
-but agreeing counts are not a mapping, and there is no ground-truth pair yet to
-prove that reference *n* is the *n*th record.
+Laid out from the record start (the id sits at +64):
+
+| Offset | Field | Example |
+| --- | --- | --- |
+| +0 | First name | `Tristan` |
+| +17 | Head asset | `gen_4_B_G_003` |
+| +43 | Surname | `Wirfs` |
+| +64 | Asset id | `WirfsTristan_20971` |
+| +105 | Hometown | `Mount Vernon` |
+
+**Every byte of it is string data.** There is no age, height, weight, position,
+overall or rating anywhere in the 131 bytes. That single fact explains every
+failed search below it, and it is why dumping a record beats sweeping for values.
+
+### What is not in this table, and the searches that proved it
+
+Five player cards gave age, height, weight and overall for named players, and
+the roster screen gave age and overall for 24 more. Against those:
+
+- **No plain byte** within ±300 of the id holds age, weight or overall.
+- **No bit field** of width 5–11 within ±2400 bits holds them either, with or
+  without a constant storage offset.
+- The best any offset manages for age is **6 of 24 anchors**, against 0.8
+  expected from chance — noise, not signal.
+
+An earlier pass on **three** anchors did report six candidate age fields, spaced
+exactly 1048 bits apart, and that spacing is real: 1048 bits is the 131-byte
+record. But the hits themselves were chance — five bits across three players
+over that range should throw up about five false positives, and it threw up six.
+Widening to 24 anchors killed all of them. Three anchors is not an answer key.
+
+**Overall is not stored**, which is now established twice independently: not in
+the draft class record, and not here.
+
+### The next step
+
+The numbers live in a **parallel structure indexed the same way** — the name
+table holds about 3,538 entries and `HistoryEntryStore` references indices 0 to
+3,527. Finding that array is the next job, and the name table makes it tractable:
+any candidate array must have the same entry count, and row *n* of it must give
+Tristan Wirfs 97 overall and Nash Hutmacher 53.
