@@ -388,10 +388,46 @@ Widening to 24 anchors killed all of them. Three anchors is not an answer key.
 **Overall is not stored**, which is now established twice independently: not in
 the draft class record, and not here.
 
-### The next step
+### The table is 3,528 records, and the history resolves against it
 
-The numbers live in a **parallel structure indexed the same way** — the name
-table holds about 3,538 entries and `HistoryEntryStore` references indices 0 to
-3,527. Finding that array is the next job, and the name table makes it tractable:
-any candidate array must have the same entry count, and row *n* of it must give
-Tristan Wirfs 97 overall and Nash Hutmacher 53.
+The regex that finds records by their asset id **undercounts the table**: it
+matched 3,061 records, because some ids begin with a character it did not expect.
+Walking the 131-byte stride outward from a known record instead gives the true
+extent:
+
+```
+base 7939428, 3,528 records of 131 bytes, 3,526 of them filled
+first: Israel Abanikanda      last: Braxton Woodson
+```
+
+**3,528 is exactly the index space `HistoryEntryStore` references** (0 to 3,527).
+That is not a coincidence and it settles the mapping that could not be proven
+before: **the reference index is the record's position in this table.**
+
+Resolving every history row against it: **48,176 of 48,176 player references
+resolve to a named player, 100.0%** — Terence Steele, Kyle Pitts Sr, Andrew Van
+Ginkel, Sean Murphy-Bunting, Tyler Warren. The news and transaction log can be
+read by player today.
+
+Worth noting how the earlier count went wrong. The mismatch between "3,061
+records" and "references up to 3,527" was written down as an open question
+rather than smoothed over, and that is what made it findable. Two numbers that
+should agree and don't are a lead, not a rounding error.
+
+### Still not decoded: the numeric attributes
+
+Age, height, weight, position and ratings are in neither the 131-byte record nor
+any parallel array found so far. The search is now bounded, with 20 Buccaneers
+of known index, age and overall as the key:
+
+- **No byte-aligned array at any stride from 1 to 400**, keyed by player index,
+  reproduces the known ages.
+- Nor does one reproduce overall — though that search was misconceived, since
+  overall is computed rather than stored, established twice already.
+- **No column at any stride to 400 holds one shared value for all 20
+  Buccaneers** while splitting the table into ~32 groups of the right size. That
+  test needs no encoding assumption at all, and it comes back empty.
+
+So the attributes are either bit-packed rather than byte-aligned, keyed by
+something other than the table index, or at a stride beyond 400. That is the
+next thing to try, and the 20-player key is ready for it.
