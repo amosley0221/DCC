@@ -230,24 +230,22 @@ private fun RecruitRow(
                 r.stars?.takeIf { it in 1..5 }?.let { StarRow(it, 9) }
                 Spacer(Modifier.height(3.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // The overall sits inside the crests rather than outside
+                    // them, so the last crest ends flush with the stars above
+                    // however many schools are still in it.
+                    if (revealed) {
+                        NumText(
+                            "${r.overall}",
+                            if (r.overall >= 85) c.ink else c.ink2,
+                            13, FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
                     // Once he is committed the race is over, so the row says who
                     // got him rather than who else was asking.
-                    r.leaders().forEach { s ->
+                    r.leaders().forEachIndexed { i, s ->
+                        if (i > 0) Spacer(Modifier.width(4.dp))
                         SchoolBadge(s.take(2).uppercase(), s, isUser = false, size = 17.dp)
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    // The slot keeps its width whether or not the number is in
-                    // it, so rows do not shift under the thumb as they are
-                    // scouted — but an unscouted overall shows nothing rather
-                    // than two dashes, which beside a crest read as a fault.
-                    Box(Modifier.width(24.dp), contentAlignment = Alignment.CenterEnd) {
-                        if (revealed) {
-                            NumText(
-                                "${r.overall}",
-                                if (r.overall >= 85) c.ink else c.ink2,
-                                13, FontWeight.SemiBold,
-                            )
-                        }
                     }
                 }
             }

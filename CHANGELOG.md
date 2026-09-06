@@ -10,6 +10,16 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.57.1] - 2026-09-06
+
+### Fixed
+
+- **The school crests on a recruit row line up with the stars above them.** The
+  overall's slot was sitting to their right and pushing them in by its width,
+  so the crests stopped short of the edge everything else lines up on. The
+  overall now sits inside the crests, and the last one ends flush however many
+  schools are still in it.
+
 ## [0.57.0] - 2026-09-06
 
 ### Fixed
