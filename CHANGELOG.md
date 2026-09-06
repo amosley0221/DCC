@@ -10,6 +10,22 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.52.0] - 2026-09-06
+
+### Added
+
+- **School crests on every recruit row**, on both apps, in the place the hidden
+  overall was sitting on its own.
+
+  A committed or signed recruit shows one crest — the school that got him. The
+  race is over, and the interest numbers behind a settled recruit are last
+  week's news. Everyone else shows the three schools still in it.
+
+  A soft commit counts as still in it and keeps all three, because that is
+  exactly the recruit worth a second look.
+
+  The overall keeps its slot beside them, so rows do not shift as you scout.
+
 ## [0.51.0] - 2026-09-06
 
 ### Added

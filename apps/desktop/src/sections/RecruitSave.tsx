@@ -1,9 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { indexArt, rosterPatch, useSave } from '../saveStore'
-import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SectionHeader, Tab } from '../ui'
+import { Btn, Card, Chip, Empty, Input, Kicker, Meta, PlayerFace, SchoolArt, SectionHeader, Tab } from '../ui'
 import { useOps, useStore } from '../store'
 import type { RecruitBoard, RosterPlayer } from '../../electron/saveAnalysis'
 import { COMMIT_MAX, INTEREST_MAX, RECRUIT_STAGES, STAGE_LABEL } from '../../electron/recruiting'
+
+/**
+ * The schools worth showing on a row: the one he picked, or the three still in
+ * it.
+ *
+ * A hard commit or a signature settles it, so showing the field there would be
+ * noise — the interest behind a committed recruit is last week's race. A soft
+ * commit keeps all three, because that is the recruit worth looking at twice.
+ */
+const leaders = (board: RecruitBoard | null): string[] => {
+  const ranked = [...(board?.topSchools ?? [])].sort((a, b) => b.interest - a.interest)
+  if (!ranked.length) return []
+  return board!.stage === 'HardCommitted' || board!.stage === 'Signed'
+    ? [ranked[0].school]
+    : ranked.slice(0, 3).map((s) => s.school)
+}
 
 /**
  * The recruiting pool, read from the save.
@@ -89,6 +105,12 @@ export default function RecruitSave() {
   const board = useMemo(
     () => new Map((save.roster?.recruitBoard ?? []).map((b) => [b.playerIndex, b])),
     [save.roster],
+  )
+
+  /** A school's mark, by the same fallbacks the rest of the app uses. */
+  const crest = useCallback(
+    (school: string) => save.schoolArt[`${school}|logoLight`] ?? save.schoolArt[`${school}|icon`],
+    [save.schoolArt],
   )
 
   const unrostered = useMemo(
@@ -216,6 +238,7 @@ export default function RecruitSave() {
         {shown.slice(0, 300).map((p) => (
           <RecruitRow key={p.index} p={p} open={open === p.index}
             board={board.get(p.index) ?? null}
+            crest={crest}
             onSaved={() => void load()}
             ratingNames={save.roster!.ratingNames}
             face={save.facePaths[p.assetId]}
@@ -285,9 +308,10 @@ export default function RecruitSave() {
 }
 
 function RecruitRow(
-  { p, board, open, onClick, ratingNames, face, shown, onReveal, onSaved }:
+  { p, board, crest, open, onClick, ratingNames, face, shown, onReveal, onSaved }:
   {
     p: RosterPlayer; board: RecruitBoard | null
+    crest: (school: string) => string | undefined
     open: boolean; onClick: () => void; ratingNames: string[]; face?: string
     shown: boolean; onReveal: () => void; onSaved: () => void
   },
@@ -315,6 +339,11 @@ function RecruitRow(
             {STAGE_LABEL[board.stage] ?? board.stage}
           </span>
         ) : null}
+        <span className="row" style={{ gap: 3, width: 66, justifyContent: 'flex-end' }}>
+          {leaders(board).map((school) => (
+            <SchoolArt key={school} size={18} file={crest(school)} />
+          ))}
+        </span>
         <span style={{ width: 150, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
           {p.hometown}{p.homeState ? `, ${p.homeState}` : ''}
         </span>

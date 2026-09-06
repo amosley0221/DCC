@@ -20,6 +20,24 @@ import com.dcc.app.state.SnapshotView
 import com.dcc.app.ui.components.*
 import com.dcc.app.ui.theme.Dcc
 
+/**
+ * The schools worth showing on his row: the one he picked, or the three still
+ * in it.
+ *
+ * A hard commit or a signature settles it, so showing the field there would be
+ * noise — the interest numbers behind a committed recruit are last week's race.
+ * A soft commit is not settled, so it keeps all three: that is exactly the
+ * recruit worth looking at twice.
+ */
+private fun SnapshotRecruit.leaders(): List<String> {
+    val ranked = topSchools.filter { it.school.isNotEmpty() }.sortedByDescending { it.interest }
+    if (ranked.isEmpty()) return emptyList()
+    return when (stage) {
+        "HardCommitted", "Signed" -> listOf(ranked.first().school)
+        else -> ranked.take(3).map { it.school }
+    }
+}
+
 /** The game's own words for how far along a recruitment is. */
 private val STAGE_LABEL = mapOf(
     "Top10" to "TOP 10", "Top5" to "TOP 5", "Top3" to "TOP 3", "Battle" to "BATTLE",
@@ -152,18 +170,28 @@ private fun RecruitRow(
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
                 r.stars?.takeIf { it in 1..5 }?.let { StarRow(it, 9) }
-                Spacer(Modifier.height(2.dp))
-                // An unscouted overall keeps its slot rather than leaving one, so
-                // the rows do not shift under the thumb as they are revealed.
-                NumText(
-                    if (revealed) "${r.overall}" else "––",
-                    when {
-                        !revealed -> c.ink4
-                        r.overall >= 85 -> c.ink
-                        else -> c.ink2
-                    },
-                    13, FontWeight.SemiBold,
-                )
+                Spacer(Modifier.height(3.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Once he is committed the race is over, so the row says who
+                    // got him rather than who else was asking.
+                    r.leaders().forEach { s ->
+                        SchoolBadge(s.take(2).uppercase(), s, isUser = false, size = 17.dp)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    // An unscouted overall keeps its slot rather than leaving one,
+                    // so the rows do not shift under the thumb as they are revealed.
+                    Box(Modifier.width(24.dp), contentAlignment = Alignment.CenterEnd) {
+                        NumText(
+                            if (revealed) "${r.overall}" else "––",
+                            when {
+                                !revealed -> c.ink4
+                                r.overall >= 85 -> c.ink
+                                else -> c.ink2
+                            },
+                            13, FontWeight.SemiBold,
+                        )
+                    }
+                }
             }
         }
 
