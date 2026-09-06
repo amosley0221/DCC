@@ -10,6 +10,39 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.45.0] - 2026-09-05
+
+### Fixed
+
+- **The Heisman watch named five players it had no business naming.** A
+  sixty-eight overall receiver on no team at all, then the next names
+  alphabetically. The check was worthless: it asked only that the value be a
+  valid roster row, and a save holds sixteen thousand of those — so a column
+  counting 0, 1, 2, 3, 4 sailed through and the "shortlist" was the first five
+  rows of the player table.
+
+  A reference in this format is a two-byte type tag and a two-byte index, so the
+  tag is the thing worth insisting on: it must be the same across all five rows
+  and large enough to be a type id rather than a small number that happens to
+  sit there, the five indices must be five different players, and they must not
+  be the first five in the table. When nothing passes, DCC now prints the five
+  rows as raw numbers and says the column is not placed, rather than naming
+  people it cannot vouch for.
+
+- **No ranking was found because the search was reading bytes.** This save is
+  bit-packed everywhere else — the entire player record is — so a rank that
+  needs eight bits sits wherever the field before it ended, not on a byte
+  boundary. The search now runs over every bit position at every width from five
+  to twelve, which is where a ranking of 143 programs can actually live.
+
+### Changed
+
+- **The bracket is a bracket.** Four columns, a stub out of every game and a
+  spine joining the two that feed the next — first round through to the title.
+  The geometry needs no measuring, so it holds at any window size: a pair of
+  cells puts its two midpoints at a quarter and three quarters of its height,
+  and a line between those two points meets both by construction.
+
 ## [0.44.0] - 2026-09-05
 
 ### Added

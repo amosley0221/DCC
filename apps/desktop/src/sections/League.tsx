@@ -5,7 +5,7 @@ import { Card, Chip, Empty, Kicker, Meta, SchoolArt, SectionHeader, Tab } from '
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import {
   buildLeague, conferenceArtKeys, conferences, FIRST_ROUND, margin, orderByRanks,
-  played, projectPlayoff, QUARTERFINALS, rankings, visibleGames, winPct,
+  played, projectPlayoff, QUARTERFINALS, rankings, SEMIFINALS, visibleGames, winPct,
 } from '../../electron/league'
 import type { LeagueRow, PlayoffField } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
@@ -535,24 +535,30 @@ function Postseason({ field, bowls, art, award, me, onPick }: {
 
   const Slot = ({ n, note }: { n: number | null; note?: string }) => {
     const t = n === null ? null : seed(n)
+    if (!t) {
+      return (
+        <div className="bkt-slot is-tbd">
+          <span className="bkt-seed" />
+          <span style={{ width: 22, flex: '0 0 auto' }} />
+          <span className="bkt-name">{note ?? 'TBD'}</span>
+        </div>
+      )
+    }
     return (
-      <div className="cfp-slot">
-        <span className="cfp-seed">{n ?? ''}</span>
-        {t ? <SchoolArt size={22} file={art(t.row.name)} /> : <span style={{ width: 22 }} />}
+      <div className="bkt-slot">
+        <span className="bkt-seed">{n}</span>
+        <SchoolArt size={22} file={art(t.row.name)} />
         <button
-          onClick={t ? () => onPick(t.row.name) : undefined}
+          className="bkt-name"
+          onClick={() => onPick(t.row.name)}
           style={{
-            all: 'unset', cursor: t ? 'pointer' : 'default', flex: 1, minWidth: 0,
-            color: t && t.row.name === me ? 'var(--accent)' : t ? 'var(--ink)' : 'var(--ink3)',
+            all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0,
+            color: t.row.name === me ? 'var(--accent)' : 'var(--ink)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
-        >{t ? t.row.name : note ?? 'TBD'}</button>
-        {t ? (
-          <span className="num" style={{ fontSize: 12, color: 'var(--ink3)' }}>
-            {t.row.wins}-{t.row.losses}
-          </span>
-        ) : null}
-        {t?.champion ? <Meta size={9} color="var(--accent)">CH</Meta> : null}
+        >{t.row.name}</button>
+        {t.champion ? <Meta size={9} color="var(--accent)">CH</Meta> : null}
+        <span className="bkt-rec">{t.row.wins}-{t.row.losses}</span>
       </div>
     )
   }
@@ -577,51 +583,73 @@ function Postseason({ field, bowls, art, award, me, onPick }: {
         </p>
       </Card>
 
-      <div className="cfp">
-        <div className="cfp-col">
-          <RoundHead file={award('playoff:round1')} label="First round" />
-          {FIRST_ROUND.map(([a, b]) => (
-            <Card className="cfp-game" key={a}>
-              <Slot n={a} /><Slot n={b} />
-            </Card>
-          ))}
-        </div>
-        <div className="cfp-col">
-          <RoundHead file={award('playoff:qtrfinal')} label="Quarterfinals" />
-          {QUARTERFINALS.map(({ seed: s, from }) => (
-            <Card className="cfp-game" key={s}>
-              <Slot n={s} />
-              <div className="cfp-slot">
-                <span className="cfp-seed" />
-                <span style={{ width: 22 }} />
-                <span style={{ flex: 1, color: 'var(--ink3)' }}>
-                  Winner of {from[0]} v {from[1]}
-                </span>
+      <div className="bkt">
+        <div className="bkt-col">
+          <div className="bkt-head"><RoundHead file={award('playoff:round1')} label="First round" /></div>
+          <div className="bkt-body">
+            {/* Four games, each feeding the quarterfinal beside it, so no pair
+                is joined here — the spine starts one column along. */}
+            {FIRST_ROUND.map(([a, b]) => (
+              <div className="bkt-pair" key={a}>
+                <div className="bkt-cell">
+                  <div className="bkt-game"><Slot n={a} /><Slot n={b} /></div>
+                </div>
               </div>
-            </Card>
-          ))}
+            ))}
+          </div>
         </div>
-        <div className="cfp-col">
-          <RoundHead file={award('playoff:semigame')} label="Semifinals" />
-          <Card className="cfp-game">
-            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
-              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 1 bracket</span></div>
-            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
-              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 4 bracket</span></div>
-          </Card>
-          <Card className="cfp-game">
-            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
-              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 3 bracket</span></div>
-            <div className="cfp-slot"><span className="cfp-seed" /><span style={{ width: 22 }} />
-              <span style={{ flex: 1, color: 'var(--ink3)' }}>Winner of the 2 bracket</span></div>
-          </Card>
-          <Card className="cfp-game" style={{ borderColor: 'var(--accent)' }}>
-            <div className="cfp-slot">
-              <span className="cfp-seed" />
-              <SchoolArt size={22} file={award('playoff:nationalchampionship')} />
-              <span style={{ flex: 1, color: 'var(--accent)' }}>National championship</span>
+
+        <div className="bkt-col">
+          <div className="bkt-head"><RoundHead file={award('playoff:qtrfinal')} label="Quarterfinals" /></div>
+          <div className="bkt-body">
+            {[[0, 1], [2, 3]].map(([i, j]) => (
+              <div className="bkt-pair is-joined" key={i}>
+                {[i, j].map((k) => {
+                  const q = QUARTERFINALS[k]
+                  return (
+                    <div className="bkt-cell" key={q.seed}>
+                      <div className="bkt-game">
+                        <Slot n={q.seed} />
+                        <Slot n={null} note={`Winner of ${q.from[0]} v ${q.from[1]}`} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bkt-col">
+          <div className="bkt-head"><RoundHead file={award('playoff:semigame')} label="Semifinals" /></div>
+          <div className="bkt-body">
+            <div className="bkt-pair is-joined">
+              {SEMIFINALS.map(([a, b]) => (
+                <div className="bkt-cell" key={a}>
+                  <div className="bkt-game">
+                    <Slot n={null} note={`Winner of the ${a} bracket`} />
+                    <Slot n={null} note={`Winner of the ${b} bracket`} />
+                  </div>
+                </div>
+              ))}
             </div>
-          </Card>
+          </div>
+        </div>
+
+        <div className="bkt-col">
+          <div className="bkt-head">
+            <RoundHead file={award('playoff:nationalchampionship')} label="The title" />
+          </div>
+          <div className="bkt-body">
+            <div className="bkt-pair">
+              <div className="bkt-cell">
+                <div className="bkt-game is-title">
+                  <Slot n={null} note="Winner of the top half" />
+                  <Slot n={null} note="Winner of the bottom half" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

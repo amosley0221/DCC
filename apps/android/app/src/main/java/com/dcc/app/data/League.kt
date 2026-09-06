@@ -222,8 +222,11 @@ object League {
         )
     }
 
-    /** First-round pairings, higher seed first. Seeds one to four are not here. */
-    val FIRST_ROUND: List<Pair<Int, Int>> = listOf(5 to 12, 6 to 11, 7 to 10, 8 to 9)
+    /**
+     * First-round pairings, in the order the bracket is drawn: 8v9, 5v12, 6v11,
+     * 7v10, so each sits beside the quarterfinal it feeds. Same order as the PC.
+     */
+    val FIRST_ROUND: List<Pair<Int, Int>> = listOf(8 to 9, 5 to 12, 6 to 11, 7 to 10)
 
     /** Quarterfinals: a bye seed against the winner of one first-round game. */
     val QUARTERFINALS: List<Pair<Int, Pair<Int, Int>>> =

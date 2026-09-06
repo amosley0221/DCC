@@ -120,31 +120,44 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
   const order25 = [5, 1, 9, 3, 12, 2, 20, 7, 25, 4, 18, 6, 11, 8, 22, 10, 15, 13, 24, 14, 19, 16, 23, 17, 21]
   order25.forEach((rank, i) => { poll[i * 1 + 3] = rank })
 
+  // Written at bit positions, not byte ones: this save is bit-packed
+  // everywhere else, and reading it in bytes is why the first version of this
+  // search came back with nothing on a real file.
+  const putBits = (row, start, w, v) => {
+    for (let b = 0; b < w; b++) {
+      const bit = start + b
+      const mask = 1 << (7 - (bit & 7))
+      const at = row * TROW + (bit >> 3)
+      if ((v >> (w - 1 - b)) & 1) trows[at] |= mask
+      else trows[at] &= ~mask
+    }
+  }
+  const ORDER_AT = 11, POLL_AT = 30, COUNTER_AT = 47, CONST_AT = 61
   for (let r = 0; r < TEAMS; r++) {
-    const o = r * TROW
-    trows.writeUInt8(full[r], o + 0)          // the ordering
-    trows.writeUInt8(poll[r], o + 1)          // the poll
-    trows.writeUInt8(r + 1, o + 2)            // a counter — the decoy
-    trows.writeUInt8(7, o + 3)                // a constant
-    trows.writeUInt16BE(3000 + r * 13, o + 8) // something else entirely
+    putBits(r, ORDER_AT, 8, full[r])          // the ordering
+    putBits(r, POLL_AT, 5, poll[r])           // the poll
+    putBits(r, COUNTER_AT, 8, r + 1)          // a counter — the decoy
+    putBits(r, CONST_AT, 6, 7)                // a constant
+    putBits(r, 80, 12, 3000 + r * 13)         // something else entirely
   }
   const tpayload = Buffer.concat([Buffer.alloc(64), thead, trows, Buffer.alloc(64)])
 
   const found = S.findTeamRanks(tpayload)
-  const kinds = found.map((f) => `${f.kind}@${f.at}`)
-  assert.ok(kinds.includes('full@0'), 'the shuffled ordering is found: ' + kinds.join(' '))
-  assert.ok(kinds.includes('top25@1'), 'the poll is found: ' + kinds.join(' '))
-  assert.ok(!kinds.some((k) => k.endsWith('@2')), 'a counter is not a ranking')
-  assert.ok(!kinds.some((k) => k.endsWith('@3')), 'a constant is not a ranking')
-
-  const ordering = found.find((f) => f.at === 0 && f.kind === 'full')
+  const ordering = found.find((f) => f.kind === 'full' && f.ranks[0] === full[0])
+  assert.ok(ordering, 'the shuffled ordering is found somewhere: ' +
+    found.map((f) => `${f.kind}@${f.at}/${f.width}`).join(' '))
   for (let r = 0; r < TEAMS; r++) assert.equal(ordering.ranks[r], full[r])
   assert.equal(ordering.top[0].rank, 1)
   assert.equal(ordering.top.length, 25, 'the sample is the top 25 of whatever it found')
 
-  const found25 = found.find((f) => f.kind === 'top25' && f.at === 1)
+  const found25 = found.find((f) => f.kind === 'top25' && f.ranks[3] === 5)
+  assert.ok(found25, 'the poll is found')
   assert.equal(Object.keys(found25.ranks).length, 25, 'only the ranked teams carry a rank')
-  assert.equal(found25.ranks[3], 5, 'and the rank is the one the column held')
+
+  // The counter must not appear as a ranking under any width or position.
+  const counter = Array.from({ length: TEAMS }, (_, r) => r + 1)
+  assert.ok(!found.some((f) => counter.every((v, r) => f.ranks[r] === v)),
+    'a counter is not a ranking, whatever bit it starts at')
 }
 
 /* ---------------------------------------------------------- the Heisman five */
@@ -182,6 +195,22 @@ assert.equal(g1.played, false); assert.equal(g1.kickoff, 900)
   // pointing at whichever bytes happened to look plausible.
   const blind = S.readHeisman(hpayload, new Set([1, 2, 3]))
   assert.deepEqual(blind.map((w) => w.playerIndex), [-1, -1, -1, -1, -1])
+
+  // The failure that shipped: a save holds sixteen thousand roster rows, so
+  // "this value is a roster row" is no test at all. A column counting 0..4 read
+  // as five real players, and the watch list came out alphabetical.
+  const crows = Buffer.alloc(HROW * HROWS)
+  for (let r = 0; r < HROWS; r++) {
+    crows.writeUInt32BE(r, r * HROW + 0)       // a counter, no tag in front
+    crows.writeUInt32BE(r * 3, r * HROW + 4)   // another one
+    crows.writeUInt32BE(0, r * HROW + 8)
+    crows.writeUInt32BE(0, r * HROW + 12)
+  }
+  const cpayload = Buffer.concat([Buffer.alloc(64), hhead, crows, Buffer.alloc(64)])
+  const everyone = new Set(Array.from({ length: 16000 }, (_, i) => i))
+  const counted = S.readHeisman(cpayload, everyone)
+  assert.deepEqual(counted.map((w) => w.playerIndex), [-1, -1, -1, -1, -1],
+    'a counter is not a player reference, however valid its values look')
 }
 
 console.log('check-save: game table decodes 2/2 synthetic rows, team order verified,')

@@ -277,16 +277,27 @@ export function projectPlayoff(table: Map<string, LeagueRow>): PlayoffField {
   }
 }
 
-/** First-round pairings, higher seed first. Seeds one to four are not here. */
-export const FIRST_ROUND: [number, number][] = [[5, 12], [6, 11], [7, 10], [8, 9]]
+/**
+ * The bracket, in the order it is drawn top to bottom.
+ *
+ * Written out rather than derived, because the order is the whole point: a
+ * bracket is only readable when a game sits level with the two that feed it.
+ * The first round runs 8v9, 5v12, 6v11, 7v10 so that the quarterfinals below
+ * read 1, 4, 3, 2 — which puts the 1 and 4 brackets in the top semifinal and
+ * the 3 and 2 in the bottom, exactly as the sport seeds it.
+ */
+export const FIRST_ROUND: [number, number][] = [[8, 9], [5, 12], [6, 11], [7, 10]]
 
-/** Quarterfinals: a bye seed against the winner of one first-round game. */
+/** Quarterfinals: a bye seed against the winner of the first-round game beside it. */
 export const QUARTERFINALS: { seed: number; from: [number, number] }[] = [
   { seed: 1, from: [8, 9] },
   { seed: 4, from: [5, 12] },
   { seed: 3, from: [6, 11] },
   { seed: 2, from: [7, 10] },
 ]
+
+/** The semifinals, by the bye seed whose quarter feeds each side. */
+export const SEMIFINALS: [number, number][] = [[1, 4], [3, 2]]
 
 /**
  * The art key for a conference's championship mark.

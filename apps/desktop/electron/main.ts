@@ -310,7 +310,7 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
     // only the real thing has, so a wrong answer is not one of the outcomes —
     // finding nothing is.
     const rankColumns = findTeamRanks(payload).map((c) => ({
-      at: c.at, width: c.width, endian: c.endian, kind: c.kind,
+      at: c.at, width: c.width, kind: c.kind,
       ranks: Object.fromEntries(
         Object.entries(c.ranks).map(([i, rank]) => [order[Number(i)]?.name ?? `Team ${i}`, rank]),
       ),

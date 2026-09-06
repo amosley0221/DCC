@@ -873,7 +873,8 @@ function Stores({ stores, path }: {
  */
 function Found({ roster }: { roster: NonNullable<SaveState['roster']> }) {
   const columns = roster.rankColumns ?? []
-  const heisman = (roster.heisman ?? []).filter((h) => h.index >= 0)
+  const all = roster.heisman ?? []
+  const heisman = all.filter((h) => h.index >= 0)
 
   return (
     <Card className="card-pad">
@@ -905,7 +906,7 @@ function Found({ roster }: { roster: NonNullable<SaveState['roster']> }) {
                   <Meta size={9} color="var(--accent)">#{i + 1}</Meta>
                   <Meta size={9}>{c.kind === 'top25' ? 'A POLL — 25 RANKED' : 'A FULL ORDERING'}</Meta>
                   <Meta size={9} color="var(--ink4)">
-                    BYTE {c.at} · {c.width === 1 ? '8-BIT' : `16-BIT ${c.endian.toUpperCase()}`}
+                    BIT {c.at} · {c.width} WIDE
                   </Meta>
                 </div>
                 <div style={{ marginTop: 5, fontSize: 12, color: 'var(--ink2)' }}>
@@ -925,8 +926,24 @@ function Found({ roster }: { roster: NonNullable<SaveState['roster']> }) {
         {heisman.length === 0 ? (
           <div style={{ marginTop: 6 }}>
             <Meta size={9} color="var(--warn)">
-              NO SHORTLIST IN THIS SAVE YET — THE GAME FILLS IT LATER IN THE SEASON
+              {all.length
+                ? `${all.length} ROWS ARE THERE, BUT NONE OF THEIR COLUMNS IS A PLAYER REFERENCE`
+                : 'NO SHORTLIST IN THIS SAVE YET — THE GAME FILLS IT LATER IN THE SEASON'}
             </Meta>
+            {all.length ? (
+              <>
+                <p className="body-serif" style={{ marginTop: 7 }}>
+                  The table is here and it has the right number of rows; which of its four members
+                  is the player is not written down, and nothing in these rows passes the test for
+                  a reference. Rather than name five players it cannot vouch for, DCC prints the
+                  rows. Send these and the column can be placed.
+                </p>
+                <pre style={{
+                  marginTop: 6, fontSize: 11, color: 'var(--ink2)', background: 'var(--surface)',
+                  border: '1px solid var(--line)', borderRadius: 6, padding: 10, overflowX: 'auto',
+                }}>{all.map((h) => `row ${h.rank - 1}  ${h.words.join('  ')}`).join('\n')}</pre>
+              </>
+            ) : null}
           </div>
         ) : (
           <div className="col" style={{ gap: 0, marginTop: 6 }}>

@@ -1994,10 +1994,10 @@ export function dumpStore(payload: Buffer, name: string, limit = 40): StoreDump 
  * a rank, it is an index.
  */
 export interface TeamRankColumn {
-  /** Byte offset within a team row. */
+  /** First bit of the field within a team row, counted from the top. */
   at: number
-  width: 1 | 2
-  endian: 'be' | 'le'
+  /** How wide the field is, in bits. */
+  width: number
   /** Every team ranked, or a top 25 with the rest level. */
   kind: 'full' | 'top25'
   /** Team-table index to rank. */
@@ -2010,24 +2010,37 @@ export function findTeamRanks(payload: Buffer): TeamRankColumn[] {
   const t = storeTable(payload, 'TeamStore')
   if (!t || t.rows < 8 || t.rowBytes < 4) return []
   const rows = t.rows
+  const rowBits = t.rowBytes * 8
+
+  /**
+   * A field at a bit position, read in O(1).
+   *
+   * Bytes were the wrong unit and finding nothing was the proof: this save is
+   * bit-packed everywhere else — the whole player record is — so a rank that
+   * needs eight bits sits wherever the field before it ended, not on a byte
+   * boundary. `start` is the first bit of the field, counted from the top of
+   * the row the same way the player reader counts them.
+   */
+  const at = (base: number, start: number, w: number) => {
+    const i = base + (start >> 3)
+    const shift = start & 7
+    const v = (payload[i] << 16) | (payload[i + 1] << 8) | payload[i + 2]
+    return (v >>> (24 - shift - w)) & ((1 << w) - 1)
+  }
+
   const out: TeamRankColumn[] = []
+  const seen = new Set<string>()
 
-  const readers: [1 | 2, 'be' | 'le', (at: number) => number][] = [
-    [1, 'be', (at) => payload.readUInt8(at)],
-    [2, 'be', (at) => payload.readUInt16BE(at)],
-    [2, 'le', (at) => payload.readUInt16LE(at)],
-  ]
-
-  for (const [width, endian, read] of readers) {
-    for (let a = 0; a + width <= t.rowBytes; a++) {
-      const vals: number[] = []
-      let ok = true
-      for (let r = 0; r < rows; r++) {
-        const cell = t.data + r * t.rowBytes + a
-        if (cell + width > payload.length) { ok = false; break }
-        vals.push(read(cell))
-      }
-      if (!ok) continue
+  // Five bits is enough for a top 25, twelve for a full ordering of 143 with
+  // room over. Narrower than five cannot hold a ranking; wider is a field that
+  // happens to have a small value in it.
+  for (let w = 5; w <= 12; w++) {
+    const limit = rowBits - w
+    for (let start = 0; start <= limit; start++) {
+      // The last bytes of the last row must exist for the three-byte read.
+      if (t.data + (rows - 1) * t.rowBytes + (start >> 3) + 3 > payload.length) break
+      const vals: number[] = new Array(rows)
+      for (let r = 0; r < rows; r++) vals[r] = at(t.data + r * t.rowBytes, start, w)
 
       // A counter is a perfect permutation and means nothing.
       if (vals.every((v, i) => v === i + 1) || vals.every((v, i) => v === i)) continue
@@ -2035,10 +2048,16 @@ export function findTeamRanks(payload: Buffer): TeamRankColumn[] {
       const kind = rankKind(vals, rows)
       if (!kind) continue
 
+      // The same field read one bit wider is the same field with a leading
+      // zero. Keep the narrowest reading of any set of values.
+      const key = vals.join(',')
+      if (seen.has(key)) continue
+      seen.add(key)
+
       const ranks: Record<number, number> = {}
       vals.forEach((v, i) => { if (v >= 1 && v <= rows) ranks[i] = v })
       out.push({
-        at: a, width, endian, kind, ranks,
+        at: start, width: w, kind, ranks,
         top: Object.entries(ranks)
           .map(([index, rank]) => ({ index: Number(index), rank }))
           .sort((x, y) => x.rank - y.rank)
@@ -2085,34 +2104,54 @@ export function readHeisman(payload: Buffer, playerRows: Set<number>): HeismanEn
   if (!t || !t.rows || t.rowBytes < 4) return []
 
   const rowAt = (r: number) => t.data + r * t.rowBytes
-
-  // The player column: a 4-byte reference whose index is a real roster row in
-  // every row of the table. One column that works for all five is not a
-  // coincidence; one that works for three is.
-  let playerAt = -1
-  for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
-    let all = true
-    for (let r = 0; r < t.rows; r++) {
-      const at = rowAt(r) + a
-      if (at + 4 > payload.length) { all = false; break }
-      if (!playerRows.has(payload.readUInt16BE(at + 2))) { all = false; break }
-    }
-    if (all) { playerAt = a; break }
-  }
-
-  const out: HeismanEntry[] = []
+  const rows: number[][] = []
   for (let r = 0; r < t.rows; r++) {
     const o = rowAt(r)
-    if (o + t.rowBytes > payload.length) break
+    if (o + t.rowBytes > payload.length) return []
     const words: number[] = []
     for (let i = 0; i + 4 <= t.rowBytes; i += 4) words.push(payload.readUInt32BE(o + i))
-    out.push({
-      rank: r + 1,
-      playerIndex: playerAt >= 0 ? payload.readUInt16BE(o + playerAt + 2) : -1,
-      words,
-    })
+    rows.push(words)
   }
-  return out
+
+  /*
+   * Which column is the player.
+   *
+   * The first attempt asked only that the value be a roster row, and a save
+   * holds sixteen thousand of those — so a column counting 0, 1, 2, 3, 4
+   * passed, and the watch list came out as the first five players in the table:
+   * alphabetical, sixty-eight overall, one of them on no team at all.
+   *
+   * A reference in this format is a two-byte type tag and a two-byte index, so
+   * the tag is the thing worth insisting on. It must be the same in all five
+   * rows, and large enough to be a type id rather than a small number that
+   * happens to sit there. The indices must also be five different players, and
+   * not the first five in the table — which is what a counter looks like.
+   */
+  let playerAt = -1
+  for (let a = 0; a + 4 <= t.rowBytes; a += 2) {
+    const tag = payload.readUInt16BE(rowAt(0) + a)
+    if (tag < 0x0100 || tag === 0xffff) continue
+    const idx: number[] = []
+    let all = true
+    for (let r = 0; r < t.rows; r++) {
+      const o = rowAt(r) + a
+      if (payload.readUInt16BE(o) !== tag) { all = false; break }
+      const i = payload.readUInt16BE(o + 2)
+      if (!playerRows.has(i)) { all = false; break }
+      idx.push(i)
+    }
+    if (!all) continue
+    if (new Set(idx).size !== idx.length) continue
+    if (idx.every((v, i) => v === i) || idx.every((v, i) => v === i + 1)) continue
+    playerAt = a
+    break
+  }
+
+  return rows.map((words, r) => ({
+    rank: r + 1,
+    playerIndex: playerAt >= 0 ? payload.readUInt16BE(rowAt(r) + playerAt + 2) : -1,
+    words,
+  }))
 }
 
 /**
@@ -2124,8 +2163,7 @@ export function readHeisman(payload: Buffer, playerRows: Set<number>): HeismanEn
  */
 export interface RankColumnView {
   at: number
-  width: 1 | 2
-  endian: 'be' | 'le'
+  width: number
   kind: 'full' | 'top25'
   /** School name to rank. */
   ranks: Record<string, number>

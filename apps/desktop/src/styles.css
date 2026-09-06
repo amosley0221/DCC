@@ -950,21 +950,6 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
 .gs-select:hover { border-color: var(--accent-ui); }
 .gs-select option { background: var(--bg1); color: var(--ink); }
 
-/* ── the playoff bracket ─────────────────────────────────────────────────────
-   Three columns left to right, which is how a bracket is read. It stays a grid
-   rather than drawing connector lines: the pairings are written out in the
-   slots themselves, and a line that has to survive a resize is a line that ends
-   up pointing at the wrong game. */
-.cfp { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
-.cfp-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.cfp-game { padding: 9px 12px; display: flex; flex-direction: column; gap: 6px; }
-.cfp-slot { display: flex; align-items: center; gap: 9px; font-size: 13.5px; min-width: 0; }
-.cfp-seed {
-  width: 18px; flex: 0 0 auto; text-align: right;
-  font-family: var(--mono); font-variant-numeric: tabular-nums;
-  font-size: 12px; color: var(--ink3);
-}
-@media (max-width: 1100px) { .cfp { grid-template-columns: 1fr; } }
 
 /* ── a player in his kit ─────────────────────────────────────────────────────
    One composite, used at every size: the school's colour behind, the school's
@@ -1019,3 +1004,86 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
   object-fit: contain;
   opacity: 0.9;
 }
+
+/* ── the playoff bracket ─────────────────────────────────────────────────────
+   A real bracket: columns of games, a stub out of each one, and a spine joining
+   the two that feed the next.
+
+   The geometry needs no measuring, which is what makes it hold at any size. A
+   pair is a flex column of two equal cells, so their midpoints sit at 25% and
+   75% of the pair's height — and a spine drawn from 25% to 75% meets both, on
+   every screen, whatever the rows inside the games do. */
+.bkt {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 4px 0 10px;
+}
+.bkt-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  flex: 1 1 0;
+}
+.bkt-head { padding: 0 22px 8px 0; }
+.bkt-body { display: flex; flex-direction: column; flex: 1; }
+
+/* A pair of cells with the spine that joins them. One cell alone has no spine. */
+.bkt-pair { position: relative; display: flex; flex-direction: column; flex: 1; }
+.bkt-pair.is-joined::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 25%;
+  bottom: 25%;
+  border-right: 1px solid var(--line);
+}
+
+.bkt-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  padding: 7px 22px 7px 0;
+}
+/* Out to the right, and in from the left. The last column has nothing to feed. */
+.bkt-col:not(:last-child) .bkt-cell::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 22px;
+  border-top: 1px solid var(--line);
+}
+.bkt-col:not(:first-child) .bkt-cell::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 50%;
+  width: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.bkt-game {
+  background: var(--surface);
+  border: 1px solid var(--surfaceLine);
+  border-radius: var(--r-card);
+  padding: 8px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.bkt-game.is-title { border-color: var(--accent); }
+.bkt-slot { display: flex; align-items: center; gap: 9px; font-size: 13.5px; min-width: 0; }
+.bkt-slot.is-tbd { color: var(--ink3); }
+.bkt-seed {
+  width: 18px; flex: 0 0 auto; text-align: right;
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 12px; color: var(--ink3);
+}
+.bkt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bkt-rec { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink3); }
+
+@media (max-width: 1150px) { .bkt-col { min-width: 190px; } }
