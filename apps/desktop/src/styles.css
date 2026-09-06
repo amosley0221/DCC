@@ -1239,3 +1239,17 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
   background-position: 0 0, 0 58%, 0 100%, 0 100%;
   background-repeat: no-repeat, no-repeat, repeat-x, no-repeat;
 }
+
+/* A photograph of the ground, when DCC has one.
+
+   Blurred, because it is a background and not the subject — the scoreline has
+   to read over it — and scaled up a little so the blur has no soft edge to
+   show. This is the one picture in the app that is neither the game's art nor
+   the save's own numbers, so it is only ever the real home team's real ground:
+   there is no generic stadium standing in for the ones DCC could not find. */
+.gs-figure-photo {
+  position: absolute; inset: -4%;
+  background-size: cover; background-position: center 42%;
+  filter: blur(7px) saturate(0.88);
+  transform: scale(1.06);
+}

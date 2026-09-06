@@ -26,6 +26,10 @@ import type { TamperThread } from './sidecar'
 import { readRecruitLedger, writeRecruitLedger } from './sidecar'
 import { fileRecruiting, recruitingNews } from './recruitLedger'
 import type { RecruitEvent } from './recruitLedger'
+import {
+  VENUE_QUERY, commonsUrl, matchVenues, parseCredit, parseVenues, stadiumFileName, thumbFrom,
+} from './stadiums'
+import type { StadiumCredit } from './stadiums'
 import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
 import type { WeekGame } from './season'
@@ -581,6 +585,73 @@ ipcMain.handle('poll:choose', (_e, index: number) => {
 /** The week a save is sitting on. Null without a team, since it is per team. */
 const weekOf = (games: WeekGame[], teamId: number | null) =>
   currentWeek(games, teamId === null ? null : TEAM_ID_NAMES[teamId] ?? null)
+
+/**
+ * Fetch a stadium photograph for every school DCC can find one for.
+ *
+ * This runs here rather than anywhere else because it is the machine with the
+ * internet on it: the environment DCC is written in reaches GitHub and the
+ * package registries and nothing else, so Commons cannot be read from there at
+ * all. See electron/stadiums.ts for the join and the licence rules.
+ *
+ * Writes into the art folder the user already pointed at, named the way every
+ * other mark is named, so the indexer, the art pack and the phone all pick them
+ * up with no further plumbing.
+ */
+ipcMain.handle('stadiums:fetch', async (
+  _e, schools: { name: string; fullName?: string | null }[],
+) => {
+  if (!faceRoot) {
+    return { ok: false as const, message: 'Point DCC at your art folder first — the photographs go in beside the logos.' }
+  }
+  const dir = join(faceRoot, 'stadiums')
+  try {
+    const ua = { 'User-Agent': `DCC/${app.getVersion()} (dynasty companion; personal use)` }
+    const res = await fetch(
+      `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(VENUE_QUERY)}`,
+      { headers: { ...ua, Accept: 'application/sparql-results+json' } },
+    )
+    if (!res.ok) return { ok: false as const, message: `Wikidata answered ${res.status}.` }
+    const rows = parseVenues(await res.json())
+    if (!rows.length) return { ok: false as const, message: 'Wikidata returned no venues.' }
+
+    const { hits, missing } = matchVenues(rows, schools)
+    mkdirSync(dir, { recursive: true })
+
+    const credits: StadiumCredit[] = []
+    const skipped: string[] = []
+    let written = 0
+    for (const { school, row } of hits) {
+      try {
+        const meta = await fetch(commonsUrl(row.image), { headers: ua })
+        if (!meta.ok) { skipped.push(school); continue }
+        const body = await meta.json()
+        const credit = parseCredit(school, row.venue, body)
+        // Commons is free content but not unconditionally: anything it marks
+        // as fair use or non-free is left where it is.
+        if (!credit || !credit.free) { skipped.push(school); continue }
+        const url = thumbFrom(body)
+        if (!url) { skipped.push(school); continue }
+        const img = await fetch(url, { headers: ua })
+        if (!img.ok) { skipped.push(school); continue }
+        const ext = /\.png(\?|$)/i.test(url) ? 'png' : 'jpg'
+        writeFileSync(join(dir, stadiumFileName(school, ext)), Buffer.from(await img.arrayBuffer()))
+        const { free: _free, ...keep } = credit
+        credits.push(keep)
+        written++
+      } catch {
+        skipped.push(school)
+      }
+    }
+    // The record of who took each photograph and under what terms, kept beside
+    // them. Most of Commons asks for the photographer's name; this is where it
+    // is, rather than nowhere.
+    writeFileSync(join(dir, 'credits.json'), JSON.stringify(credits, null, 2))
+    return { ok: true as const, written, missing, skipped, folder: dir }
+  } catch (err) {
+    return { ok: false as const, message: String((err as Error)?.message ?? err) }
+  }
+})
 
 ipcMain.handle('transfers:read', () => {
   const ledger = readLedger()

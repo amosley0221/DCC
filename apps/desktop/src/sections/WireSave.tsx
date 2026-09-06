@@ -275,12 +275,15 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
 
   const artOf = (
     name: string | null | undefined,
-    kind: 'logoLight' | 'helmet' | 'helmetRight' = 'logoLight',
-  ) =>
-    (name
-      ? save.schoolArt[`${name}|${kind}`] ?? save.schoolArt[`${name}|logoLight`] ??
-        save.schoolArt[`${name}|icon`] ?? save.schoolArt[`${name}|logoGold`]
-      : undefined)
+    kind: 'logoLight' | 'helmet' | 'helmetRight' | 'stadium' = 'logoLight',
+  ) => {
+    if (!name) return undefined
+    // A stadium either exists or it does not. Falling back to a logo here would
+    // put a giant mark behind the headline, which is the thing 0.64.0 removed.
+    if (kind === 'stadium') return save.schoolArt[`${name}|stadium`]
+    return save.schoolArt[`${name}|${kind}`] ?? save.schoolArt[`${name}|logoLight`] ??
+      save.schoolArt[`${name}|icon`] ?? save.schoolArt[`${name}|logoGold`]
+  }
 
   const pick = (s: Slide) => { setSlide(s); setHolding(true) }
 
@@ -632,25 +635,44 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
  * at, so this is the honest version of a photograph — the right colour and the
  * right shape, with nothing invented in it.
  */
-function FeatureGround({ bg, tint, field }: {
+function FeatureGround({ bg, tint, field, photo }: {
   bg?: string; tint?: string | null
   /** Draw the ground as a field rather than as a plain colour. */
   field?: boolean
+  /**
+   * A photograph of the ground the game was played at, when there is one.
+   *
+   * This is the only picture in DCC that is not the game's own art or the
+   * user's save, so it is the only one that has to earn its place: it is the
+   * real stadium of the real home team, blurred back and darkened so the
+   * scoreline still reads over it. Where there is none, the drawn field stands
+   * on its own — nothing generic is substituted.
+   */
+  photo?: string
 }) {
   return (
     <>
-      {bg ? (
+      {photo ? (
+        <div className="gs-figure-photo" style={{
+          backgroundImage: `url("dccart://art/${photo.split(/[\\/]/).map(encodeURIComponent).join('/')}")`,
+        }} />
+      ) : null}
+      {bg && !photo ? (
         <div className="gs-figure-bg" style={{
           backgroundImage: `url("dccart://art/${bg.split(/[\\/]/).map(encodeURIComponent).join('/')}")`,
         }} />
       ) : null}
       <div className="gs-figure-wash" style={{
         background: tint
-          ? `linear-gradient(155deg, ${tint}cc, var(--surface) 78%)`
-          : 'linear-gradient(160deg, var(--surfaceStrong), var(--surface))',
-        opacity: bg ? 0.82 : 1,
+          ? photo
+            ? `linear-gradient(155deg, ${tint}aa, rgb(0 0 0 / 0.55) 82%)`
+            : `linear-gradient(155deg, ${tint}cc, var(--surface) 78%)`
+          : photo
+            ? 'linear-gradient(160deg, rgb(0 0 0 / 0.34), rgb(0 0 0 / 0.62))'
+            : 'linear-gradient(160deg, var(--surfaceStrong), var(--surface))',
+        opacity: bg && !photo ? 0.82 : 1,
       }} />
-      {field ? <div className="gs-figure-field" aria-hidden /> : null}
+      {field && !photo ? <div className="gs-figure-field" aria-hidden /> : null}
     </>
   )
 }
@@ -686,7 +708,7 @@ function FeatureList({ kicker, headline, standfirst, bg, tint, children }: {
  */
 function WireRow({ it, artOf, onOpen }: {
   it: WireItem
-  artOf: (n: string | null | undefined, k?: 'logoLight' | 'helmet' | 'helmetRight') => string | undefined
+  artOf: (n: string | null | undefined, k?: 'logoLight' | 'helmet' | 'helmetRight' | 'stadium') => string | undefined
   onOpen: () => void
 }) {
   const openable = it.row !== undefined || it.playerIndex !== undefined
@@ -752,7 +774,7 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
   onBoxScore: () => void
   bg?: string; tint?: string | null
   season: number | null
-  artOf: (name: string | null | undefined, kind?: 'logoLight' | 'helmet' | 'helmetRight') => string | undefined
+  artOf: (name: string | null | undefined, kind?: 'logoLight' | 'helmet' | 'helmetRight' | 'stadium') => string | undefined
   rankOf: (name: string | null | undefined) => number | undefined
   recordOf: (name: string | null | undefined) => { wins: number; losses: number } | undefined
 }) {
@@ -800,7 +822,7 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
         onClick={openGame}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGame() } }}
       >
-        <FeatureGround bg={bg} tint={tint} field />
+        <FeatureGround bg={bg} tint={tint} field photo={artOf(g.home, 'stadium')} />
         <div className="gs-figure-kicker" style={{ zIndex: 1 }}><Kicker>{won ? 'Won' : 'Lost'} · week {g.week}</Kicker></div>
         {/*
           A matchup, not a bare scoreline. Each side stands under its own

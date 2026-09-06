@@ -39,6 +39,42 @@ export default function ArtFolder() {
     dispatch({ type: 'log', line: { text: msg, kind: art.matched ? 'good' : 'bad' } })
   }
 
+  /**
+   * Stadium photographs, which are the one thing the game's art does not have.
+   *
+   * The save has no stadium and the dump has no picture of one, so these come
+   * from Wikimedia Commons — fetched by this machine, because it is the one
+   * with an unrestricted internet connection. They land in the art folder named
+   * like every other mark, so the pack and the phone pick them up with nothing
+   * else to do.
+   */
+  const [stadiums, setStadiums] = useState(false)
+  const getStadiums = async () => {
+    const schools = save.roster?.schools ?? []
+    if (!schools.length) { setNote('Read your save first — the photographs are matched to your schools.'); return }
+    setStadiums(true)
+    setNote(null)
+    const res = await window.dcc.fetchStadiums(
+      schools.map((t) => ({ name: t.name, fullName: t.fullName })),
+    )
+    setStadiums(false)
+    if (!res.ok) {
+      setNote(res.message)
+      dispatch({ type: 'log', line: { text: res.message, kind: 'bad' } })
+      return
+    }
+    const msg = `${res.written} stadium photographs into ${res.folder}` +
+      (res.missing.length ? `; no venue found for ${res.missing.length}` : '') +
+      (res.skipped.length ? `; ${res.skipped.length} skipped` : '')
+    setNote(msg)
+    dispatch({ type: 'log', line: { text: msg, kind: res.written ? 'good' : 'bad' } })
+    // They are only art once the folder has been read again.
+    if (state.artPath && save.roster) {
+      const art = await indexArt(state.artPath, save.roster)
+      if (art.ok) patch(art.patch)
+    }
+  }
+
   const search = async (q: string) => {
     const res = await window.dcc.searchArt(q)
     setFound({ hits: res.hits, total: res.total })
@@ -86,6 +122,36 @@ export default function ArtFolder() {
         ) : null}
       </div>
       {note ? <div style={{ marginTop: 9 }}><Meta size={9}>{note.toUpperCase()}</Meta></div> : null}
+
+      {/* The ground behind a headline. */}
+      {faces ? (
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+          <Kicker>Stadium photographs</Kicker>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            The one thing the game's art does not have. Your save holds no stadium and the
+            extracted dump holds no picture of one, so these come from Wikimedia Commons and this
+            machine fetches them. The link is Wikidata's own — a team's home venue, and that
+            venue's photograph — rather than a search for the school's name, so a school either
+            gets its own ground or keeps the drawn field behind its headline. Anything Commons
+            marks as non-free is skipped, and who took each picture and under what licence is
+            written to <code>credits.json</code> beside them.
+          </p>
+          <div className="row" style={{ gap: 8, marginTop: 10, alignItems: 'center' }}>
+            <Btn onClick={getStadiums} disabled={stadiums}>
+              {stadiums ? 'Fetching…' : 'Fetch stadium photographs'}
+            </Btn>
+            <Meta size={9} color="var(--ink4)">
+              {Object.keys(save.schoolArt).filter((k) => k.endsWith('|stadium')).length} IN THE FOLDER
+            </Meta>
+          </div>
+          <p className="body-serif" style={{ marginTop: 9 }}>
+            Your own pictures work just as well: drop them in the art folder as
+            <code> stadium_PennState.jpg</code> and DCC will use them. That is the same name the
+            fetch writes, so the two mix freely and yours are never overwritten by a worse one
+            unless you fetch again.
+          </p>
+        </div>
+      ) : null}
 
       {/* What is in the folder that DCC has not learned to read yet.
           Faces, logos, helmets and jerseys are matched by pattern; bowl crests,

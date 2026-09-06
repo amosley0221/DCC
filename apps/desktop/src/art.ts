@@ -40,6 +40,31 @@ export function fitted(w: number, h: number, max: number): [number, number] {
  * a school's colour and half of them are cut-outs — a format without an alpha
  * channel would put a white box behind every player's head.
  */
+/**
+ * The same, as a JPEG.
+ *
+ * Only stadium photographs go through this. A nine-hundred pixel PNG of a
+ * stadium is about a megabyte and a pack of them is unsendable; the same
+ * picture as a quality-0.82 JPEG is a tenth of that, and a photograph has no
+ * transparency for PNG to be protecting.
+ */
+export async function toJpeg(
+  img: HTMLImageElement, max: number, quality = 0.82,
+): Promise<Uint8Array | null> {
+  const [w, h] = fitted(img.naturalWidth, img.naturalHeight, max)
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(img, 0, 0, w, h)
+  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', quality))
+  if (!blob) return null
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
 export async function toPng(img: HTMLImageElement, max: number): Promise<Uint8Array | null> {
   const [w, h] = fitted(img.naturalWidth, img.naturalHeight, max)
   const canvas = document.createElement('canvas')
@@ -139,11 +164,14 @@ export async function buildPack(
   facePaths: Record<string, string>,
   assetIds: string[],
   awardArt: Record<string, string>,
-  opts: { schoolPx?: number; playerPx?: number; batch?: number } = {},
+  opts: { schoolPx?: number; playerPx?: number; stadiumPx?: number; batch?: number } = {},
   onProgress?: (p: PackProgress) => void,
 ): Promise<PackOutcome> {
   const schoolPx = opts.schoolPx ?? 160
   const playerPx = opts.playerPx ?? 256
+  // A mark is drawn at a couple of hundred pixels; a stadium fills the well
+  // behind a headline, which on an unfolded phone is most of the screen.
+  const stadiumPx = opts.stadiumPx ?? 900
   const batchSize = opts.batch ?? 200
 
   const plan = schoolPlan(schoolArt)
@@ -153,7 +181,7 @@ export async function buildPack(
       jobs.push({
         name: schoolEntryName(school, mark),
         file: schoolArt[`${school}|${cat}`],
-        max: schoolPx,
+        max: mark === 'stadium' ? stadiumPx : schoolPx,
         school,
         mark,
       })
@@ -206,7 +234,9 @@ export async function buildPack(
       const hex = dominantColor(img)
       if (hex) colors[job.school] = hex
     }
-    const png = await toPng(img, job.max)
+    const png = job.mark === 'stadium'
+      ? await toJpeg(img, job.max)
+      : await toPng(img, job.max)
     if (!png) {
       skipped++
       kinds.set(extOf(job.file), (kinds.get(extOf(job.file)) ?? 0) + 1)

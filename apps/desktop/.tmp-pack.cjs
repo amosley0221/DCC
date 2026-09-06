@@ -43,10 +43,12 @@ var PACK_CATEGORIES = {
   // image cannot do that — which is what it had been doing.
   helmet: "helmet",
   helmetRight: "helmetRight",
-  jersey: "jersey"
+  jersey: "jersey",
+  // The ground behind a headline. Not from the game — see gameAssets.ts.
+  stadium: "stadium"
 };
 var safe = (s) => s.replace(/[^A-Za-z0-9._-]+/g, "_");
-var schoolEntryName = (school, mark) => `schools/${safe(school)}__${mark}.png`;
+var schoolEntryName = (school, mark) => `schools/${safe(school)}__${mark}.${mark === "stadium" ? "jpg" : "png"}`;
 var playerEntryName = (assetId) => `players/${safe(assetId)}.png`;
 var awardEntryName = (key) => {
   const [kind, ...rest] = key.split(":");
@@ -77,7 +79,7 @@ function packManifest(names, bytes, now = /* @__PURE__ */ new Date(), fit = {}) 
   const players = [];
   const awards = [];
   for (const name of names) {
-    const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(name);
+    const school = /^schools\/(.+)__([a-zA-Z]+)\.(?:png|jpg)$/.exec(name);
     if (school) {
       (schools[school[1]] ??= []).push(school[2]);
       continue;

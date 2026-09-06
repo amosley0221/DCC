@@ -119,10 +119,21 @@ object ArtPack {
         cache.evictAll()
     }
 
-    /** A school's mark: "logo", "gold", "helmet", "helmetRight" or "jersey". */
+    /**
+     * A school's mark: "logo", "gold", "helmet", "helmetRight", "jersey" — or
+     * "stadium", which is the one that is not the game's art at all and is only
+     * there if the PC fetched or was given a photograph of the ground.
+     */
     fun school(context: Context, name: String?, kind: String): File? {
         if (name.isNullOrBlank()) return null
-        return File(root(context), "schools/${safe(name)}__$kind.png").takeIf { it.exists() }
+        // Every mark is a PNG except the stadium, which is a photograph and
+        // travels as a JPEG — a pack of hundred-and-forty megabyte PNGs is not
+        // a thing anyone would send over a phone's Wi-Fi. Both are tried rather
+        // than switching on the kind, so a pack written either way still reads.
+        val base = File(root(context), "schools/${safe(name)}__$kind")
+        return listOf("png", "jpg")
+            .map { File("${base.path}.$it") }
+            .firstOrNull { it.exists() }
     }
 
     /**

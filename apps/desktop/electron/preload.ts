@@ -55,6 +55,10 @@ const api = {
   pickSave: () => ipcRenderer.invoke('save:pick') as Promise<string | null>,
   analyzeSave: (path: string) => ipcRenderer.invoke('save:analyze', path),
   roster: (path: string, teamId?: number | null) => ipcRenderer.invoke('save:roster', path, teamId ?? null),
+  // Stadium photographs, fetched from Wikimedia Commons by this machine — the
+  // one with the internet on it. See electron/stadiums.ts.
+  fetchStadiums: (schools: { name: string; fullName?: string | null }[]) =>
+    ipcRenderer.invoke('stadiums:fetch', schools),
   transfers: () => ipcRenderer.invoke('transfers:read') as Promise<TransferView>,
   setTransferYear: (year: number | null) => ipcRenderer.invoke('transfers:setYear', year),
   forgetTransferSeason: (season: number) => ipcRenderer.invoke('transfers:forget', season),

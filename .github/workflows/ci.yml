@@ -106,6 +106,10 @@ jobs:
         run: npm run check:recruits
         working-directory: apps/desktop
 
+      - name: Check the stadium photographs
+        run: npm run check:stadiums
+        working-directory: apps/desktop
+
       - name: Check the wire
         run: npm run check:wire
         working-directory: apps/desktop

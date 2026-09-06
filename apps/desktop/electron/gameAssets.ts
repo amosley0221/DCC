@@ -844,6 +844,13 @@ const SCHOOL_PATTERNS: [string, RegExp][] = [
   // 3d set abbreviates. It matches the save's own names more often, so it is
   // worth carrying as its own category rather than as a duplicate.
   ['icon', /^([a-z][A-Za-z]+)$/],
+  // Stadiums are the one category that is not in the game's art at all. The
+  // save has no stadium and the dump has no picture of one, so these come from
+  // outside — fetched from Wikimedia Commons on your PC, or dropped in by hand.
+  // They live in the art folder like everything else and are named for the
+  // school rather than for the ground, because the school is what the app has
+  // to match on and a stadium's name is a second thing to get wrong.
+  ['stadium', /^stadium[_-](.+)$/i],
 ]
 
 /**

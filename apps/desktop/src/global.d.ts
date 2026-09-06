@@ -41,6 +41,11 @@ declare global {
             classRanks: Record<string, number> | null }
         | { ok: false; message: string }
       >
+      /** Downloads a stadium photograph per school into the art folder. */
+      fetchStadiums(schools: { name: string; fullName?: string | null }[]): Promise<
+        | { ok: true; written: number; missing: string[]; skipped: string[]; folder: string }
+        | { ok: false; message: string }
+      >
       transfers(): Promise<TransferView>
       setTransferYear(year: number | null): Promise<{ ok: true }>
       forgetTransferSeason(season: number): Promise<{ ok: true }>

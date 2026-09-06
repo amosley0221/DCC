@@ -76,6 +76,8 @@ export const PACK_CATEGORIES: Record<string, string> = {
   helmet: 'helmet',
   helmetRight: 'helmetRight',
   jersey: 'jersey',
+  // The ground behind a headline. Not from the game — see gameAssets.ts.
+  stadium: 'stadium',
 }
 
 /** One image, already resized, on its way into the archive. */
@@ -99,8 +101,16 @@ export interface PackResult {
  */
 export const safe = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, '_')
 
+/**
+ * A school's mark in the archive.
+ *
+ * Every mark is a PNG except the stadium, which is a photograph: a nine-hundred
+ * pixel PNG of a stadium is about a megabyte, and a hundred and forty of them
+ * would be a pack nobody could send over a phone's Wi-Fi. Photographs are what
+ * JPEG is for, and the transparency PNG is carried for does not exist in one.
+ */
 export const schoolEntryName = (school: string, mark: string) =>
-  `schools/${safe(school)}__${mark}.png`
+  `schools/${safe(school)}__${mark}.${mark === 'stadium' ? 'jpg' : 'png'}`
 
 export const playerEntryName = (assetId: string) => `players/${safe(assetId)}.png`
 
@@ -156,7 +166,7 @@ export function packManifest(
   const players: string[] = []
   const awards: string[] = []
   for (const name of names) {
-    const school = /^schools\/(.+)__([a-z]+)\.png$/.exec(name)
+    const school = /^schools\/(.+)__([a-zA-Z]+)\.(?:png|jpg)$/.exec(name)
     if (school) { (schools[school[1]] ??= []).push(school[2]); continue }
     const player = /^players\/(.+)\.png$/.exec(name)
     if (player) { players.push(player[1]); continue }

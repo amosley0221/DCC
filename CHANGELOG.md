@@ -10,6 +10,46 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.66.0] - 2026-09-06
+
+### Added
+
+- **Stadium photographs behind the headline.** The one thing the game's art
+  does not have: your save holds no stadium and the extracted dump holds no
+  picture of one. So DCC fetches them from Wikimedia Commons — Recruiting is not
+  where that lives, it is on the art screen — and the join is Wikidata's own: a
+  team's home venue, and that venue's photograph. Not a search for the school's
+  name, which is how a folder of unrelated pictures comes to look like a
+  success. A school either gets its own ground or keeps the drawn field; there
+  is no generic stadium standing in for the ones it could not find, and the
+  schools it could not match are listed rather than filled in.
+
+  The photograph sits behind the matchup blurred and darkened, so the scoreline
+  still reads over it, and it travels to the phone in the art pack. Anything
+  Commons marks as non-free is skipped, and who took each picture and under what
+  licence is written to `credits.json` beside them.
+
+  Your own pictures work identically: drop them in the art folder as
+  `stadium_PennState.jpg`. That is the same name the fetch writes.
+
+### Changed
+
+- **Stadiums travel as JPEG.** Every other mark in an art pack is a PNG, which
+  is right for a logo with a transparent background and wrong for a photograph:
+  a nine-hundred pixel PNG of a stadium is about a megabyte, and a hundred and
+  forty of them would be a pack nobody could send over Wi-Fi. They pack at 900px
+  as JPEG, where the marks pack at 160 as PNG.
+
+### A note on where this had to be built
+
+The environment DCC is written in reaches GitHub, npm and PyPI and nothing
+else — a request to `commons.wikimedia.org` is refused by its proxy before it
+leaves the machine. So the images could not be gathered there and shipped in
+the repository, and the fetch lives in the app instead, on the machine that
+actually has an internet connection. That is the better arrangement regardless:
+a hundred and forty photographs would be tens of megabytes in git, in the
+Windows installer and in the APK, for something one person looks at.
+
 ## [0.65.0] - 2026-09-06
 
 ### Added

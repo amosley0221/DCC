@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -358,6 +359,7 @@ private fun FeatureWell(
     modifier: Modifier = Modifier,
 ) {
     val c = Dcc.colors
+    val context = LocalContext.current
     val slides = remember(last, biggest, heisman, topCommit) {
         buildList {
             if (last != null) add(FEATURE_GAME)
@@ -416,9 +418,6 @@ private fun FeatureWell(
             val teamSize = scale(0.020f, 12f, 26f).toDouble()
             val scoreSize = scale(0.090f, 34f, 108f).toInt()
             val gap = scale(0.070f, 26f, 96f).dp
-            // The background is the schools' own marks, dimmed almost out.
-            // The save carries no photographs, and inventing one would be
-            // the only made-up thing on the screen.
             Spacer(
                 Modifier.fillMaxWidth().height(
                     if (slideGame != null) scale(0.62f, 190f, 460f).dp else 128.dp,
@@ -429,7 +428,21 @@ private fun FeatureWell(
                 FEATURE_CLASS -> listOfNotNull(topCommit?.topSchools?.maxByOrNull { it.interest }?.school)
                 else -> listOfNotNull(slideGame?.away, slideGame?.home)
             }
-            CrestWash(wash)
+            // A photograph of the ground, when the pack carries one. The
+            // stadiums are the one category that is not the game's art — see
+            // apps/desktop/electron/stadiums.ts — and there is never a generic
+            // one standing in: no picture means the crests, as before.
+            val ground = remember(slideGame?.home) {
+                slideGame?.home?.let { ArtPack.school(context, it, "stadium") }
+            }
+            if (ground != null) {
+                ArtImage(ground, Modifier.fillMaxSize(), ContentScale.Crop, alpha = 0.34f)
+                Spacer(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                    listOf(Color.Black.copy(alpha = 0.38f), Color.Black.copy(alpha = 0.66f)),
+                )))
+            } else {
+                CrestWash(wash)
+            }
 
             when {
                 slideGame != null -> {
