@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.79.0] - 2026-09-07
+
 ### Fixed
 
 - **A scheduled bowl is no longer counted as a played one.** The save keeps 36

@@ -1925,3 +1925,75 @@ records goes into that one record. A running back who returns kicks keeps his
 rushing yards in the return store. So a rushing leaderboard has to read all six,
 each with its own word layout — reading `CareerOffensiveStats` alone silently
 drops the returners, who are exactly the players a Heisman list cares about.
+
+## Correction: the bowls are this season's, and "played" is the wrong question
+
+An earlier section here said a save between the conference championship and the
+postseason holds the *previous* season's bowls. That was wrong, and the game's
+own Bowl Matchups screen says so: all twelve visible fixtures — Frisco, Salute to
+Veterans, Boca Raton, New Orleans, Cure, Gasparilla, the four CFP first-round
+games, Myrtle Beach, Famous Idaho Potato and Hawaii — match the save exactly,
+right down to the first round being on campus rather than neutral.
+
+They are this season's bowls. The save keeps **36 postseason rows and rewrites
+them in place** as each bracket is drawn, and a row that has been scheduled but
+not played still carries whatever score it held last year. Comparing a week 16
+save with a bowl week 1 save, 27 of the 36 changed as the bracket filled in and
+the nine dated 26 December to 3 January had not been reached yet.
+
+So the question was never "which season is this bowl from". It is "has this game
+been played", and DCC answered it from the scoreboard:
+
+```ts
+played: homeScore + awayScore > 0 || homeQ.some(Boolean) || awayQ.some(Boolean)
+```
+
+### The test that works: a played game leaves statistics behind
+
+Count the references to a game row — tag `0x3196` — across the file:
+
+| Game | References |
+| --- | --- |
+| The championship, played | 98 |
+| A week 12 game, played | 93-100 |
+| A bowl, scheduled | 4 |
+| A bowl row not yet redrawn | 2 |
+
+A played game is named by every per-player stat line it produced; a scheduled one
+has only its schedule links. There is no overlap and no threshold to tune, so
+`playedGameRows` collects the game references out of `GameOffensiveStats` and
+`GameDefensiveStats` in one pass and the season reader asks that instead.
+
+Verified against the game's own Big Ten standings on three saves — after the
+championship, the week 16 bye, and bowl week 1 — twelve of twelve rows on each,
+conference record and overall.
+
+## The calendar, read rather than inferred
+
+`SeasonInfo` is one 20-byte row and it states the date:
+
+| Bits | Field | Across four saves |
+| --- | --- | --- |
+| 120/8 | week | 15, 15, 16, 17 |
+| 36/15 | year | 2028 |
+
+Week 15 is championship week, 16 the bye, 17 the first bowl week — matching the
+game's own "WEEK 16, 2028" and "BOWL WEEK 1 OF 4, 2028" headers. Playing a game
+does not move it; advancing does, which is why the pre- and post-championship
+saves read the same.
+
+## Awards: what is known and what is not
+
+`PlayerAward` holds 8,505 rows of 20 bytes. Bytes 4-7 are a team reference
+(`0x319e`) and bytes 8-11 a player reference (`0x213e`), and those resolve
+correctly: Penn State's rows name Zeke Mama, Mark Bowman and Quinton Martin Jr.,
+which is exactly the three Penn State players on the game's All-American teams.
+`CoachAward` is the same shape at 12 bytes and puts a Penn State reference beside
+award `0x46` in the save where the Bear Bryant trophy unlocked.
+
+**Which award a row represents is not decoded.** The remaining fields are
+bit-packed, and the member offsets in the store header do not line up with them —
+the first header word is a used-row count rather than an offset, as it is in
+`GameOffensiveStats`. Reading a first-team All-American as a weekly honour, or
+the reverse, is exactly the kind of plausible-looking wrong answer this file
+exists to prevent, so nothing is claimed until the layout is separated.
