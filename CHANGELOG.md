@@ -10,7 +10,7 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
-## [0.80.0] - 2026-09-07
+## [0.81.0] - 2026-09-07
 
 ### Changed
 
@@ -28,6 +28,8 @@ _Nothing yet._
   season it now leads with the bowls and the playoff instead, in the order they
   kick off, and a game that has not been played shows the date it starts rather
   than the stale score its row still carries.
+
+## [0.80.0] - 2026-09-07
 
 ### Fixed
 
