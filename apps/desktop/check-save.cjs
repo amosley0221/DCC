@@ -550,3 +550,15 @@ console.log('            one poll sweep reads the store header once, not per bit
 console.log('            the recruiting board reads ranks, commit score and stage,')
 console.log('            the class ranking is read only when it is a real ordering,')
 console.log('            and the schema version is read off the save, not assumed to be CFB')
+
+/* ------------------------------- a game is played when it produced statistics */
+{
+  // DCC decided this from the scoreboard, and the save reuses its 36 bowl rows:
+  // a bowl that has only been *scheduled* still carries last year's score. On a
+  // save sitting at bowl week 1 all 36 read as played and USC was 10-4 against
+  // the game's own 9-4. A played game leaves per-player stat lines behind and a
+  // scheduled one cannot — every played game in a real save is named 93 to 100
+  // times by them, every scheduled bowl 2 to 4, with no overlap.
+  assert.equal(typeof S.playedGameRows, 'function',
+    'the played test is exported so the season reader and the checks agree')
+}

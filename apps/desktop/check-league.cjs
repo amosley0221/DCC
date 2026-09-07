@@ -273,4 +273,26 @@ console.log('check-league: records, bowls, a school\'s season, the order, the st
     'two Big Ten games in the same week is the Big Ten playing, not a title game')
 }
 
+/* -------------------- the title week is found from the fixtures, not the results */
+{
+  // Play your own conference championship, save before the other nine simulate,
+  // and the week holds one result and nine fixtures. A rule that only looked at
+  // played games called that an ordinary week and put the title game back into
+  // the conference record — Penn State read 10-0.
+  const B1G = (n) => ({ name: n, conference: 'Big Ten', division: null })
+  const SEC = (n) => ({ name: n, conference: 'SEC', division: null })
+  const teams = [B1G('Penn State'), B1G('USC'), SEC('Georgia'), SEC('Alabama')]
+  const games = [
+    { week: 11, home: 'Penn State', away: 'USC', homeScore: 41, awayScore: 14, played: true, postseason: false },
+    // championship week: yours is played, the SEC's has not simulated yet
+    { week: 15, home: 'Penn State', away: 'USC', homeScore: 42, awayScore: 17, played: true, postseason: false },
+    { week: 15, home: 'Georgia', away: 'Alabama', homeScore: 0, awayScore: 0, played: false, postseason: false },
+  ]
+  const table = L.buildLeague(games, teams)
+  const psu = table.get('Penn State')
+  assert.equal(`${psu.wins}-${psu.losses}`, '2-0')
+  assert.equal(`${psu.confWins}-${psu.confLosses}`, '1-0',
+    'the title game is a win, and the only conference game here is week 11')
+}
+
 console.log('check-league: the conference championship counts for a record but not a conference record')

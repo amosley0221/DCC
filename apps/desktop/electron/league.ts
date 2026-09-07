@@ -85,6 +85,12 @@ const empty = (name: string, conference: string | null, division: string | null)
  * That last condition is what keeps Army-Navy out of it. It is played alone, the
  * week after the championships, and both academies are Independents — so it
  * passes every test but the count.
+ *
+ * Scheduled games count here, not just played ones. A user who plays their own
+ * conference championship and saves before the other nine simulate leaves a week
+ * holding one played game and nine fixtures, and a rule that only looked at
+ * played games called that an ordinary week and put the title game back in the
+ * conference record.
  */
 function titleGames(
   games: LeagueGame[],
@@ -94,7 +100,7 @@ function titleGames(
   for (const t of teams) if (t.name) conf.set(t.name, t.conference)
   const weeks = new Map<number, LeagueGame[]>()
   for (const g of games) {
-    if (g.postseason || !g.played || !g.home || !g.away) continue
+    if (g.postseason || !g.home || !g.away) continue
     const w = weeks.get(g.week) ?? []
     w.push(g)
     weeks.set(g.week, w)

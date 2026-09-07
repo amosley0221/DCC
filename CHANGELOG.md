@@ -8,7 +8,21 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **A scheduled bowl is no longer counted as a played one.** The save keeps 36
+  postseason rows and rewrites them in place as each season's bracket is drawn,
+  so a bowl that has only been *scheduled* still carries last year's score. DCC
+  decided "played" from the scoreboard and counted all of them: on a save at bowl
+  week 1, USC read 10-4 against the game's own 9-4. A game now counts as played
+  only if it produced player statistics, which a scheduled game cannot fake.
+  Checked against the game's Big Ten standings screen on three saves — the
+  conference championship, the bye week and bowl week 1 — and all twelve rows
+  match on every one.
+- **The conference championship week is found from the fixtures, not the
+  results.** Play your own title game and save before the other nine simulate,
+  and the week holds one result and nine fixtures; DCC read that as an ordinary
+  week and put Penn State back at 10-0 in the Big Ten.
 
 ## [0.78.0] - 2026-09-07
 

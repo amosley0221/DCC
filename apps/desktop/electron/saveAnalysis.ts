@@ -2111,6 +2111,50 @@ export function readSeasonOrdinal(payload: Buffer): number | null {
  * yards allowed, so a team's rushing and its opponent's rush-allowed differ by
  * exactly the yardage lost behind the line.
  */
+/**
+ * The game rows that have actually been played, according to the save.
+ *
+ * DCC used to decide this from the scoreboard — a game was played if somebody
+ * had scored — and that is wrong for the postseason. The save keeps 36 bowl
+ * rows and rewrites them in place as each season's bracket is drawn, so a bowl
+ * that has been *scheduled* still carries whatever score the row held last
+ * year. In a save sitting on bowl week 1 all 36 read as played, and Penn State
+ * were 13-0 only because they had no leftover row; USC read 10-4 against the
+ * standings screen's 9-4, off by a bowl they had not played.
+ *
+ * A played game leaves evidence that a scheduled one cannot fake: the per-player
+ * stat lines it produced. Counting references to a game row in a real save,
+ * every played game is named 93 to 100 times and every scheduled bowl 2 to 4 —
+ * the schedule links and nothing else. There is no overlap and no threshold to
+ * tune.
+ *
+ * Both stat stores are consulted because a game is only missing from one of them
+ * if nobody on either side recorded a single carry or a single tackle, which
+ * does not happen in a game that was played.
+ */
+export function playedGameRows(payload: Buffer): Set<number> {
+  const seen = playedScans.get(payload)
+  if (seen) return seen
+  const out = new Set<number>()
+  for (const name of ['GameOffensiveStats', 'GameDefensiveStats']) {
+    const table = namedTable(payload, name)
+    if (!table || table.rowBytes < 12) continue
+    for (let r = 0; r < table.rows; r++) {
+      const at = table.data + r * table.rowBytes
+      if (at + 8 > payload.length) break
+      if (payload.readUInt16BE(at + 4) !== GAME_REF_TAG) continue
+      out.add(payload.readUInt16BE(at + 6))
+    }
+  }
+  playedScans.set(payload, out)
+  return out
+}
+
+/** The tag a reference to `SeasonGameStore` carries. */
+const GAME_REF_TAG = 0x3196
+
+const playedScans = new WeakMap<Buffer, Set<number>>()
+
 export function readTeamGameStats(payload: Buffer): TeamGameStats[] {
   const games = seasonGameTable(payload)
   const table = namedTable(payload, 'TeamStats')
@@ -2165,6 +2209,11 @@ export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGam
   const order = teamTableOrder(teams)
   const nameOf = (i: number) => (i >= 0 && i < order.length ? order[i].name : null)
 
+  // Read once for the whole table rather than per row: each call walks two
+  // stores of tens of thousands of rows.
+  const played = playedGameRows(payload)
+  const stats = played.size ? played : null
+
   const out: SeasonGame[] = []
   for (let r = 0; r < store.rows; r++) {
     const o = data + r * SEASON_GAME_ROW
@@ -2187,7 +2236,11 @@ export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGam
       temperatureF: rd(G.temperature) - 40, weather: rd(G.weather), windMph: rd(G.wind),
       homeIndex, awayIndex, home: nameOf(homeIndex), away: nameOf(awayIndex),
       homeScore, awayScore, homeQ, awayQ, homeOT: rd(G.homeOT), awayOT: rd(G.awayOT),
-      played: homeScore + awayScore > 0 || homeQ.some(Boolean) || awayQ.some(Boolean),
+      // Whether the game produced player statistics, not whether its row holds
+      // a score — see playedGameRows. The scoreboard test is kept only for a
+      // save whose stat stores cannot be read at all, where a wrong answer for
+      // the postseason beats no season at all.
+      played: stats ? stats.has(r) : homeScore + awayScore > 0 || homeQ.some(Boolean) || awayQ.some(Boolean),
       userPlayed: rd(G.userPlayed) === 1,
       overtime: rd(G.overtime) === 1,
       neutralSite: rd(G.neutralSite) === 1,
