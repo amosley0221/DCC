@@ -227,6 +227,24 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
     }),
   }), [games, me, holdFrom, week, table, rankOf, roster])
 
+  /**
+   * The game the front page leads with.
+   *
+   * The last result, unless the next one is bigger: a ranked opponent, or the
+   * postseason. A conference championship on Saturday is the story — the win
+   * from a fortnight ago is not — and that is what every front page in the
+   * sport does with the same two facts.
+   */
+  const feature = useMemo((): { g: SeasonGame; upcoming: boolean } | null => {
+    if (next) {
+      const other = (next.home === me ? next.away : next.home) ?? ''
+      const rank = rankOf.get(other)
+      if (next.postseason || (rank !== undefined && rank <= 25)) return { g: next, upcoming: true }
+    }
+    if (last) return { g: last, upcoming: false }
+    return next ? { g: next, upcoming: true } : null
+  }, [last, next, rankOf, me])
+
   const scouted = (p: RosterPlayer) => state.revealAllRecruits || state.revealedRecruits.includes(p.playerId)
 
   const board = useMemo(
@@ -382,15 +400,16 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
               </div>
             </div>
 
-            {slide === 'GAME' && last ? (
+            {slide === 'GAME' && feature ? (
               <Feature
-                g={last}
+                g={feature.g}
+                upcoming={feature.upcoming}
                 team={me}
-                bg={artOf(last.home)}
-                tint={save.schoolColors[last.home ?? ''] ?? null}
+                bg={artOf(feature.g.home)}
+                tint={save.schoolColors[feature.g.home ?? ''] ?? null}
                 apiKey={state.anthropicKey}
                 log={(text, kind) => dispatch({ type: 'log', line: { text, kind: kind ?? 'good' } })}
-                onBoxScore={() => setOpen({ kind: 'game', row: last.row })}
+                onBoxScore={() => setOpen({ kind: 'game', row: feature.g.row })}
                 season={save.roster?.season ?? null}
                 artOf={artOf}
                 rankOf={(n) => (n ? rankOf.get(n) : undefined)}
@@ -399,7 +418,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                   return r ? { wins: r.wins, losses: r.losses } : undefined
                 }}
               />
-            ) : slide === 'COUNTRY' || (slide === 'GAME' && !last) ? (
+            ) : slide === 'COUNTRY' || (slide === 'GAME' && !feature) ? (
               <FeatureList
                 kicker={week ? `Around the country · week ${week}` : 'Around the country'}
                 headline={topGames.length
@@ -743,7 +762,8 @@ function MatchupSide({ name, art, rank, record, score, won }: {
   art: string | undefined
   rank: number | undefined
   record: { wins: number; losses: number } | undefined
-  score: number
+  /** Null before kickoff — a preview has records where a result has scores. */
+  score: number | null
   won: boolean
 }) {
   return (
@@ -756,7 +776,8 @@ function MatchupSide({ name, art, rank, record, score, won }: {
         </span>
       </div>
       {record ? <span className="gs-matchup-rec">{record.wins}-{record.losses}</span> : null}
-      <span className={`gs-matchup-score${won ? '' : ' is-lost'}`}>{score}</span>
+      {score === null ? null
+        : <span className={`gs-matchup-score${won ? '' : ' is-lost'}`}>{score}</span>}
     </div>
   )
 }
@@ -768,8 +789,11 @@ function MatchupSide({ name, art, rank, record, score, won }: {
  * the save has no images, and a fabricated one would be the only invented thing
  * on the page.
  */
-function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, rankOf, recordOf }: {
-  g: SeasonGame; team: string | null; apiKey: string
+function Feature({ g, upcoming, team, apiKey, log, onBoxScore, bg, tint, season, artOf, rankOf, recordOf }: {
+  g: SeasonGame
+  /** The game has not been played: this is a preview, not a result. */
+  upcoming: boolean
+  team: string | null; apiKey: string
   log: (text: string, kind?: 'good' | 'bad') => void
   onBoxScore: () => void
   bg?: string; tint?: string | null
@@ -796,9 +820,14 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
 
   const write = async () => {
     setBusy(true); setError(null)
-    const res = await window.dcc.writePress({ game: g, kind: 'recap', userTeam: team, season })
+    const res = await window.dcc.writePress({
+      game: g, kind: upcoming ? 'preview' : 'recap', userTeam: team, season,
+    })
     setBusy(false)
-    if (res.ok) { setStories(res.stories); log(`wrote a recap for ${g.away} at ${g.home}`) }
+    if (res.ok) {
+      setStories(res.stories)
+      log(`wrote a ${upcoming ? 'preview' : 'recap'} for ${g.away} at ${g.home}`)
+    }
     else { setError(res.message); log(res.message, 'bad') }
   }
 
@@ -808,7 +837,8 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
   const [box, setBox] = useState(false)
   const openGame = () => {
     if (!story && apiKey && !busy) void write()
-    setBox(true)
+    // Nothing to open on a game that has not happened: the preview is the page.
+    if (!upcoming) setBox(true)
   }
 
   return (
@@ -823,7 +853,9 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGame() } }}
       >
         <FeatureGround bg={bg} tint={tint} field photo={artOf(g.home, 'stadium')} />
-        <div className="gs-figure-kicker" style={{ zIndex: 1 }}><Kicker>{won ? 'Won' : 'Lost'} · week {g.week}</Kicker></div>
+        <div className="gs-figure-kicker" style={{ zIndex: 1 }}>
+          <Kicker>{upcoming ? 'Next up' : won ? 'Won' : 'Lost'} · week {g.week}</Kicker>
+        </div>
         {/*
           A matchup, not a bare scoreline. Each side stands under its own
           helmet with its rank, its record and its score, the way a broadcast
@@ -837,7 +869,7 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
           <MatchupSide
             name={g.away} art={artOf(g.away, 'helmet')}
             rank={rankOf(g.away)} record={recordOf(g.away)}
-            score={g.awayScore} won={g.awayScore >= g.homeScore}
+            score={upcoming ? null : g.awayScore} won={upcoming || g.awayScore >= g.homeScore}
           />
           <div className="col gs-matchup-mid">
             <span className="gs-matchup-at">AT</span>
@@ -846,12 +878,14 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
           <MatchupSide
             name={g.home} art={artOf(g.home, 'helmetRight') ?? artOf(g.home, 'helmet')}
             rank={rankOf(g.home)} record={recordOf(g.home)}
-            score={g.homeScore} won={g.homeScore > g.awayScore}
+            score={upcoming ? null : g.homeScore} won={upcoming || g.homeScore > g.awayScore}
           />
         </div>
         <div className="gs-figure-caption" style={{ zIndex: 1 }}>
           {[home ? `vs ${other}` : `at ${other}`, dateLabel(g.month, g.day),
-            g.attendance ? `${g.attendance.toLocaleString()} in attendance` : null,
+            // Before kickoff the crowd is not a number yet, and the time is.
+            upcoming ? kickoffLabel(g.kickoff) : null,
+            !upcoming && g.attendance ? `${g.attendance.toLocaleString()} in attendance` : null,
             weatherName(g.weather) ? `${g.temperatureF}°F ${weatherName(g.weather)?.toLowerCase()}` : null]
             .filter(Boolean).join('  ·  ')}
         </div>
@@ -859,7 +893,9 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
 
       <div style={{ paddingTop: 20 }}>
         <h2 className="hero-headline" style={{ maxWidth: 560 }}>
-          {story ? story.headline : `${team ?? 'You'} ${us}, ${other} ${them}`}
+          {story ? story.headline
+            : upcoming ? `${team ?? 'You'} ${home ? 'host' : 'travel to'} ${other}`
+            : `${team ?? 'You'} ${us}, ${other} ${them}`}
         </h2>
         {story ? (
           <>
@@ -874,10 +910,14 @@ function Feature({ g, team, apiKey, log, onBoxScore, bg, tint, season, artOf, ra
 
         <div className="row" style={{ gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
           <Btn variant="primary" onClick={write} disabled={busy || !apiKey}>
-            {busy ? 'Writing…' : story ? 'Write another' : 'Read'}
+            {busy ? 'Writing…' : story ? 'Write another' : upcoming ? 'Preview it' : 'Read'}
           </Btn>
-          <Btn onClick={() => setBox((b) => !b)}>{box ? 'Hide the game' : 'Box score'}</Btn>
-          <Btn onClick={onBoxScore}>Open it fully</Btn>
+          {!upcoming ? (
+            <>
+              <Btn onClick={() => setBox((b) => !b)}>{box ? 'Hide the game' : 'Box score'}</Btn>
+              <Btn onClick={onBoxScore}>Open it fully</Btn>
+            </>
+          ) : null}
           {!apiKey ? <Meta size={10}>ADD AN API KEY IN SETTINGS</Meta> : null}
           {error ? <Meta size={10} color="var(--accent-ui)">{error.toUpperCase()}</Meta> : null}
         </div>

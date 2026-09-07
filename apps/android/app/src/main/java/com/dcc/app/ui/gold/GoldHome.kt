@@ -133,6 +133,20 @@ fun GoldHome(
         League.rankings(table).withIndex().associate { (i, r) -> r.index to i + 1 }
     }
     val recordOf = remember(table) { table.mapValues { (_, r) -> r.wins to r.losses } }
+
+    /**
+     * The game the front page leads with: the last result, unless the next one
+     * is bigger. A conference championship on Saturday is the story and a win
+     * from a fortnight ago is not, which is what every front page in the sport
+     * does with the same two facts. Kept to the same rule as the desktop's.
+     */
+    val nextUp = mine.firstOrNull { !it.played }
+    val lead = remember(last, nextUp, rankOf, me) {
+        val opponent = nextUp?.let { if (it.home == me?.name) it.awayIndex else it.homeIndex }
+        val rank = opponent?.let { rankOf[it] }
+        if (nextUp != null && (nextUp.postseason || (rank != null && rank <= 25))) nextUp
+        else last ?: nextUp
+    }
     val bestRank = { g: SnapshotGame ->
         minOf(rankOf[g.homeIndex] ?: 999, rankOf[g.awayIndex] ?: 999)
     }
@@ -170,7 +184,7 @@ fun GoldHome(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 FeatureWell(
-                    me?.name, me?.wins, me?.losses, last, biggest, heisman, heismanFace, topCommit,
+                    me?.name, me?.wins, me?.losses, lead, biggest, heisman, heismanFace, topCommit,
                     rankOf, recordOf, onOpenGame, onOpenBoard, Modifier.weight(0.58f),
                 )
                 Column(Modifier.weight(0.42f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -183,7 +197,7 @@ fun GoldHome(
             }
         } else {
             FeatureWell(
-                me?.name, me?.wins, me?.losses, last, biggest, heisman, heismanFace, topCommit,
+                me?.name, me?.wins, me?.losses, lead, biggest, heisman, heismanFace, topCommit,
                 rankOf, recordOf, onOpenGame, onOpenBoard, Modifier.fillMaxWidth(),
             )
         }
@@ -465,7 +479,8 @@ private fun FeatureWell(
                     ) {
                         MatchupSide(
                             away, mono(away), rankOf[slideGame.awayIndex],
-                            recordOf[slideGame.awayIndex], a, won = a >= h,
+                            recordOf[slideGame.awayIndex],
+                            if (slideGame.played) a else null, won = !slideGame.played || a >= h,
                             isUser = away == meName, helmet = "helmet",
                             helmetSize = helmet, teamSize = teamSize, scoreSize = scoreSize,
                             modifier = Modifier.weight(1f),
@@ -483,7 +498,8 @@ private fun FeatureWell(
                         }
                         MatchupSide(
                             home, mono(home), rankOf[slideGame.homeIndex],
-                            recordOf[slideGame.homeIndex], h, won = h > a,
+                            recordOf[slideGame.homeIndex],
+                            if (slideGame.played) h else null, won = !slideGame.played || h > a,
                             isUser = home == meName, helmet = "helmetRight",
                             helmetSize = helmet, teamSize = teamSize, scoreSize = scoreSize,
                             modifier = Modifier.weight(1f),
@@ -606,7 +622,8 @@ private fun MatchupSide(
     monogram: String,
     rank: Int?,
     record: Pair<Int, Int>?,
-    score: Int,
+    /** Null before kickoff: a preview has records where a result has scores. */
+    score: Int?,
     won: Boolean,
     isUser: Boolean,
     helmet: String,
@@ -634,8 +651,10 @@ private fun MatchupSide(
             Spacer(Modifier.height(2.dp))
             MetaText("${record.first}-${record.second}", c.ink4, 10)
         }
-        Spacer(Modifier.height(3.dp))
-        GoldNum("$score", scoreSize, if (won) c.ink else c.ink3)
+        if (score != null) {
+            Spacer(Modifier.height(3.dp))
+            GoldNum("$score", scoreSize, if (won) c.ink else c.ink3)
+        }
     }
 }
 
@@ -735,6 +754,8 @@ private fun featureHeadline(g: SnapshotGame, me: String?): String {
     val us = if (home) g.homeScore else g.awayScore
     val them = if (home) g.awayScore else g.homeScore
     val other = (if (home) g.away else g.home) ?: "their opponent"
+    // A game that has not happened has no score to lead with.
+    if (!g.played) return "${me ?: "You"} ${if (home) "host" else "travel to"} $other"
     return when {
         them == 0 -> "A shutout of $other"
         us > them -> "${me ?: "You"} $us, $other $them"
@@ -746,7 +767,13 @@ private fun featureStandfirst(g: SnapshotGame?, wins: Int?, losses: Int?): Strin
     if (g == null) return "Your season fills this in as it is played."
     val bits = mutableListOf<String>()
     if (wins != null && losses != null) bits += "$wins-$losses on the season."
-    if (g.attendance > 0) bits += "${"%,d".format(g.attendance)} watched it."
+    // Before kickoff the crowd is not a number yet, and the time is.
+    if (!g.played) {
+        SaveLabels.kickoff(g.kickoff)?.let { bits += it }
+        bits += SaveLabels.date(g.month, g.day)
+    } else if (g.attendance > 0) {
+        bits += "${"%,d".format(g.attendance)} watched it."
+    }
     if (g.temperatureF > 0) bits += "${g.temperatureF}°F."
     return bits.joinToString(" ")
 }

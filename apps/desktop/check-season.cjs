@@ -57,6 +57,44 @@ const g = (week, home, away, extra = {}) =>
   assert.equal(S.userTeamOf([]), null)
 }
 
+/* -------------------------------------------------- what is actually a bowl */
+{
+  // The calendar out of a real save, in the shape that broke it. The week
+  // counter runs up through the regular season and RESTARTS for the bowls, so
+  // weeks 1 and 2 appear in September and again in December.
+  const d = (week, month, day) => ({ week, month, day, postseason: false })
+  const games = [
+    d(0, 8, 26),   // week zero
+    d(1, 9, 2),
+    d(2, 9, 9),
+    d(13, 11, 25), // the last ordinary Saturday
+    d(14, 12, 2),  // Army–Navy: December, and not a bowl
+    d(15, 12, 9),  // the conference championships: December, and not a bowl
+    d(1, 12, 15),  // the counter restarts — from here it is the postseason
+    d(2, 12, 26),
+    d(2, 1, 3),    // January sorts after December, not before August
+  ]
+  S.markPostseason(games)
+  const post = (w, m, dd) => games.find((g) => g.week === w && g.month === m && g.day === dd).postseason
+
+  assert.equal(post(0, 8, 26), false)
+  assert.equal(post(1, 9, 2), false, 'week 1 in September is week 1')
+  assert.equal(post(13, 11, 25), false)
+  assert.equal(post(14, 12, 2), false, 'Army-Navy is a regular-season game in December')
+  assert.equal(post(15, 12, 9), false, 'so is a conference championship')
+  assert.equal(post(1, 12, 15), true, 'the week counter going backwards is where the bowls start')
+  assert.equal(post(2, 12, 26), true)
+  assert.equal(post(2, 1, 3), true, 'and January is the end of the season, not the start')
+
+  // Which is what the week you are about to play depends on: with the
+  // championship counted as a bowl, this fell back to the last week played.
+  const psu = games.map((g) => ({
+    ...g, home: 'Penn State', away: 'Someone', played: g.month === 11 || g.month < 11,
+  }))
+  assert.equal(S.currentWeek(psu, 'Penn State'), 14,
+    'the next regular-season game, not the last one played')
+}
+
 /* ----------------------------------------------------------- the week, still */
 {
   const games = [

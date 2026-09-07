@@ -10,6 +10,41 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.71.0] - 2026-09-06
+
+### Fixed
+
+- **A conference championship is not a bowl game.** Both apps sat on week 13 in
+  front of a save that had reached week 15. Whether a game was postseason was
+  decided by its month — December or January — which makes a bowl of Army–Navy
+  on the second of December and, expensively, of the conference championships on
+  the ninth. Everything downstream skips the postseason, so the week you are
+  about to play had no unplayed regular-season game left to find and fell back
+  to the last one you had finished.
+
+  The save says it plainly and DCC was not reading it: the week numbers run from
+  0 upwards through the season and **restart** for the bowls — weeks 1 and 2
+  appear in September and again on the fifteenth and twenty-sixth of December.
+  So the postseason now begins where the week counter goes backwards, and
+  nothing about it depends on the month. Checked against a real calendar,
+  Army–Navy and the championships included.
+
+### Changed
+
+- **The front page leads with the bigger game.** It always showed your last
+  result. Now, when the next game is against a top-25 side or is a postseason
+  game, that gets the headline instead — with both records under the helmets
+  where the scores would be, the kickoff and the conditions underneath, and
+  UPCOMING down the middle. Asking for the story writes a preview rather than a
+  recap. A conference championship on Saturday is the story; a win from a
+  fortnight ago is not.
+
+### Worth checking
+
+The championship game now counts as a regular-season conference game, so a 9-0
+Big Ten record becomes 10-0 if you win it. If the game itself keeps that at 9-0,
+say so and the conference record will leave the title game out.
+
 ## [0.70.0] - 2026-09-06
 
 ### Fixed

@@ -20,6 +20,51 @@ export interface WeekGame {
   away: string | null
 }
 
+/** A game on the calendar, enough of one to say whether it is a bowl. */
+export interface DatedGame {
+  week: number
+  month: number
+  day: number
+  postseason: boolean
+}
+
+/**
+ * Which games are the postseason, from the shape of the calendar.
+ *
+ * This used to be "December or January", and that was wrong twice over. It made
+ * a bowl of Army–Navy, which is played on the second of December and is a
+ * regular-season game, and — the one that actually cost something — it made a
+ * bowl of the conference championships on the ninth. Everything downstream
+ * skips the postseason, so the app sat on week 13 in front of a save that had
+ * reached week 15: the only unplayed games left were "bowls", and the week you
+ * are about to play fell back to the last one you had.
+ *
+ * The save's own week numbers say it plainly. They run from 0 upwards through
+ * the regular season and then **restart** for the bowls: in a real save, weeks
+ * 1 and 2 appear in September and again on the fifteenth and twenty-sixth of
+ * December. So walk the calendar in date order, and the postseason begins where
+ * the week number goes backwards — nothing after week 14 is week 1 unless the
+ * counter has started again. Everything from there on is postseason, because a
+ * bowl season does not go back to being a regular season.
+ *
+ * January sorts after December rather than before August, which is the one
+ * thing a month number does not say on its own.
+ */
+export function markPostseason(games: DatedGame[]): void {
+  const day = (g: DatedGame) => (g.month >= 8 ? g.month : g.month + 12) * 100 + g.day
+  const order = [...games].sort((a, b) => day(a) - day(b))
+  let high = -1
+  let started = false
+  for (const g of order) {
+    if (started || (high >= 0 && g.week < high)) {
+      started = true
+      g.postseason = true
+      continue
+    }
+    if (g.week > high) high = g.week
+  }
+}
+
 /** A game that also knows whether the person playing the dynasty played it. */
 export interface UserGame extends WeekGame {
   /** The user played this one rather than simulating it. */

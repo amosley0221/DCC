@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { inflateSync, inflateRawSync, gunzipSync } from 'node:zlib'
 import * as zlib from 'node:zlib'
 import { TEAM_ID_NAMES } from './teamIds'
+import { markPostseason } from './season'
 import {
   PLAYER_TAG, RECRUIT_CLASSES, RECRUIT_FIELDS, RECRUIT_PLAYER_AT, RECRUIT_STAGES,
   RECRUIT_STRIDE, TOP_SCHOOLS_PER_RECRUIT,
@@ -2015,11 +2016,14 @@ export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGam
       played: homeScore + awayScore > 0 || homeQ.some(Boolean) || awayQ.some(Boolean),
       userPlayed: rd(G.userPlayed) === 1,
       overtime: rd(G.overtime) === 1,
-      postseason: rd(G.month) === 12 || rd(G.month) === 1,
+      // Filled in below: one row cannot tell whether it is a bowl.
+      postseason: false,
     })
   }
+  markPostseason(out)
   return out.sort((a, b) => a.week - b.week || a.row - b.row)
 }
+
 
 /**
  * One store's rows, dumped for reading by eye.
