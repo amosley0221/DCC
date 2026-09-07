@@ -1815,3 +1815,54 @@ That wants a per-player anchor, the way the team box score anchored `TeamStats`:
 the game's own Player Stats screen for a game whose save is held on both sides.
 Without it this is pattern-matching, which is how the neutral-site flag went wrong
 twice before it went right.
+
+## The conference championship is not a conference game
+
+The game's own standings screen settles this. The week Penn State beat USC for
+the Big Ten title it read **9-0 in the conference and 13-0 overall** — a
+thirteenth win and a ninth conference game, not a tenth. Every Big Ten row on
+that screen sums to nine. DCC counted the title game both ways and had Penn
+State at 10-0.
+
+There is no flag on the game saying "this is a championship", and the
+neutral-site bit does not stand in for one: five conferences host theirs at the
+better seed's ground. What works is the shape of the week. A real season runs
+sixty to seventy games a week and then championship week holds exactly ten —
+one per conference, every one between two teams of the same conference:
+
+```
+reg wk11: 65   reg wk12: 64   reg wk13: 65   reg wk14: 1   reg wk15: 10
+```
+
+So the rule is: the last pre-postseason week in which every played game is a
+conference meeting, no conference appears twice, and there are at least two such
+games. That last clause is what keeps Army-Navy out — it is played alone in week
+14 and both academies are Independents, so it passes every other test.
+
+Checked against the game's own Big Ten standings: **all twelve conference
+records match**, Penn State 9-0 through Maryland 4-5.
+
+## A bowl reference, and last season's games left in the table
+
+A postseason game's row carries a reference at **byte 20** — tag `0x21d0`, index
+the bowl — where a regular-season game has zeros. All 36 postseason rows in a
+real save have it and all 865 regular-season rows do not, so it agrees with the
+week-counter rule on every one of the 901 played games.
+
+It also exposed a bug that is **not yet fixed**. In a season-3 save taken right
+after the Big Ten championship, those 36 played postseason games are *season 2's
+bowls*, still sitting in the table because season 3's postseason has not been
+scheduled yet. DCC counts them in season 3's records, which is why the overall
+record was wrong for eight of the twelve Big Ten teams — USC read 10-4 against
+the screen's 9-4, Nebraska 9-4 against 9-3 — while Penn State, who has no
+leftover bowl row, read 13-0 and looked right.
+
+Dates cannot separate them: the week 15 championship is 12/9 and the stale bowls
+begin 12/12, exactly where this season's would. Every row in the table reads as
+played, so there is no "not yet scheduled" to detect. The row carries a bowl
+reference but no season, and nothing else in it distinguishes the two years.
+
+**This needs a second save to settle** — one taken after advancing past the
+championship, when the game schedules season 3's own postseason. Whatever
+changes in those 36 rows between the two saves is the discriminator. Guessing at
+one from a single save is how the neutral-site flag went wrong twice.

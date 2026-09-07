@@ -63,11 +63,64 @@ const empty = (name: string, conference: string | null, division: string | null)
  * Bowl games count in the overall record and never in the conference one, which
  * is how the sport counts them.
  */
+/**
+ * The conference championship games, which count for a record but not a
+ * conference record.
+ *
+ * The game's own standings settle this. After Penn State beat USC for the Big
+ * Ten title the screen read 9-0 in the conference and 13-0 overall — a
+ * thirteenth win, and a ninth conference game, not a tenth. Every Big Ten row
+ * on that screen sums to nine, so the title game is outside the conference
+ * record for winner and loser alike. DCC counted it and had Penn State at 10-0.
+ *
+ * There is no flag on the game saying so, and deriving it from the neutral-site
+ * bit does not work: five conferences host their title game at the better seed's
+ * ground. What does work is the shape of the week. A real save's regular season
+ * runs sixty to seventy games a week, and then championship week holds exactly
+ * ten — one per conference, every one of them between two teams of the same
+ * conference. So: the last week before the postseason in which every played game
+ * is a conference meeting and no conference appears twice, with at least two
+ * such games.
+ *
+ * That last condition is what keeps Army-Navy out of it. It is played alone, the
+ * week after the championships, and both academies are Independents — so it
+ * passes every test but the count.
+ */
+function titleGames(
+  games: LeagueGame[],
+  teams: { name: string; conference: string | null; division: string | null }[],
+): Set<LeagueGame> {
+  const conf = new Map<string, string | null>()
+  for (const t of teams) if (t.name) conf.set(t.name, t.conference)
+  const weeks = new Map<number, LeagueGame[]>()
+  for (const g of games) {
+    if (g.postseason || !g.played || !g.home || !g.away) continue
+    const w = weeks.get(g.week) ?? []
+    w.push(g)
+    weeks.set(g.week, w)
+  }
+  let best: LeagueGame[] | null = null
+  let bestWeek = -1
+  for (const [week, played] of weeks) {
+    if (played.length < 2 || week < bestWeek) continue
+    const seen = new Set<string>()
+    let ok = true
+    for (const g of played) {
+      const c = conf.get(g.home!) ?? null
+      if (!c || c !== (conf.get(g.away!) ?? null) || seen.has(c)) { ok = false; break }
+      seen.add(c)
+    }
+    if (ok) { best = played; bestWeek = week }
+  }
+  return new Set(best ?? [])
+}
+
 export function buildLeague(
   games: LeagueGame[],
   teams: { name: string; conference: string | null; division: string | null }[],
 ): Map<string, LeagueRow> {
   const table = new Map<string, LeagueRow>()
+  const title = titleGames(games, teams)
   const confOf = new Map<string, string | null>()
   for (const t of teams) {
     if (!t.name) continue
@@ -84,7 +137,7 @@ export function buildLeague(
     if (!g.played || !g.home || !g.away) continue
     const h = row(g.home), a = row(g.away)
     const homeWon = g.homeScore > g.awayScore
-    const sameConf = !g.postseason && !!h.conference && h.conference === a.conference
+    const sameConf = !g.postseason && !title.has(g) && !!h.conference && h.conference === a.conference
 
     h.pointsFor += g.homeScore; h.pointsAgainst += g.awayScore
     a.pointsFor += g.awayScore; a.pointsAgainst += g.homeScore

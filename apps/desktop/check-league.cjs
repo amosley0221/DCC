@@ -209,3 +209,68 @@ const table = L.buildLeague(games, teams)
 }
 
 console.log('check-league: records, bowls, a school\'s season, the order, the standings, the spoiler line, the playoff field and the save\'s own order')
+
+/* ------------------------- the conference championship is not a conference game */
+{
+  // The game's own standings screen, the week Penn State beat USC for the Big
+  // Ten: 9-0 in the conference and 13-0 overall. A thirteenth win and a ninth
+  // conference game, not a tenth — every Big Ten row on that screen sums to
+  // nine. DCC counted the title game both ways and had Penn State at 10-0.
+  const B1G = (name) => ({ name, conference: 'Big Ten', division: null })
+  const SEC = (name) => ({ name, conference: 'SEC', division: null })
+  const teams = [B1G('Penn State'), B1G('USC'), B1G('Iowa'), SEC('Georgia'), SEC('Alabama')]
+  const g = (week, home, away, hs, as, postseason = false) =>
+    ({ week, home, away, homeScore: hs, awayScore: as, played: true, postseason })
+  const games = [
+    g(11, 'Penn State', 'USC', 41, 14),
+    g(12, 'Penn State', 'Iowa', 48, 17),
+    g(12, 'USC', 'Iowa', 20, 17),
+    // championship week: one game per conference, both sides in it
+    g(15, 'Penn State', 'USC', 42, 17),
+    g(15, 'Georgia', 'Alabama', 21, 20),
+  ]
+  const table = L.buildLeague(games, teams)
+  const psu = table.get('Penn State')
+  assert.equal(`${psu.wins}-${psu.losses}`, '3-0', 'the title game is still a win')
+  assert.equal(`${psu.confWins}-${psu.confLosses}`, '2-0', 'but not a conference win')
+  const usc = table.get('USC')
+  assert.equal(`${usc.wins}-${usc.losses}`, '1-2')
+  assert.equal(`${usc.confWins}-${usc.confLosses}`, '1-1', 'nor a conference loss for the loser')
+}
+
+/* ------------------------------------ a lone same-conference game is not a title week */
+{
+  // Army-Navy is played alone, the week after the championships, and both
+  // academies are Independents. It passes every test but the count, which is
+  // why the rule wants at least two games in the week.
+  const teams = [
+    { name: 'Army', conference: 'Independents', division: null },
+    { name: 'Navy', conference: 'Independents', division: null },
+  ]
+  const table = L.buildLeague(
+    [{ week: 14, home: 'Army', away: 'Navy', homeScore: 20, awayScore: 17, played: true, postseason: false }],
+    teams,
+  )
+  assert.equal(table.get('Army').confWins, 1, 'one game in a week is not championship week')
+}
+
+/* ------------------------------------------- a normal week is not a title week */
+{
+  // Mid-season the last week played is an ordinary one, and most of it is
+  // conference games. It must not be mistaken for championship week.
+  const teams = [
+    { name: 'Penn State', conference: 'Big Ten', division: null },
+    { name: 'Iowa', conference: 'Big Ten', division: null },
+    { name: 'Ohio State', conference: 'Big Ten', division: null },
+    { name: 'Rutgers', conference: 'Big Ten', division: null },
+  ]
+  const games = [
+    { week: 9, home: 'Penn State', away: 'Iowa', homeScore: 30, awayScore: 10, played: true, postseason: false },
+    { week: 9, home: 'Ohio State', away: 'Rutgers', homeScore: 24, awayScore: 21, played: true, postseason: false },
+  ]
+  const table = L.buildLeague(games, teams)
+  assert.equal(table.get('Penn State').confWins, 1,
+    'two Big Ten games in the same week is the Big Ten playing, not a title game')
+}
+
+console.log('check-league: the conference championship counts for a record but not a conference record')

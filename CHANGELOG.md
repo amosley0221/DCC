@@ -10,6 +10,26 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.78.0] - 2026-09-07
+
+### Fixed
+
+- **A conference championship is no longer counted as a conference game.** Win
+  the Big Ten and your record goes to 13-0 overall but stays 9-0 in the
+  conference, which is what the game's own standings screen says. DCC had Penn
+  State at 10-0. Checked against that screen for all twelve Big Ten teams, and
+  all twelve now match.
+
+### Known
+
+- **Last season's bowl games are still being counted in this season's record.**
+  A save taken between the conference championship and the postseason still
+  holds the *previous* season's bowls, and DCC counts them — USC reads 10-4
+  where the game says 9-4. A team with no leftover bowl row, like Penn State
+  this year, is unaffected. Dates cannot tell the two seasons apart and the game
+  row carries no year, so this needs a save from after the postseason is
+  scheduled before it can be fixed rather than guessed at.
+
 ## [0.77.0] - 2026-09-07
 
 ### Added
