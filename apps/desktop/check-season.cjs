@@ -126,3 +126,15 @@ console.log('check-season: the save names your team from the games you played, a
   assert.equal(S.weekLabel(null), null, 'a save with no calendar says nothing')
   assert.equal(S.weekLabel(-1), null)
 }
+
+/* ------------------------------------- when the front page stops reporting */
+{
+  // Two advances past the championship the dynasty is at bowl week 1, and a
+  // front page still leading with week 15's scores is reporting a fortnight-old
+  // Saturday to somebody about to watch a playoff.
+  assert.equal(S.isPostseason(15), false, 'championship week is still the season')
+  assert.equal(S.isPostseason(16), false, 'the bye is too — the bowls are not drawn')
+  assert.equal(S.isPostseason(17), true, 'bowl week 1')
+  assert.equal(S.isPostseason(20), true)
+  assert.equal(S.isPostseason(null), false, 'a save with no calendar reports nothing new')
+}

@@ -7,7 +7,7 @@ import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
 import { buildLeague, orderByRanks, rankings, visibleGames, winPct } from '../../electron/league'
-import { currentWeek, weekLabel } from '../../electron/season'
+import { currentWeek, isPostseason, weekLabel } from '../../electron/season'
 import { leaders, seasonTotals, type StatLeaderKey } from '../../electron/teamStats'
 import { buildWire, type WireItem } from '../../electron/wire'
 import {
@@ -185,6 +185,33 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
     [games, me, holdFrom, week],
   )
 
+  /**
+   * The postseason slate — every bowl and playoff game, soonest first.
+   *
+   * Read straight off the save, which draws the bracket into its own 36
+   * postseason rows. They are scheduled rather than played, so these are
+   * fixtures: the front page previews them instead of reporting them.
+   */
+  const bowlSlate = useMemo(() => {
+    const day = (g: SeasonGame) => (g.month >= 8 ? g.month : g.month + 12) * 100 + g.day
+    return games.filter((g) => g.postseason && g.home && g.away && !g.played)
+      .sort((a, b) => day(a) - day(b))
+  }, [games])
+
+  /**
+   * Once bowl season starts, the last week played stops being the news.
+   *
+   * The save says where the dynasty is; two advances past the championship it
+   * says bowl week 1, and a front page still leading with week 15's scores is
+   * reporting a fortnight-old Saturday to somebody about to watch a playoff.
+   */
+  const inBowls = isPostseason(roster?.calendar?.week ?? null) && bowlSlate.length > 0
+
+  /** What the middle column is about: this Saturday, or the bowls ahead. */
+  const countryKicker = inBowls
+    ? `${weekLabel(roster?.calendar?.week ?? null) ?? 'The postseason'} · the bowls`
+    : week ? `Around the country · week ${week}` : 'Around the country'
+
   /** Everybody still without a loss, best-ranked first. */
   const unbeaten = useMemo(
     () => [...table.values()]
@@ -234,10 +261,12 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
 
   /** The country's game of the week: the best team on the field, then the score. */
   const topGames = useMemo(
-    () => [...weekGames].sort((a, b) =>
-      bestRank(a) - bestRank(b) ||
-      (b.homeScore + b.awayScore) - (a.homeScore + a.awayScore)).slice(0, 5),
-    [weekGames, rankOf],
+    () => (inBowls
+      ? bowlSlate.slice(0, 6)
+      : [...weekGames].sort((a, b) =>
+        bestRank(a) - bestRank(b) ||
+        (b.homeScore + b.awayScore) - (a.homeScore + a.awayScore)).slice(0, 5)),
+    [inBowls, bowlSlate, weekGames, rankOf],
   )
 
   /**
@@ -332,6 +361,12 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
   }, [games, me, holdFrom, table, rankOf, roster, state.teamNames])
 
   const feature = useMemo((): { g: SeasonGame; upcoming: boolean } | null => {
+    // In bowl season the feature is the best game still to come, not the best
+    // one already played.
+    if (inBowls) {
+      const best = [...bowlSlate].sort((a, b) => bestRank(a) - bestRank(b))[0]
+      return best ? { g: best, upcoming: true } : null
+    }
     if (week === null) return null
     const seen = visibleGames(games, me, holdFrom)
       .filter((g) => !g.postseason && (g.week === week || (!g.played && g.week >= week)))
@@ -341,7 +376,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
       .sort((a, b) => b.w - a.w)
     const best = scored[0].g
     return { g: best, upcoming: !best.played }
-  }, [games, me, holdFrom, week, factsOf])
+  }, [inBowls, bowlSlate, games, me, holdFrom, week, factsOf, rankOf])
 
   /**
    * What the lead game is about — a conference on it, a rematch, who is
@@ -515,7 +550,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
         ) : (
           <>
             <div className="gs-main-head">
-              <Kicker>{week ? `Around the country · week ${week}` : 'Around the country'}</Kicker>
+              <Kicker>{countryKicker}</Kicker>
               <div className="row" style={{ gap: 7 }}>
                 {SLIDES.map((sl) => (
                   <button key={sl} aria-label={sl} title={sl.toLowerCase()}
@@ -546,38 +581,53 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
               />
             ) : slide === 'COUNTRY' || (slide === 'GAME' && !feature) ? (
               <FeatureList
-                kicker={week ? `Around the country · week ${week}` : 'Around the country'}
-                headline={topGames.length
-                  ? `${topGames[0].away} ${topGames[0].awayScore}, ${topGames[0].home} ${topGames[0].homeScore}`
-                  : 'Nothing played yet'}
-                standfirst="The week's biggest games, best team on the field first. Open one for the box score."
+                kicker={countryKicker}
+                headline={!topGames.length
+                  ? (inBowls ? 'No bowls drawn yet' : 'Nothing played yet')
+                  : inBowls
+                    ? `${topGames[0].away} meet ${topGames[0].home}`
+                    : `${topGames[0].away} ${topGames[0].awayScore}, ${topGames[0].home} ${topGames[0].homeScore}`}
+                standfirst={inBowls
+                  ? 'The bowls and the playoff, in the order they kick off. Nothing here has been played yet.'
+                  : "The week's biggest games, best team on the field first. Open one for the box score."}
                 bg={artOf(topGames[0]?.home)}
                 tint={save.schoolColors[topGames[0]?.home ?? ''] ?? null}
               >
                 {topGames.map((g) => {
-                  const homeWon = g.homeScore > g.awayScore
+                  // A scheduled bowl's row still holds last year's score, so a
+                  // game that has not been played shows the date it kicks off
+                  // and no numbers at all — see playedGameRows.
+                  const homeWon = g.played && g.homeScore > g.awayScore
+                  const dim = (side: boolean) =>
+                    !g.played ? 'var(--ink)' : side === homeWon ? 'var(--ink)' : 'var(--ink3)'
                   return (
                     <button key={g.row} className="gs-feature-row"
                       onClick={() => setOpen({ kind: 'game', row: g.row })}>
                       <span className="row" style={{ gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
                         <SchoolArt size={28} file={artOf(g.away, 'helmet')} />
-                        <span className="gs-feature-name" style={{ color: homeWon ? 'var(--ink3)' : 'var(--ink)' }}>
+                        <span className="gs-feature-name" style={{ color: dim(false) }}>
                           {rankOf.get(g.away ?? '') && rankOf.get(g.away ?? '')! <= 25
                             ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(g.away ?? '')} </span> : null}
                           {g.away}
                         </span>
                       </span>
-                      <span className="gs-feature-num" style={{ color: homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.awayScore}</span>
-                      <span style={{ color: 'var(--ink3)', fontSize: 11 }}>at</span>
+                      <span className="gs-feature-num" style={{ color: dim(false) }}>
+                        {g.played ? g.awayScore : ''}
+                      </span>
+                      <span style={{ color: 'var(--ink3)', fontSize: 11 }}>
+                        {g.played ? 'at' : (g.neutralSite ? 'vs' : 'at')}
+                      </span>
                       <span className="row" style={{ gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
                         <SchoolArt size={28} file={artOf(g.home, 'helmetRight') ?? artOf(g.home, 'helmet')} />
-                        <span className="gs-feature-name" style={{ color: homeWon ? 'var(--ink)' : 'var(--ink3)' }}>
+                        <span className="gs-feature-name" style={{ color: dim(true) }}>
                           {rankOf.get(g.home ?? '') && rankOf.get(g.home ?? '')! <= 25
                             ? <span style={{ color: 'var(--ink3)' }}>{rankOf.get(g.home ?? '')} </span> : null}
                           {g.home}
                         </span>
                       </span>
-                      <span className="gs-feature-num" style={{ color: homeWon ? 'var(--ink)' : 'var(--ink3)' }}>{g.homeScore}</span>
+                      <span className="gs-feature-num" style={{ color: dim(true) }}>
+                        {g.played ? g.homeScore : dateLabel(g.month, g.day)}
+                      </span>
                     </button>
                   )
                 })}

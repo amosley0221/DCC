@@ -142,3 +142,14 @@ export function weekLabel(week: number | null): string | null {
 const REGULAR_WEEKS = 16
 /** "BOWL WEEK 1 OF 4". */
 const BOWL_WEEKS = 4
+
+
+/**
+ * Whether the dynasty has left the regular season behind.
+ *
+ * Once it has, the last week anybody played stops being the news. Nobody
+ * previewing the bowls leads with a scoreboard from a fortnight ago.
+ */
+export function isPostseason(week: number | null): boolean {
+  return week !== null && week > REGULAR_WEEKS
+}

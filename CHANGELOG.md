@@ -12,6 +12,15 @@ _Nothing yet._
 
 ## [0.80.0] - 2026-09-07
 
+### Changed
+
+- **The front page moves on when the season does.** Two advances past the
+  conference championship, Home was still leading with week 15's scores — a
+  fortnight-old Saturday shown to somebody about to watch a playoff. In bowl
+  season it now leads with the bowls and the playoff instead, in the order they
+  kick off, and a game that has not been played shows the date it starts rather
+  than the stale score its row still carries.
+
 ### Fixed
 
 - **The week is read off the save instead of guessed from the games.** DCC
