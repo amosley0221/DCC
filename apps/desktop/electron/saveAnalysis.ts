@@ -1785,7 +1785,15 @@ export interface SeasonGame {
   /** The user played this one rather than simulating it. */
   userPlayed: boolean
   overtime: boolean
-  /** December rows are bowl games; the season's own weeks run August to November. */
+  /**
+   * Nobody is at home: a championship at a neutral site, a bowl, or one of the
+   * handful of regular-season games played away from both campuses. Read out of
+   * the save — see GAME_BITS.neutralSite — rather than guessed at from the
+   * round, because four conferences host their championship at the better
+   * seed's ground and five do not.
+   */
+  neutralSite: boolean
+  /** Where the save's week counter restarts. See season.ts. */
   postseason: boolean
 }
 
@@ -1796,6 +1804,24 @@ export interface SeasonGame {
  * docs/SAVE-FORMAT.md.
  */
 export const GAME_BITS = {
+  /**
+   * Nobody is at home.
+   *
+   * Found by the shape of what it marks rather than by a name. In a real save
+   * it is set on exactly five regular-season games — Texas-Oklahoma at the
+   * Cotton Bowl, Florida-Georgia in Jacksonville, Army-Navy, and two opening
+   * weekend kickoff classics — which is the list anybody who watches the sport
+   * would write down. It is set on 32 of the 36 bowls, and the four it leaves
+   * out are the playoff's first round, played on the higher seed's campus. And
+   * in championship week it splits the ten games exactly the way the
+   * conferences do: the SEC, Big Ten, Big 12, ACC and MAC at neutral sites, the
+   * Sun Belt, Pac-12, Mountain West, Conference USA and the American at the
+   * better seed's ground.
+   *
+   * Bits 73 and 74 carry the same value and have never once disagreed with this
+   * one across 3,574 games in four saves, so they are the same field.
+   */
+  neutralSite: [64, 1],
   kickoff: [578, 11], attendance: [589, 19],
   homeScore: [640, 8], awayScore: [648, 8], temperature: [664, 8],
   homeOT: [676, 7], awayOT: [683, 7],
@@ -2016,6 +2042,7 @@ export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGam
       played: homeScore + awayScore > 0 || homeQ.some(Boolean) || awayQ.some(Boolean),
       userPlayed: rd(G.userPlayed) === 1,
       overtime: rd(G.overtime) === 1,
+      neutralSite: rd(G.neutralSite) === 1,
       // Filled in below: one row cannot tell whether it is a bowl.
       postseason: false,
     })

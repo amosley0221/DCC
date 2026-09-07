@@ -10,6 +10,51 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.73.0] - 2026-09-07
+
+### Added
+
+- **The neutral-site flag, read out of the save.** Bit 64 of a game row, and the
+  evidence for it is unmistakable. In your save it is set on exactly five
+  regular-season games — Texas–Oklahoma at the Cotton Bowl, Florida–Georgia in
+  Jacksonville, Army–Navy, and two kickoff-weekend classics — which is the list
+  anyone who watches the sport would write down unprompted. It is set on 32 of
+  the 36 bowls, and the four it misses are the playoff's first round, played on
+  the higher seed's campus. And in championship week it splits the ten games
+  exactly the way the conferences do:
+
+  ```
+  Old Dominion   at Arkansas State    hosted        Sun Belt
+  Tennessee      vs Oklahoma          neutral site  SEC
+  Fresno State   at Boise State       hosted        Pac-12
+  Hawai'i        at UNLV              hosted        Mountain West
+  W. Michigan    vs Bowling Green     neutral site  MAC
+  Sam Houston    at Missouri State    hosted        Conference USA
+  USC            vs Penn State        neutral site  Big Ten
+  Texas Tech     vs Colorado          neutral site  Big 12
+  Charlotte      at Memphis           hosted        American
+  Pittsburgh     vs Florida State     neutral site  ACC
+  ```
+
+### Changed
+
+- **Nowhere derives it any more.** 0.72.0 assumed a conference championship was
+  at a neutral site, which is wrong for five conferences out of ten — the
+  Pac-12, Mountain West, Conference USA, the Sun Belt and the American all play
+  theirs at the better seed's ground. The flag is read instead, so DCC gets all
+  ten right, and Army–Navy and the Red River game as well.
+
+### On getting there
+
+Two wrong turns are written up in `docs/SAVE-FORMAT.md` because both were
+instructive. The first sweep found nothing — and the sweep was broken, reading
+`t.dataAt` where the field is `t.data`, so every bit came back from a NaN
+offset. The second found seven bits set on all 36 bowls and nothing else, and
+they are postseason flags, not this: in a save that has not reached
+championship weekend every neutral-site game is also a bowl, so the two cannot
+be told apart. What settled it was a save from week 15, where a neutral-site
+game that is not a bowl finally exists.
+
 ## [0.72.0] - 2026-09-07
 
 ### Changed

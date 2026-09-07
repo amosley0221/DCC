@@ -1616,35 +1616,47 @@ other was the wrong assumption to begin with. Whatever finds this record will
 have to establish its stride from a single non-monotonic field first.
 
 
-## Neutral-site games — found, not yet settled
 
-DynastyOS labels the conference championship "NEUTRAL SITE", so the flag is in
-the file. Sweeping every bit of the 100-byte `SeasonGameStore` row against a
-real save turns up seven that separate the postseason from everything else:
+## Neutral-site games — bit 64 of a game row
 
-| Bit | On | Off |
-| --- | --- | --- |
-| 162, 167, 168, 169, 171 | all 36 bowls | all 724 ordinary games |
-| 674 | all 36 bowls | all 724 ordinary games |
-| 706 | all 724 ordinary games | all 36 bowls |
+Set when nobody is at home. Found by the shape of what it marks rather than by
+a name, and the shape is unmistakable. In a real save it is set on exactly five
+regular-season games:
 
-(Note the first sweep found nothing at all, because the probe read `t.dataAt`
-where the field is `t.data`. Every bit came back from a NaN offset. A sweep that
-reports "no candidates" is worth re-reading before it is believed.)
+```
+West Virginia vs Tennessee   9/2     kickoff weekend
+LSU vs SMU                   9/2     kickoff weekend
+Texas vs Oklahoma           10/14    the Cotton Bowl
+Florida vs Georgia          11/4     Jacksonville
+Navy vs Army                12/2
+```
 
-**What this does not settle is which of two things those bits mean.** Every
-neutral-site game in that save is also a bowl, so "neutral site" and "bowl"
-are indistinguishable in it. Army–Navy, played at a neutral site in reality, is
-0 on all of them — so either the game does not treat it as neutral, or the bits
-mean postseason.
+which is the list anybody who watches the sport would write down unprompted. It
+is set on 32 of the 36 bowls, and the four it leaves out are the playoff's first
+round, played on the higher seed's campus. And in championship week it splits
+the ten games exactly the way the conferences do — the SEC, Big Ten, Big 12, ACC
+and MAC at neutral sites; the Sun Belt, Pac-12, Mountain West, Conference USA
+and the American at the better seed's ground.
 
-The discriminator is a **conference championship**: a neutral-site game that is
-not a bowl. A save from championship weekend settles it in one read — if 674 is
-1 on the Big Ten championship it is neutral-site, and if it is 0 it is
-postseason. Bit 706 is worth the same look: if it means "regular season" it is a
-better postseason flag than the week-counter rule in `season.ts`.
+Bits 73 and 74 carry the same value and have never once disagreed with bit 64
+across 3,574 games in four saves, so they are the same field.
 
-Until then `matchup.ts` derives it: two teams of one conference, in the round
-after the last full Saturday, are playing for that conference and nobody is at
-home. That is correct for the case that matters and is honest about being a
-derivation.
+### Two wrong turns worth recording
+
+**The first sweep found nothing, and the sweep was broken.** It read `t.dataAt`
+where the field is `t.data`, so every bit came back from a `NaN` offset. A sweep
+that reports "no candidates" is worth re-reading before it is believed.
+
+**The second sweep found bits 162, 167, 168, 169, 171, 674 (and 706 inverted) on
+all 36 bowls and nothing else, and they are not this.** They are postseason
+flags. In a save that has not reached championship weekend every neutral-site
+game is also a bowl, so the two are indistinguishable — and all seven read 0 on
+every conference championship. What settled it was a save from week 15, where a
+neutral-site game that is not a bowl finally exists.
+
+### And why it must be read rather than derived
+
+Deriving it — "a conference championship is at a neutral site" — is wrong for
+five conferences out of ten. Four of them were named before the flag was found:
+the Pac-12, Mountain West, Conference USA and the Sun Belt host theirs at the
+better seed's ground, and so does the American.

@@ -7,7 +7,8 @@ const M = require(process.argv[2])
 
 let row = 0
 const g = (week, home, away, hs = 0, as = 0, extra = {}) =>
-  ({ row: row++, week, home, away, homeScore: hs, awayScore: as, played: hs + as > 0, postseason: false, ...extra })
+  ({ row: row++, week, home, away, homeScore: hs, awayScore: as, played: hs + as > 0,
+     postseason: false, neutralSite: false, ...extra })
 
 const CONF = { 'Penn State': 'Big Ten', USC: 'Big Ten', Iowa: 'Big Ten', Alabama: 'SEC' }
 const RANK = { 'Penn State': 1, USC: 14, Iowa: 21 }
@@ -35,12 +36,13 @@ const opts = (game, games) => ({
   games.push(first)
   // Week 15: twelve games nationally, and this is one of them.
   for (let i = 0; i < 11; i++) games.push(g(15, `X${i}`, `Y${i}`, 0, 0))
-  const title = g(15, 'Penn State', 'USC')
+  // The Big Ten plays its championship at a neutral site, and the save says so.
+  const title = g(15, 'Penn State', 'USC', 0, 0, { neutralSite: true })
   games.push(title)
 
   const f = M.matchupFacts(opts(title, games))
   assert.equal(f.title, 'Big Ten', 'two Big Ten teams in a twelve-game week is the title game')
-  assert.equal(f.neutral, true, 'and nobody hosts one')
+  assert.equal(f.neutral, true, 'read from the save, not assumed from the round')
   assert.ok(f.rematch, 'they played in week 11')
   assert.equal(f.rematch.winner, 'Penn State')
   assert.equal(f.rematch.winnerScore, 41)
@@ -65,6 +67,24 @@ const opts = (game, games) => ({
   assert.ok(/Heisman shortlist/.test(lines), lines)
 }
 
+/* ------------------- a championship the better seed actually hosts */
+{
+  // Five conferences play theirs on campus — the Sun Belt, Pac-12, Mountain
+  // West, Conference USA and the American. Assuming a title game is neutral
+  // gets those five wrong, which is why the flag is read rather than derived.
+  const games = []
+  for (let w = 1; w <= 13; w++) for (let i = 0; i < 60; i++) games.push(g(w, `H${w}_${i}`, `A${w}_${i}`, 20, 10))
+  for (let i = 0; i < 11; i++) games.push(g(15, `X${i}`, `Y${i}`, 0, 0))
+  const hosted = g(15, 'Penn State', 'Iowa')   // neutralSite stays false
+  games.push(hosted)
+  const f = M.matchupFacts(opts(hosted, games))
+  assert.equal(f.title, 'Big Ten', 'still the title game')
+  assert.equal(f.neutral, false, 'but somebody is at home, because the save says so')
+  const lines = M.matchupLines(hosted, f).join('\n')
+  assert.ok(/championship game/.test(lines), lines)
+  assert.ok(!/neutral site/.test(lines), 'and the story is not told otherwise')
+}
+
 /* ------------------------------- an ordinary week is not championship weekend */
 {
   const games = []
@@ -87,6 +107,12 @@ const opts = (game, games) => ({
   const nobody = g(13, 'Rutgers', 'Maryland')
   const f3 = M.matchupFacts(opts(nobody, [...games, nobody]))
   assert.equal(M.matchupHeadline(nobody, f3, 'Maryland'), 'Maryland travel to Rutgers')
+
+  // Army-Navy is neither ranked nor unbeaten nor a rematch, and still nobody
+  // travels to it.
+  const classic = g(14, 'Army', 'Navy', 0, 0, { neutralSite: true })
+  const f4 = M.matchupFacts(opts(classic, [...games, classic]))
+  assert.equal(M.matchupHeadline(classic, f4, 'Navy'), 'Navy meet Army')
 }
 
 /* ------------------------------- two conferences do not play for one title */

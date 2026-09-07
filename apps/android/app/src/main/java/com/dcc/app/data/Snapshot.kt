@@ -231,6 +231,8 @@ data class SnapshotGame(
     val overtime: Boolean = false,
     /** December rows are bowls; the season's own weeks run August to November. */
     val postseason: Boolean = false,
+    /** Nobody is at home. Read out of the save; see GAME_BITS.neutralSite. */
+    val neutralSite: Boolean = false,
 )
 
 @Serializable

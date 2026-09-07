@@ -13,6 +13,12 @@
  * the round after the last full Saturday; a contender is a name on the save's
  * own Heisman shortlist. Where a fact is absent the line simply gets shorter.
  *
+ * Whether anybody is at home is *read*, not derived. It was derived once — a
+ * title game was assumed to be neutral — and that is wrong for five conferences
+ * out of ten: the Sun Belt, the Pac-12, the Mountain West, Conference USA and
+ * the American all play theirs at the better seed's ground. The save has had
+ * the answer all along at bit 64 of a game row.
+ *
  * Pure, so both the placeholder headline and the fact sheet the story is
  * written from are built by the same code, and so it can be checked without a
  * save file.
@@ -28,6 +34,8 @@ export interface MatchGame {
   awayScore: number
   played: boolean
   postseason: boolean
+  /** Read out of the save, not guessed at from the round. */
+  neutralSite: boolean
 }
 
 /** A name on the save's own Heisman shortlist. */
@@ -41,7 +49,7 @@ export interface Contender {
 export interface MatchupFacts {
   /** The conference whose title is on it, when this is that game. */
   title: string | null
-  /** Nobody hosts a conference championship. */
+  /** Nobody is at home. Straight from the save.  */
   neutral: boolean
   /** The earlier meeting this season, when there was one. */
   rematch: { week: number; winner: string; loser: string; winnerScore: number; loserScore: number } | null
@@ -109,7 +117,7 @@ export function matchupFacts(opts: {
 
   return {
     title,
-    neutral: title !== null,
+    neutral: g.neutralSite,
     rematch,
     homeRank: rankOf(g.home),
     awayRank: rankOf(g.away),
@@ -152,6 +160,8 @@ export function matchupHeadline(g: MatchGame, f: MatchupFacts, userTeam?: string
   }
   const firstUnbeaten = first === home ? f.homeUnbeaten : f.awayUnbeaten
   if (firstUnbeaten) return `Unbeaten ${first} take on ${second}`
+  // Nobody hosts a game at a neutral site, whatever the row calls home.
+  if (f.neutral) return `${first} meet ${second}`
   return `${first} ${g.home === first ? 'host' : 'travel to'} ${second}`
 }
 
@@ -184,8 +194,11 @@ export function matchupStandfirst(g: MatchGame, f: MatchupFacts): string {
 export function matchupLines(g: MatchGame, f: MatchupFacts): string[] {
   const out: string[] = []
   if (f.title) {
-    out.push(`This is the ${f.title} championship game, played at a neutral site. ` +
-      'Neither team is at home. The conference title goes to the winner.')
+    out.push(`This is the ${f.title} championship game. The conference title goes to the winner.`)
+  }
+  if (f.neutral) {
+    out.push('This game is at a neutral site. Neither team is at home, whichever is ' +
+      'listed first. Do not describe either as hosting or travelling.')
   }
   if (f.rematch) {
     out.push(`These teams already met this season: ${f.rematch.winner} beat ${f.rematch.loser} ` +
