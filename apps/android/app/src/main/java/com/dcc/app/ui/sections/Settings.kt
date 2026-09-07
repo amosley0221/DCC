@@ -149,6 +149,24 @@ fun SettingsSection(
                     BtnStyle.PRIMARY,
                     enabled = busy == null,
                 ) { vm.refreshSnapshot() }
+                Spacer(Modifier.height(9.dp))
+                // The everyday case is a week played on the PC and then a glance
+                // at the phone, so it asks on its own rather than waiting to be
+                // told. Quietly: nothing is cleared while it runs and nothing is
+                // said if it fails, because being away from the home network is
+                // the ordinary reason and not a fault.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DccChip(
+                        if (state.autoRefresh) "Refreshing on open" else "Refresh on open",
+                        state.autoRefresh,
+                    ) { vm.setAutoRefresh(!state.autoRefresh) }
+                    Spacer(Modifier.width(10.dp))
+                    MetaText(
+                        if (state.autoRefresh) "ASKS AGAIN EACH TIME THE APP OPENS"
+                        else "ONLY WHEN YOU ASK",
+                        c.ink4, 9,
+                    )
+                }
             }
 
             Spacer(Modifier.height(13.dp))

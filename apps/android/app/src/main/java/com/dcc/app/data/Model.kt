@@ -298,6 +298,14 @@ data class Persisted(
      */
     val snapshotSource: String = "",
     /**
+     * Ask for the dynasty again when the app opens, by whichever route last
+     * worked. On by default: the everyday shape of this app is a week played on
+     * the PC and then a glance at the phone, and remembering to pull down a
+     * refresh first is the app's job rather than the user's. A snapshot that
+     * came in from a file has nothing to ask again and is left alone.
+     */
+    val autoRefresh: Boolean = true,
+    /**
      * The recruits whose overall the user has chosen to see. The game keeps it
      * hidden until a recruit is scouted, so the app does too rather than handing
      * over a mechanic the dynasty is built on. Keyed by the save's own player

@@ -249,18 +249,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * leaves the phone showing the snapshot it already had, and every screen
      * picks up a good one on its own.
      */
-    private fun bringIn(route: String, load: suspend () -> Result<DynastySnapshot>) {
+    private fun bringIn(
+        route: String,
+        /**
+         * A fetch nobody asked for says nothing when it fails.
+         *
+         * The refresh on opening runs whether or not the phone is on the home
+         * network, and a relay address is a LAN one — so failing is the normal
+         * case away from the house, not a fault. Putting a red line in front of
+         * somebody who has just opened the app to look at a scoreline would make
+         * the feature worse than not having it.
+         */
+        quiet: Boolean = false,
+        load: suspend () -> Result<DynastySnapshot>,
+    ) {
         viewModelScope.launch {
-            _busy.value = route
-            _importError.value = null
+            if (!quiet) _busy.value = route
+            if (!quiet) _importError.value = null
             val result = withContext(Dispatchers.IO) { load().map { SnapshotView(it) } }
             result
                 .onSuccess {
                     _snapshot.value = it
                     update { s -> s.copy(snapshotSource = route) }
                 }
-                .onFailure { _importError.value = it.message ?: "that snapshot could not be read" }
-            _busy.value = null
+                .onFailure { if (!quiet) _importError.value = it.message ?: "that snapshot could not be read" }
+            if (!quiet) _busy.value = null
         }
     }
 
@@ -382,6 +395,40 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "github" -> fetchFromGitHub(s.githubRepo, s.githubToken)
         }
     }
+
+    /** Once per launch, not once per rotation. The view model outlives both. */
+    private var refreshedOnOpen = false
+
+    /**
+     * Catch up on opening, by whichever route last worked.
+     *
+     * The everyday shape of this is: play a week on the PC, pick up the phone.
+     * Asking somebody to remember to pull down a refresh before every glance is
+     * asking them to do the app's job. So it asks on its own, once per launch,
+     * and quietly — nothing is cleared while it runs and nothing is said if it
+     * fails, because the phone being away from the home network is the normal
+     * reason and not a fault worth a banner.
+     *
+     * A snapshot that came in from a file cannot be refreshed: the document was
+     * handed over once and there is nothing to ask again. Those keep what they
+     * have until the next import.
+     */
+    fun refreshOnOpen() {
+        if (refreshedOnOpen) return
+        refreshedOnOpen = true
+        val s = _state.value
+        if (!s.autoRefresh) return
+        when (s.snapshotSource) {
+            "wifi" -> if (s.relayUrl.isNotBlank() && s.relayToken.isNotBlank()) {
+                bringIn("wifi", quiet = true) { accept(SnapshotFetch.overWifi(s.relayUrl, s.relayToken)) }
+            }
+            "github" -> if (s.githubRepo.isNotBlank() && s.githubToken.isNotBlank()) {
+                bringIn("github", quiet = true) { accept(SnapshotFetch.fromGitHub(s.githubRepo, s.githubToken)) }
+            }
+        }
+    }
+
+    fun setAutoRefresh(on: Boolean) = update { it.copy(autoRefresh = on) }
 
     // ── the art pack ────────────────────────────────────────────────────────
 

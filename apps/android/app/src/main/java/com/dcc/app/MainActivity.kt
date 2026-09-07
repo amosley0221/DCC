@@ -40,6 +40,13 @@ class MainActivity : ComponentActivity() {
             val importError by vm.importError.collectAsState()
             val loading by vm.loading.collectAsState()
 
+            // Catch up on opening, by whichever route last worked — but only
+            // once the saved settings are actually in hand. Firing before they
+            // load would find no route, do nothing, and burn the once-a-launch
+            // guard on a blank state. The guard itself lives in the view model,
+            // which outlives a rotation.
+            LaunchedEffect(loading) { if (!loading) vm.refreshOnOpen() }
+
             DccTheme(state.theme, state.mode, state.accent, state.helmetsFlipped) {
                 val c = Dcc.colors
                 val d = derived

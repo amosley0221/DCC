@@ -10,6 +10,28 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.76.0] - 2026-09-07
+
+### Added
+
+- **The phone catches up on its own.** Opening the app now asks for the dynasty
+  again by whichever route last worked — over Wi-Fi or from GitHub — instead of
+  waiting to be told. The everyday shape of this is a week played on the PC and
+  then a glance at the phone, and remembering to pull down a refresh first was
+  the app's job rather than yours.
+
+  It is deliberately quiet. Nothing is cleared while it runs, so you are looking
+  at the dynasty you had until the newer one lands, and a fetch that fails says
+  nothing — being away from the home network is the ordinary reason a relay
+  address does not answer, not a fault worth a red line in front of somebody who
+  opened the app to check a scoreline. Once per launch, not once per rotation.
+
+  A snapshot that came in from a file is left alone: the document was handed
+  over once and there is nothing to ask again.
+
+  Settings has a switch beside the manual refresh if you would rather it only
+  went when you asked.
+
 ## [0.75.0] - 2026-09-07
 
 ### Changed
