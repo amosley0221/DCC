@@ -1,7 +1,7 @@
 {
   "name": "@dcc/desktop",
   "productName": "Dynasty Command Center",
-  "version": "0.76.0",
+  "version": "0.77.0",
   "private": true,
   "description": "Dynasty Command Center — Windows workspace and save agent.",
   "author": {
@@ -30,6 +30,7 @@
     "check:stadiums": "esbuild electron/stadiums.ts --bundle --platform=node --format=cjs --outfile=.tmp-stadiums.cjs --log-level=error && node check-stadiums.cjs ./.tmp-stadiums.cjs",
     "check:recruits": "esbuild electron/recruitLedger.ts --bundle --platform=node --format=cjs --outfile=.tmp-recruits.cjs --log-level=error && node check-recruits.cjs ./.tmp-recruits.cjs",
     "check:wire": "esbuild electron/wire.ts --bundle --platform=node --format=cjs --outfile=.tmp-wire.cjs --log-level=error && esbuild electron/league.ts --bundle --platform=node --format=cjs --outfile=.tmp-league.cjs --log-level=error && node check-wire.cjs ./.tmp-wire.cjs ./.tmp-league.cjs",
+    "check:teamstats": "esbuild electron/teamStats.ts --bundle --platform=node --format=cjs --outfile=.tmp-teamstats.cjs --log-level=error && node check-teamstats.cjs ./.tmp-teamstats.cjs",
     "check:classes": "esbuild electron/recruiting.ts --bundle --platform=node --format=cjs --outfile=.tmp-rec.cjs --log-level=error && node check-classes.cjs ./.tmp-rec.cjs"
   },
   "dependencies": {

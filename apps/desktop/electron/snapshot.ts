@@ -15,8 +15,9 @@
  */
 import {
   RATING_BITS, readClassRanks, readCoaches, readRecruitBoard, readRoster, readSeasonGames,
-  readTeamNames, teamTableOrder,
+  readTeamNames, teamTableOrder, readTeamGameStats,
 } from './saveAnalysis'
+import { seasonTotals } from './teamStats'
 import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
 import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
@@ -48,6 +49,24 @@ export interface SnapshotTeam {
    * game's number rather than an ordering of its own.
    */
   classRank: number | null
+}
+
+/** One team's totals, per season not per game; the client divides. */
+export interface SnapshotTeamStats {
+  /** Row in the team table, matching `SnapshotTeam.index`. */
+  index: number
+  games: number
+  rushYards: number
+  passYards: number
+  totalOffense: number
+  rushYardsAllowed: number
+  passYardsAllowed: number
+  yardsAllowed: number
+  firstDowns: number
+  thirdDownConversions: number
+  thirdDownAttempts: number
+  penaltyYards: number
+  possessionSeconds: number
 }
 
 export interface SnapshotPlayer {
@@ -138,6 +157,13 @@ export interface DynastySnapshot {
     playerCount: number
   }
   teams: SnapshotTeam[]
+  /**
+   * Each team's season on the field, added up over the games the phone is
+   * allowed to show. Out of the save's own `TeamStats` store — see
+   * electron/teamStats.ts — rather than worked out from the scores, which
+   * cannot tell you a third down was converted.
+   */
+  teamStats: SnapshotTeamStats[]
   games: SeasonGame[]
   players: SnapshotPlayer[]
   recruits: SnapshotRecruit[]
@@ -330,6 +356,19 @@ export function buildSnapshot(
   }
 
   const seen = visibleGames(games, userTeamName, week)
+  // Held to the same visible set as the table, so a total never runs ahead of
+  // the weeks the user has played.
+  const shownRows = new Set(seen.map((g) => g.row))
+  const teamStats: SnapshotTeamStats[] = seasonTotals(
+    readTeamGameStats(payload).filter((s) => shownRows.has(s.gameIndex)),
+  ).map((t) => ({
+    index: t.teamIndex, games: t.games,
+    rushYards: t.rushYards, passYards: t.passYards, totalOffense: t.totalOffense,
+    rushYardsAllowed: t.rushYardsAllowed, passYardsAllowed: t.passYardsAllowed,
+    yardsAllowed: t.yardsAllowed, firstDowns: t.firstDowns,
+    thirdDownConversions: t.thirdDownConversions, thirdDownAttempts: t.thirdDownAttempts,
+    penaltyYards: t.penaltyYards, possessionSeconds: t.possessionSeconds,
+  }))
   const table = buildLeague(seen, teams.map((t) => ({
     name: t.name, conference: t.conference, division: t.division,
   })))
@@ -409,5 +448,6 @@ export function buildSnapshot(
     heisman: extra?.heisman ?? [],
     lead,
     wire,
+    teamStats,
   }
 }

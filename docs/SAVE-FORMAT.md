@@ -1660,3 +1660,119 @@ Deriving it — "a conference championship is at a neutral site" — is wrong fo
 five conferences out of ten. Four of them were named before the flag was found:
 the Pac-12, Mountain West, Conference USA and the Sun Belt host theirs at the
 better seed's ground, and so does the American.
+
+## The other 1,503 stores — and the statistics
+
+`readStores` found 88 stores and reported the number confidently for months. The
+save holds **1,591**. The 1,503 it never saw are where every statistic lives.
+
+The bug is one line. A store header looks like this:
+
+```
+"SPBF"  486  1  <nameLen> <name>   "BSFT"  ... rows ... members
+```
+
+and the scanner read the name at a fixed place inside that header, rejecting any
+candidate whose `nameLen` was zero. Most stores write zero there. Their name sits
+in a fixed 128-byte buffer that **precedes** the marker by 148 bytes:
+
+```
+28436892  47 61 6d 65 4f 66 66 65 6e 73 69 76 65 53 74 61 74 73 00 ...   "GameOffensiveStats"
+          ... 128-byte name buffer, then 20 bytes ...
+28437044  53 50 42 46  00 00 01 e6  ...                                  "SPBF" 486
+28437096  42 53 46 54  ...  rows=27360  members=26                       "BSFT"
+```
+
+So the rule is: take the header's name when `nameLen` says there is one, and
+otherwise read the buffer 148 bytes back. `readNamedStores` does both. It is a
+second pass rather than a change to the first, because the first is what every
+shipped decoder stands on and it is right about all 88 — run side by side the two
+agree on the name, row count, row size and data offset of every store they share.
+
+A failed scan that reports a small number confidently is worth re-reading before
+it is believed. This is the second time: the neutral-site sweep below reported
+"no candidates" because it read `t.dataAt`, a field that does not exist.
+
+What the wider scan exposes:
+
+| Store | Rows | Row | What it is |
+| --- | --- | --- | --- |
+| `TeamStats` | 2,760 | 80B | a team's box score for one game |
+| `GameOffensiveStats` | 27,360 | 32B | one player's offence in one game |
+| `GameDefensiveStats` | 45,600 | 24B | one player's defence in one game |
+| `GameKickingStats` | 4,560 | 28B | kicking and punting |
+| `GameOLineStats` | 16,416 | 12B | line play |
+| `SeasonOffensiveStats` | 5,500 | 40B | a player's season |
+| `SeasonDefensiveStats` | 11,100 | 28B | " |
+| `CareerOffensiveStats` | 2,412 | 148B | a player's career |
+| `CareerDefensiveStats` | 4,500 | 92B | " |
+| `SeasonCoachStats` | 464 | 4B | a coach's season |
+| `CareerCoachStats` | 464 | 28B | a coach's career |
+
+`Player` also turns up here: 17,500 rows of 192 bytes, 288 members.
+
+### TeamStats — a box score, in 16-bit words
+
+A played game's row in `SeasonGameStore` carries a `TeamStats` reference —
+tag `0x2024` — four bytes behind **each** of its two team references, at bytes 16
+and 44. An unplayed game carries neither, which makes the absence of the tag a
+better test of "has this been played" than a score of nil.
+
+The reference names the team whose stats these are, so a caller never has to work
+out which side was at home. Read against a real box score — Penn State 42, USC 17
+in the Big Ten championship, rows 985 and 997:
+
+| Word | Field | PSU | USC |
+| --- | --- | --- | --- |
+| 2 | result — 1 won, 3 lost | 1 | 3 |
+| 6 | total yards | 597 | 260 |
+| 7 | kick return yards | 154 | 17 |
+| 8 / 9 | third down: made / attempted | 3 / 8 | 2 / 13 |
+| 10 | rushing yards | 151 | 57 |
+| 11 | passing yards | 245 | 169 |
+| 12 | total offence | 396 | 226 |
+| 13 | passing yards allowed | 169 | 245 |
+| 14 | rushing yards allowed | 57 | 151 |
+| 15 | first downs | 26 | 13 |
+| 16 | possession, in seconds | 845 | 595 |
+| 17 | punt return yards | 47 | 17 |
+| 19 | penalty yards | 15 | 15 |
+
+Two things the decoding turns on.
+
+**The top bit is a marker, not part of the number, and the fifteen under it are
+signed.** `0x80f5` is 245. `0xffff` is −1, not 32,767 — a team that loses more to
+sacks than it gains on the ground rushes for negative yards, which is how college
+football counts it. Across 908 played games total offence equals rushing plus
+passing in all 1,816 rows once the sign is respected, and in **none** of them
+without it. That check is what found the sign in the first place: seven rows had a
+"rushing" figure over 32,700.
+
+**Possession is what proves the rest.** Word 16 reads 845 and 595. 595 seconds is
+the 9:55 on the screen, and 845 + 595 = 1,440 = 24:00 — four six-minute quarters.
+Nothing else in the row lands on both halves of that by accident.
+
+Words 13 and 14 are what a team *gave up*, and they are not simply the opponent's
+figures. They agree in 381 of 1,816 checks and differ everywhere else, always by
+the sack yardage: a defence's "rushing yards allowed" is counted before sacks come
+off, a team's own rushing is counted after. Reading the mismatch as a decoding
+error would have been the easy mistake; it is the sport.
+
+### Where the player statistics are, and what is still missing
+
+`GameOffensiveStats` rows are 32 bytes: bytes 4–7 a `SeasonGameStore` reference
+(tag `0x3196`), bytes 8–11 a `TeamStore` reference (`0x319e`), then 24 bytes of
+packed numbers. 22,094 of the 27,360 rows are used. The championship added 27 —
+fifteen on one side, twelve on the other.
+
+The team reference in these rows is the **opponent**, not the player's own team.
+That is not a guess: a ten-bit field at bit 118 sums to 245 across the rows tagged
+USC and 169 across the rows tagged Penn State, which is each team's passing yards
+attached to the other team's tag.
+
+What is not yet solved is **which player** a row belongs to. The row holds no
+player reference, so the link runs the other way and has not been found. The
+`Player` row carries a handle at byte +24 (tag `0x210e`) that is allocated
+sequentially — player row 0 to index 0, row 1 to index 1 — so it points at a
+per-player object rather than at a per-game stat line. Until that link is found,
+team statistics are readable and per-player leaders are not.

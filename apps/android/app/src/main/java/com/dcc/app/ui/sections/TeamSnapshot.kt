@@ -31,6 +31,7 @@ import com.dcc.app.data.SaveLabels
 import com.dcc.app.data.SnapshotGame
 import com.dcc.app.data.SnapshotPlayer
 import com.dcc.app.data.SnapshotTeam
+import com.dcc.app.data.SnapshotTeamStats
 import com.dcc.app.data.monogram
 import com.dcc.app.data.name
 import com.dcc.app.state.SnapshotView
@@ -150,6 +151,12 @@ fun TeamSnapshotSection(view: SnapshotView) {
             // A team's own season is never held back: these results are either
             // already watched or not played yet.
             "SCHEDULE" -> LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // The season on the field, above the games that made it. Out of
+                // the save's own TeamStats store rather than worked out from the
+                // scores — a scoreboard cannot tell you a third down was
+                // converted.
+                view.snapshot.teamStats.firstOrNull { it.index == teamIndex && it.games > 0 }
+                    ?.let { st -> item { SeasonStatsCard(st) } }
                 if (schedule.isEmpty()) item { DccCard { EmptyState("the snapshot has no games for this team") } }
                 items(schedule, key = { it.row }) { g ->
                     TeamGameRow(g, teamIndex, g.row == nextRow, openGame == g.row) {
@@ -217,6 +224,65 @@ fun TeamSnapshotSection(view: SnapshotView) {
  * One program as the save has it. Shared with National's standings, so the
  * teams read the same wherever they appear.
  */
+/**
+ * A team's season totals, shown per game so a team that has played fewer of
+ * them still reads fairly.
+ */
+@Composable
+private fun SeasonStatsCard(st: SnapshotTeamStats) {
+    fun per(total: Int) = kotlin.math.round(st.perGame(total)).toInt()
+    val possession = kotlin.math.round(st.perGame(st.possessionSeconds)).toInt()
+    val third =
+        if (st.thirdDownAttempts > 0)
+            "${kotlin.math.round(100.0 * st.thirdDownConversions / st.thirdDownAttempts).toInt()}% ON THIRD DOWN"
+        else "NO THIRD DOWNS READ"
+    DccCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MonoLabel("ON THE FIELD")
+            Spacer(Modifier.weight(1f))
+            MetaText("${st.games} GAME${if (st.games == 1) "" else "S"}")
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCell(
+                "TOTAL OFFENSE", per(st.totalOffense).toString(),
+                "${per(st.rushYards)} RUSH · ${per(st.passYards)} PASS", Modifier.weight(1f),
+            )
+            StatCell(
+                "YARDS ALLOWED", per(st.yardsAllowed).toString(),
+                "${per(st.rushYardsAllowed)} RUSH · ${per(st.passYardsAllowed)} PASS", Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCell("FIRST DOWNS", per(st.firstDowns).toString(), third, Modifier.weight(1f))
+            StatCell(
+                "POSSESSION", "${possession / 60}:${(possession % 60).toString().padStart(2, '0')}",
+                "${per(st.penaltyYards)} PENALTY YARDS", Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/** One number in the season card: what it is, the number, and what it is made of. */
+@Composable
+private fun StatCell(label: String, value: String, note: String, modifier: Modifier = Modifier) {
+    val c = Dcc.colors
+    Column(modifier) {
+        MetaText(label)
+        Spacer(Modifier.height(3.dp))
+        Text(
+            value,
+            style = TextStyle(
+                fontFamily = Dcc.fonts.sans, fontWeight = FontWeight.SemiBold,
+                fontSize = 24.sp, color = c.ink,
+            ),
+        )
+        Spacer(Modifier.height(2.dp))
+        MetaText(note)
+    }
+}
+
 @Composable
 fun SnapshotTeamRow(t: SnapshotTeam, isUser: Boolean, onClick: (() -> Unit)? = null) {
     val c = Dcc.colors

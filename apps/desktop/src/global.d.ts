@@ -9,6 +9,7 @@ import type { GameEdit, PlayerEdit, PlayerWriteResult, RecruitEdit, RecruitWrite
 import type { PressRequest, PressStory } from '../electron/press'
 import type { StoredStory } from '../electron/sidecar'
 import type { RecruitEvent } from '../electron/recruitLedger'
+import type { TeamGameStatsView } from '../electron/teamStats'
 import type { RelayState } from '../electron/relay'
 import type { TamperThreadView, TransferView } from '../electron/preload'
 import type { TamperCoach, TamperTarget } from '../electron/tamper'
@@ -40,7 +41,9 @@ declare global {
             /** The game's own recruiting class ranking, school name to place. */
             classRanks: Record<string, number> | null
             /** Whose dynasty this is, read off the save's own played games. */
-            userTeam: { id: number; name: string } | null }
+            userTeam: { id: number; name: string } | null
+            /** One row per team per played game, out of the save's TeamStats store. */
+            teamStats: TeamGameStatsView[] }
         | { ok: false; message: string }
       >
       /** Downloads a stadium photograph per school into the art folder. */

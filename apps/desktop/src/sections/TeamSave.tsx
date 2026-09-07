@@ -9,6 +9,7 @@ import DepthChart from './DepthChart'
 import Roster from './Roster'
 import { buildLeague, visibleGames } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
+import { clock, perGame, rate, seasonTotals } from '../../electron/teamStats'
 import { dateLabel, kickoffLabel } from '../../electron/gameEnums'
 
 // OVERVIEW is first because it is what the front page used to be: your record,
@@ -39,6 +40,22 @@ const UNASSIGNED = 255
  * link every list here is league-wide, and the screen says so plainly rather
  * than implying these are your players.
  */
+/** One number in the season panel: a big value, and what it is made of underneath. */
+function StatLine(
+  { label, value, text, note }:
+  { label: string; value?: number; text?: string; note: string },
+) {
+  return (
+    <div>
+      <Kicker>{label}</Kicker>
+      <div className="gs-tile-val is-mid" style={{ fontSize: 26 }}>
+        {text ?? (value === undefined ? '—' : Math.round(value))}
+      </div>
+      <div style={{ marginTop: 4 }}><Meta size={10}>{note}</Meta></div>
+    </div>
+  )
+}
+
 export default function TeamSave() {
   const { save, patch } = useSave()
   const { state, dispatch } = useStore()
@@ -101,6 +118,24 @@ export default function TeamSave() {
       .filter((t) => t.name),
   ), [roster, myName, names])
   const record = myName ? table.get(myName) ?? null : null
+
+  /**
+   * Your season on the field, added up over the games you have reached.
+   *
+   * Out of the save's own TeamStats store rather than worked out from scores —
+   * a scoreboard cannot tell you a third down was converted. Held to the same
+   * visible set as the table above, so the totals never run ahead of the weeks
+   * you have played.
+   */
+  const mineStats = useMemo(() => {
+    if (!myName) return null
+    const shown = new Set(
+      visibleGames(roster?.games ?? [], myName, currentWeek(roster?.games ?? [], myName))
+        .map((g) => g.row))
+    const lines = (roster?.teamStats ?? [])
+      .filter((s) => s.school === myName && shown.has(s.gameIndex))
+    return seasonTotals(lines)[0] ?? null
+  }, [roster, myName])
   const next = useMemo(() => (roster?.games ?? [])
     .filter((g) => (g.home === myName || g.away === myName) && !g.played)
     .sort((a, b) => a.week - b.week)[0] ?? null, [roster, myName])
@@ -286,6 +321,25 @@ export default function TeamSave() {
                 </div>
               </div>
             </div>
+
+            {mineStats ? (
+              <div className="card card-pad">
+                <div className="card-head">
+                  <Kicker>On the field</Kicker>
+                  <Meta size={9}>{mineStats.games} GAME{mineStats.games === 1 ? '' : 'S'}</Meta>
+                </div>
+                <div className="grid-2" style={{ gap: 12, marginTop: 8 }}>
+                  <StatLine label="Total offense" value={perGame(mineStats.totalOffense, mineStats.games)}
+                    note={`${Math.round(perGame(mineStats.rushYards, mineStats.games))} RUSH · ${Math.round(perGame(mineStats.passYards, mineStats.games))} PASS`} />
+                  <StatLine label="Yards allowed" value={perGame(mineStats.yardsAllowed, mineStats.games)}
+                    note={`${Math.round(perGame(mineStats.rushYardsAllowed, mineStats.games))} RUSH · ${Math.round(perGame(mineStats.passYardsAllowed, mineStats.games))} PASS`} />
+                  <StatLine label="First downs" value={perGame(mineStats.firstDowns, mineStats.games)}
+                    note={`${rate(mineStats.thirdDownConversions, mineStats.thirdDownAttempts)} ON THIRD DOWN`} />
+                  <StatLine label="Possession" text={clock(perGame(mineStats.possessionSeconds, mineStats.games))}
+                    note={`${Math.round(perGame(mineStats.penaltyYards, mineStats.games))} PENALTY YARDS`} />
+                </div>
+              </div>
+            ) : null}
 
             {next ? (
               <div className="card card-pad">

@@ -34,6 +34,12 @@ data class DynastySnapshot(
     val generated: String = "",
     val meta: SnapshotMeta = SnapshotMeta(),
     val teams: List<SnapshotTeam> = emptyList(),
+    /**
+     * Each team's season on the field, out of the save's own TeamStats store.
+     * Empty on a snapshot written before DCC could read it, which is why every
+     * screen that uses it checks for games played first.
+     */
+    val teamStats: List<SnapshotTeamStats> = emptyList(),
     val games: List<SnapshotGame> = emptyList(),
     val players: List<SnapshotPlayer> = emptyList(),
     val recruits: List<SnapshotRecruit> = emptyList(),
@@ -201,6 +207,32 @@ data class SnapshotTeam(
      */
     val classRank: Int? = null,
 )
+
+/**
+ * One team's totals for the season so far — per season, not per game, so the
+ * screen divides by [games] itself and a team that has played fewer of them
+ * still compares fairly.
+ */
+@Serializable
+data class SnapshotTeamStats(
+    /** Row in the team table, matching [SnapshotTeam.index]. */
+    val index: Int,
+    val games: Int = 0,
+    val rushYards: Int = 0,
+    val passYards: Int = 0,
+    val totalOffense: Int = 0,
+    val rushYardsAllowed: Int = 0,
+    val passYardsAllowed: Int = 0,
+    val yardsAllowed: Int = 0,
+    val firstDowns: Int = 0,
+    val thirdDownConversions: Int = 0,
+    val thirdDownAttempts: Int = 0,
+    val penaltyYards: Int = 0,
+    val possessionSeconds: Int = 0,
+) {
+    /** Per game, which is the only way two teams compare. */
+    fun perGame(total: Int): Double = if (games > 0) total.toDouble() / games else 0.0
+}
 
 @Serializable
 data class SnapshotGame(

@@ -4,6 +4,7 @@ import type {
   RankColumnView, HeismanView, RecruitBoard,
 } from '../electron/saveAnalysis'
 import type { RecruitEvent } from '../electron/recruitLedger'
+import type { TeamGameStatsView } from '../electron/teamStats'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
 
@@ -71,6 +72,13 @@ export interface SaveState {
      * when the save did not hold it in the shape the reader insists on.
      */
     classRanks: Record<string, number> | null
+    /**
+     * Team statistics, one row per team per played game, named by school.
+     *
+     * Per game rather than per season because DCC holds back weeks you have not
+     * played: a screen adds up only the games it is already showing you.
+     */
+    teamStats: TeamGameStatsView[]
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -256,6 +264,7 @@ export function rosterPatch(
     recruitEvents: res.recruitEvents ?? [],
     userTeam: res.userTeam ?? null,
     classRanks: res.classRanks ?? null,
+    teamStats: res.teamStats ?? [],
   }
 }
 

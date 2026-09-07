@@ -3,6 +3,7 @@ import { inflateSync, inflateRawSync, gunzipSync } from 'node:zlib'
 import * as zlib from 'node:zlib'
 import { TEAM_ID_NAMES } from './teamIds'
 import { markPostseason } from './season'
+import { TEAM_STAT_WORDS, statValue, wonFrom, type TeamGameStats } from './teamStats'
 import {
   PLAYER_TAG, RECRUIT_CLASSES, RECRUIT_FIELDS, RECRUIT_PLAYER_AT, RECRUIT_STAGES,
   RECRUIT_STRIDE, TOP_SCHOOLS_PER_RECRUIT,
@@ -1925,6 +1926,91 @@ export function storeTable(payload: Buffer, name: string): StoreTable | null {
   return found
 }
 
+/**
+ * Every store in the payload, including the ones that keep their name outside
+ * the header.
+ *
+ * `storeCandidates` reads a store's name from inside the `SPBF` block, where a
+ * length word says how long it is. Most stores write a zero there and keep the
+ * name in a fixed 128-byte buffer that sits 148 bytes *before* the marker, so
+ * the length check threw them away without a sound. The save holds 1,591
+ * stores; the header-name path finds 88 of them, and the 1,503 it dropped are
+ * where the statistics live — `TeamStats`, `GameOffensiveStats`,
+ * `GameDefensiveStats`, `SeasonCoachStats` and the rest.
+ *
+ * This is a second, wider pass rather than a fix to the first, because the
+ * first is what every shipped decoder reads and it is right about all 88: run
+ * side by side on a real save the two agree on the name, row count, row size
+ * and data offset of every store they share. Names are not unique in the wider
+ * set — `Transition` occurs 118 times and `Stage` 78 — so a lookup asks for the
+ * largest match and callers should name a store they expect to be singular.
+ */
+export function readNamedStores(payload: Buffer): NamedStore[] {
+  const seen = namedScans.get(payload)
+  if (seen) return seen
+  const found = scanNamedStores(payload)
+  namedScans.set(payload, found)
+  return found
+}
+
+export interface NamedStore extends StoreTable {
+  name: string
+  members: number
+}
+
+const namedScans = new WeakMap<Buffer, NamedStore[]>()
+
+function scanNamedStores(payload: Buffer): NamedStore[] {
+  const marker = Buffer.from('SPBF', 'latin1')
+  const bsft = Buffer.from('BSFT', 'latin1')
+  const out: NamedStore[] = []
+  let i = 0
+  while ((i = payload.indexOf(marker, i)) !== -1) {
+    const sp = i
+    i += 4
+    if (sp + 20 > payload.length) break
+    const name = storeName(payload, sp)
+    if (!name) continue
+    const at = payload.indexOf(bsft, sp)
+    if (at < 0 || at > sp + 220 || at + 28 > payload.length) continue
+    const members = payload.readUInt32BE(at + 20)
+    if (members > 512 || at + 28 + members * 4 > payload.length) continue
+    const memberBits: number[] = []
+    for (let m = 0; m < members; m++) memberBits.push(payload.readUInt32BE(at + 28 + m * 4))
+    out.push({
+      name, members, memberBits,
+      rows: payload.readUInt32BE(at + 16),
+      rowBytes: payload.readUInt32BE(at + 12) * 4,
+      data: at + 28 + members * 4,
+    })
+  }
+  return out
+}
+
+/** A store's name, from the header when it carries one and the buffer in front when it does not. */
+function storeName(payload: Buffer, sp: number): string | null {
+  const inline = payload.readUInt32BE(sp + 16)
+  if (inline > 0 && inline <= 96 && sp + 20 + inline <= payload.length) {
+    const held = payload.subarray(sp + 20, sp + 20 + inline).toString('latin1')
+    if (/^[A-Za-z0-9_]+$/.test(held)) return held
+  }
+  if (sp < 148) return null
+  const buffer = payload.subarray(sp - 148, sp - 148 + 128).toString('latin1')
+  const end = buffer.indexOf('\0')
+  const held = end < 0 ? buffer : buffer.slice(0, end)
+  return /^[A-Za-z][A-Za-z0-9_]{2,63}$/.test(held) ? held : null
+}
+
+/** One named store's table, largest first where the name is not unique. */
+export function namedTable(payload: Buffer, name: string): NamedStore | null {
+  let best: NamedStore | null = null
+  for (const s of readNamedStores(payload)) {
+    if (s.name !== name) continue
+    if (!best || s.rows > best.rows) best = s
+  }
+  return best
+}
+
 function locateTable(payload: Buffer, name: string): StoreTable | null {
   const store = readStores(payload).find((s) => s.name === name)
   if (!store) return null
@@ -2007,6 +2093,68 @@ export function readSeasonOrdinal(payload: Buffer): number | null {
     }
   }
   return used || null
+}
+
+/**
+ * Every played game's two team stat lines, joined to the game that produced them.
+ *
+ * The join is the save's own: a played game's row carries a `TeamStats`
+ * reference — tag `0x2024` — four bytes behind each of its two team
+ * references, at bytes 16 and 44. An unplayed game carries neither, so the
+ * absence of the tag is the test for whether a game has been played rather
+ * than a score of nil.
+ *
+ * The reference names the team whose stats these are, so the pair comes back
+ * the right way round without asking which side was at home. That matters: the
+ * same row holds what the team gained and what it gave up, and the two are not
+ * mirror images — sacks come off rushing yards gained but not off rushing
+ * yards allowed, so a team's rushing and its opponent's rush-allowed differ by
+ * exactly the yardage lost behind the line.
+ */
+export function readTeamGameStats(payload: Buffer): TeamGameStats[] {
+  const games = seasonGameTable(payload)
+  const table = namedTable(payload, 'TeamStats')
+  if (!games || !table || table.rowBytes < 40) return []
+  const out: TeamGameStats[] = []
+  for (let g = 0; g < games.rows; g++) {
+    const at = games.data + g * SEASON_GAME_ROW
+    for (const [teamAt, statsAt] of [[G_AWAY_REF, G_AWAY_REF + 4], [G_HOME_REF, G_HOME_REF + 4]]) {
+      if (at + statsAt + 4 > payload.length) continue
+      if (payload.readUInt16BE(at + statsAt) !== TEAM_STATS_TAG) continue
+      if (payload.readUInt16BE(at + teamAt) !== TEAM_TAG) continue
+      const row = payload.readUInt16BE(at + statsAt + 2)
+      if (row >= table.rows) continue
+      out.push(readTeamStatRow(payload, table, row, payload.readUInt16BE(at + teamAt + 2), g))
+    }
+  }
+  return out
+}
+
+const TEAM_STATS_TAG = 0x2024
+
+function readTeamStatRow(
+  payload: Buffer, table: NamedStore, row: number, teamIndex: number, gameIndex: number,
+): TeamGameStats {
+  const base = table.data + row * table.rowBytes
+  const word = (i: number) => statValue(payload.readUInt16BE(base + i * 2))
+  const W = TEAM_STAT_WORDS
+  return {
+    teamIndex, gameIndex,
+    won: wonFrom(payload.readUInt16BE(base + W.result * 2)),
+    firstDowns: word(W.firstDowns),
+    rushYards: word(W.rushYards),
+    passYards: word(W.passYards),
+    totalOffense: word(W.totalOffense),
+    totalYards: word(W.totalYards),
+    passYardsAllowed: word(W.passYardsAllowed),
+    rushYardsAllowed: word(W.rushYardsAllowed),
+    thirdDownConversions: word(W.thirdDownConversions),
+    thirdDownAttempts: word(W.thirdDownAttempts),
+    kickReturnYards: word(W.kickReturnYards),
+    puntReturnYards: word(W.puntReturnYards),
+    penaltyYards: word(W.penaltyYards),
+    possessionSeconds: word(W.possessionSeconds),
+  }
 }
 
 export function readSeasonGames(payload: Buffer, teams: TeamRecord[]): SeasonGame[] {

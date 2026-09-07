@@ -13,7 +13,7 @@ import {
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
   readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman, readRecruitBoard,
-  findRankColumns, readRankField, readClassRankByName,
+  findRankColumns, readRankField, readClassRankByName, readTeamGameStats,
 } from './saveAnalysis'
 import type { RankColumnView } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
@@ -478,6 +478,18 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       recruitEvents,
       // The game's own recruiting class ranking, school name to place.
       classRanks: readClassRankByName(payload),
+      // Team statistics, out of the save's own TeamStats store. Named by school
+      // rather than by table row so the renderer never has to hold the team
+      // table to read them — see electron/teamStats.ts for how the store was
+      // found and what each word in a row means.
+      // Per game rather than per season on purpose. DCC holds back results from
+      // weeks you have not played, and a season total is every week at once —
+      // sent whole it would put next Saturday's yards on the front page. The
+      // client adds up the games it is already allowed to show.
+      teamStats: readTeamGameStats(payload).flatMap((g) => {
+        const school = order[g.teamIndex]?.name
+        return school ? [{ ...g, school }] : []
+      }),
       // Whose dynasty this is, read off the save rather than remembered. The
       // save marks the games the user played rather than simulated, and their
       // team is in all of them — see electron/season.ts. Null when a dynasty

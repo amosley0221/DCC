@@ -8,6 +8,7 @@ import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
 import { buildLeague, orderByRanks, rankings, visibleGames, winPct } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
+import { leaders, seasonTotals, type StatLeaderKey } from '../../electron/teamStats'
 import { buildWire, type WireItem } from '../../electron/wire'
 import {
   gameWeight, matchupFacts, matchupHeadline, matchupLines, matchupStandfirst,
@@ -92,6 +93,14 @@ const HEISMAN_WEIGHT: Record<string, number> = { QB: 1, HB: 0.86, WR: 0.8, TE: 0
  * read is the lead story, generated on demand from a fact sheet of these same
  * numbers, so it can describe the game but cannot invent one.
  */
+/** The leaderboards the front page offers, in the order they read. */
+const STAT_BOARDS: [StatLeaderKey, string][] = [
+  ['totalOffense', 'OFFENSE'],
+  ['rushYards', 'RUSH'],
+  ['passYards', 'PASS'],
+  ['yardsAllowed', 'DEFENSE'],
+]
+
 export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void } = {}) {
   const { save } = useSave()
   const { state, dispatch } = useStore()
@@ -117,6 +126,29 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
     () => buildLeague(visibleGames(games, me, holdFrom), teams),
     [games, teams, me, holdFrom],
   )
+  /**
+   * The country's team statistics, over the games you are allowed to see.
+   *
+   * Read out of the save's own TeamStats store. The rows are filtered to the
+   * same visible set the league table stands on, so a leaderboard cannot show
+   * you a yard gained in a week you have not played yet.
+   */
+  const statTotals = useMemo(() => {
+    const shown = new Set(visibleGames(games, me, holdFrom).map((g) => g.row))
+    const lines = (roster?.teamStats ?? []).filter((s) => shown.has(s.gameIndex))
+    const school = new Map(lines.map((s) => [s.teamIndex, s.school]))
+    return { totals: seasonTotals(lines), school }
+  }, [roster, games, me, holdFrom])
+
+  /** Which leaderboard the rail is showing. */
+  const [board, setBoard] = useState<StatLeaderKey>('totalOffense')
+  const statLeaders = useMemo(
+    () => leaders(statTotals.totals, board, 5).map((l) => ({
+      ...l, school: statTotals.school.get(l.teamIndex) ?? null,
+    })).filter((l) => l.school),
+    [statTotals, board],
+  )
+
   const season = save.roster?.season ?? null
   const poll = usePoll()
   const order = useMemo(
@@ -403,6 +435,34 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
             <div className="gs-tile-val is-mid" style={{ fontSize: 32 }}>{weekGames.length}</div>
             <div style={{ marginTop: 6 }}><Meta size={10}>GAMES THIS WEEK</Meta></div>
           </div>
+        </div>
+
+        {/* What the country is doing on the field, per game, over the weeks you
+            have reached. Yards allowed sorts the other way, because the best
+            defence gives up the fewest. */}
+        <div className="card card-pad">
+          <div className="card-head">
+            <Kicker>Nationally</Kicker>
+            <Meta size={10}>PER GAME</Meta>
+          </div>
+          <div className="row" style={{ gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+            {STAT_BOARDS.map(([key, label]) => (
+              <Tab key={key} on={board === key} onClick={() => setBoard(key)}>{label}</Tab>
+            ))}
+          </div>
+          {statLeaders.map((l, i) => (
+            <div key={l.teamIndex} className="gs-row" style={{ cursor: 'default' }}>
+              <span className="gs-tag gs-tag-mute">{i + 1}</span>
+              <SchoolArt size={22} file={artOf(l.school!, 'helmet')} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="gs-row-title">{l.school}</span>
+              </span>
+              <span className="gs-tile-val is-mid" style={{ fontSize: 18 }}>
+                {Math.round(l.value)}
+              </span>
+            </div>
+          ))}
+          {!statLeaders.length ? <Meta size={10}>NO GAMES PLAYED YET</Meta> : null}
         </div>
 
         {/* The best players in the country's next class, wherever they are

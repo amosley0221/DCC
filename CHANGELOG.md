@@ -10,6 +10,34 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.77.0] - 2026-09-07
+
+### Added
+
+- **Statistics, at last.** Home has a leaderboard for what the country is doing
+  on the field — total offence, rushing, passing and yards allowed, per game —
+  and The Program shows your own season beside it: offence, defence, first
+  downs, third-down rate, possession and penalty yards. Both are on the phone
+  too. All of it is held to the weeks you have actually played, so a leaderboard
+  cannot show you a yard gained on a Saturday you have not reached.
+
+### Fixed
+
+- **DCC was reading 88 of the save's 1,591 tables.** A store announces its name
+  either inside its header or in a buffer just in front of it, and the reader
+  only understood the first. The 1,503 it was skipping are where the statistics
+  live — team box scores, per-player offence and defence, kicking, and the
+  season and career records for players and coaches. The old reader is untouched
+  and still right about all 88; the new one runs beside it. See
+  `docs/SAVE-FORMAT.md` for the header layout and how the box score decodes.
+
+### Known
+
+- Team statistics are readable; **per-player leaders are not yet**. The per-game
+  stat rows carry the game and the team but no player, and the link from a
+  player to their own rows has not been found. Until it is, there is no passing
+  leader, no sack leader and no statistical case for the Heisman.
+
 ## [0.76.0] - 2026-09-07
 
 ### Added

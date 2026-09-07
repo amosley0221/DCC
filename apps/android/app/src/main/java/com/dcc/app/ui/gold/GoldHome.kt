@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -51,6 +52,7 @@ import com.dcc.app.data.SnapshotGame
 import com.dcc.app.data.SnapshotHeisman
 import com.dcc.app.data.SnapshotLead
 import com.dcc.app.data.SnapshotRecruit
+import com.dcc.app.data.SnapshotTeamStats
 import com.dcc.app.data.SnapshotWire
 import com.dcc.app.data.name
 import com.dcc.app.state.SnapshotView
@@ -211,6 +213,7 @@ fun GoldHome(
                     // The panel is taller than the column needs, and a
                     // recruiting-minded glance wants this more than it wants
                     // empty ground.
+                    LeadersWell(snap, Modifier.fillMaxWidth())
                     ClassTable(snap, limit = 8, onOpenAll = onOpenBoard)
                 }
             }
@@ -318,7 +321,10 @@ fun GoldHome(
             }
         }
 
-        if (!wide) BoardWell(board, state, onOpenBoard, Modifier.fillMaxWidth())
+        if (!wide) {
+            BoardWell(board, state, onOpenBoard, Modifier.fillMaxWidth())
+            LeadersWell(snap, Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -697,6 +703,99 @@ private fun MatchupSide(
  * in the game's own national order. Home is the sport's page, so it now says
  * what it is and shows where each of them is leaning.
  */
+/**
+ * What the country is doing on the field, per game, over the weeks you have
+ * reached.
+ *
+ * Out of the save's own TeamStats store, carried on the snapshot. Yards allowed
+ * sorts the other way — the best defence gives up the fewest — and a team that
+ * has not played is left out rather than sorted to the front on a zero.
+ */
+@Composable
+private fun LeadersWell(
+    snap: SnapshotView,
+    modifier: Modifier = Modifier,
+) {
+    val c = Dcc.colors
+    val stats = snap.snapshot.teamStats.filter { it.games > 0 }
+    if (stats.isEmpty()) return
+    var board by remember { mutableStateOf(STAT_BOARDS.first()) }
+    val nameOf = remember(snap) { snap.snapshot.teams.associate { it.index to it.name } }
+    val rows = remember(stats, board) {
+        stats
+            .map { it.index to it.perGame(board.pick(it)) }
+            .sortedWith(if (board.fewestWins) compareBy { it.second } else compareByDescending { it.second })
+            .take(5)
+    }
+    Column(
+        modifier
+            .clip(RoundedCornerShape(Dcc.shapes.card))
+            .border(1.dp, c.line, RoundedCornerShape(Dcc.shapes.card))
+            .background(c.surface)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Label("NATIONALLY", 10.0, c.ink3, 2.0)
+            Spacer(Modifier.width(8.dp))
+            Label("PER GAME", 9.0, c.ink4, 1.5)
+        }
+        Spacer(Modifier.height(9.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (b in STAT_BOARDS) {
+                val on = b == board
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (on) c.accent.copy(alpha = 0.16f) else Color.Transparent)
+                        .border(1.dp, if (on) c.accent else c.line, RoundedCornerShape(999.dp))
+                        .clickable { board = b }
+                        .padding(horizontal = 9.dp, vertical = 4.dp),
+                ) {
+                    Label(b.label, 9.0, if (on) c.accent else c.ink3, 1.2)
+                }
+            }
+        }
+        Spacer(Modifier.height(11.dp))
+        rows.forEachIndexed { i, (index, value) ->
+            val school = nameOf[index] ?: return@forEachIndexed
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Label("${i + 1}", 11.0, c.ink4, 1.0, Modifier.width(16.dp))
+                Spacer(Modifier.width(4.dp))
+                SchoolHelmet(school, 22.dp)
+                Spacer(Modifier.width(9.dp))
+                Ui(school, 13.0, c.ink, FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
+                Ui("${kotlin.math.round(value).toInt()}", 15.0, c.ink2, FontWeight.SemiBold)
+            }
+            Spacer(Modifier.height(9.dp))
+        }
+    }
+}
+
+/** The leaderboards Home offers, and which way each one sorts. */
+private enum class StatBoard(val label: String, val fewestWins: Boolean) {
+    OFFENSE("OFFENSE", false),
+    RUSH("RUSH", false),
+    PASS("PASS", false),
+    DEFENSE("DEFENSE", true);
+
+    fun pick(t: SnapshotTeamStats): Int = when (this) {
+        OFFENSE -> t.totalOffense
+        RUSH -> t.rushYards
+        PASS -> t.passYards
+        DEFENSE -> t.yardsAllowed
+    }
+}
+
+private val STAT_BOARDS = StatBoard.entries.toList()
+
+/** One school's helmet at a small size, or nothing when the art is not there. */
+@Composable
+private fun SchoolHelmet(school: String, size: Dp) {
+    val context = LocalContext.current
+    val file = remember(school) { ArtPack.school(context, school, "helmet") }
+    ArtImage(file, Modifier.size(size), ContentScale.Fit)
+}
+
 @Composable
 private fun BoardWell(
     board: List<SnapshotRecruit>,
