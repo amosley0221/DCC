@@ -26,6 +26,14 @@ export interface PressRequest {
   awayPlayers?: PressPlayer[]
   /** The user's own team, so the piece can be written from their side. */
   userTeam?: string | null
+  /**
+   * What the game is about, in sentences: a conference title on it, an earlier
+   * meeting this season, who is unbeaten, who is in the Heisman race. Derived
+   * from the save by electron/matchup.ts. Without these the model was handed a
+   * date, a kickoff and the weather, and wrote exactly what you would expect
+   * from that.
+   */
+  context?: string[]
   kind: 'preview' | 'recap'
 }
 
@@ -58,6 +66,7 @@ export function factSheet(req: PressRequest): string {
   }
   roster(g.away, req.awayPlayers)
   roster(g.home, req.homePlayers)
+  for (const line of req.context ?? []) lines.push(line)
   if (req.userTeam) lines.push(`The reader coaches ${req.userTeam}.`)
   return lines.join('\n')
 }
@@ -78,6 +87,9 @@ function prompt(req: PressRequest): string {
     '- No score prediction in a recap; the score is given.',
     '- Around 180 words of body text. Short paragraphs.',
     '- A headline of at most nine words, and a one-sentence standfirst beneath it.',
+    '- Lead with what is at stake. A conference title, a rematch and a player in',
+    '  the Heisman race are the story; the date and the weather are not.',
+    '- Never say a team is at home in a game the facts call neutral-site.',
     '',
     'Reply as JSON only, in this exact shape:',
     '{"headline": "...", "standfirst": "...", "body": "..."}',

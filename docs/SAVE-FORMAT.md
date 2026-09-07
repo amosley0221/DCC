@@ -1614,3 +1614,37 @@ fields across all 1,536 bits with no grouping — Speed at 849, Acceleration at
 504, Agility at 490 — so expecting a recruit's four numbers to sit near each
 other was the wrong assumption to begin with. Whatever finds this record will
 have to establish its stride from a single non-monotonic field first.
+
+
+## Neutral-site games — found, not yet settled
+
+DynastyOS labels the conference championship "NEUTRAL SITE", so the flag is in
+the file. Sweeping every bit of the 100-byte `SeasonGameStore` row against a
+real save turns up seven that separate the postseason from everything else:
+
+| Bit | On | Off |
+| --- | --- | --- |
+| 162, 167, 168, 169, 171 | all 36 bowls | all 724 ordinary games |
+| 674 | all 36 bowls | all 724 ordinary games |
+| 706 | all 724 ordinary games | all 36 bowls |
+
+(Note the first sweep found nothing at all, because the probe read `t.dataAt`
+where the field is `t.data`. Every bit came back from a NaN offset. A sweep that
+reports "no candidates" is worth re-reading before it is believed.)
+
+**What this does not settle is which of two things those bits mean.** Every
+neutral-site game in that save is also a bowl, so "neutral site" and "bowl"
+are indistinguishable in it. Army–Navy, played at a neutral site in reality, is
+0 on all of them — so either the game does not treat it as neutral, or the bits
+mean postseason.
+
+The discriminator is a **conference championship**: a neutral-site game that is
+not a bowl. A save from championship weekend settles it in one read — if 674 is
+1 on the Big Ten championship it is neutral-site, and if it is 0 it is
+postseason. Bit 706 is worth the same look: if it means "regular season" it is a
+better postseason flag than the week-counter rule in `season.ts`.
+
+Until then `matchup.ts` derives it: two teams of one conference, in the round
+after the last full Saturday, are playing for that conference and nobody is at
+home. That is correct for the case that matters and is honest about being a
+derivation.

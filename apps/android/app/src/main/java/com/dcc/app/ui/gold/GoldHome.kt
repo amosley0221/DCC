@@ -49,6 +49,7 @@ import com.dcc.app.data.Persisted
 import com.dcc.app.data.SaveLabels
 import com.dcc.app.data.SnapshotGame
 import com.dcc.app.data.SnapshotHeisman
+import com.dcc.app.data.SnapshotLead
 import com.dcc.app.data.SnapshotRecruit
 import com.dcc.app.data.SnapshotWire
 import com.dcc.app.data.name
@@ -141,7 +142,7 @@ fun GoldHome(
      * does with the same two facts. Kept to the same rule as the desktop's.
      */
     val nextUp = mine.firstOrNull { !it.played }
-    val lead = remember(last, nextUp, rankOf, me) {
+    val leadGame = remember(last, nextUp, rankOf, me) {
         val opponent = nextUp?.let { if (it.home == me?.name) it.awayIndex else it.homeIndex }
         val rank = opponent?.let { rankOf[it] }
         if (nextUp != null && (nextUp.postseason || (rank != null && rank <= 25))) nextUp
@@ -184,7 +185,8 @@ fun GoldHome(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 FeatureWell(
-                    me?.name, me?.wins, me?.losses, lead, biggest, heisman, heismanFace, topCommit,
+                    me?.name, me?.wins, me?.losses, leadGame, biggest, heisman, heismanFace, topCommit,
+                    snap.snapshot.lead,
                     rankOf, recordOf, onOpenGame, onOpenBoard, Modifier.weight(0.58f),
                 )
                 Column(Modifier.weight(0.42f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -197,7 +199,8 @@ fun GoldHome(
             }
         } else {
             FeatureWell(
-                me?.name, me?.wins, me?.losses, lead, biggest, heisman, heismanFace, topCommit,
+                me?.name, me?.wins, me?.losses, leadGame, biggest, heisman, heismanFace, topCommit,
+                snap.snapshot.lead,
                 rankOf, recordOf, onOpenGame, onOpenBoard, Modifier.fillMaxWidth(),
             )
         }
@@ -365,6 +368,8 @@ private fun FeatureWell(
     heisman: SnapshotHeisman?,
     heismanFace: String?,
     topCommit: SnapshotRecruit?,
+    /** The PC's line for the lead game, when it picked the same one. */
+    lead: SnapshotLead?,
     /** Poll place by team index, and each side's record, for the matchup line. */
     rankOf: Map<Int, Int>,
     recordOf: Map<Int, Pair<Int, Int>>,
@@ -563,6 +568,10 @@ private fun FeatureWell(
                     slide == FEATURE_CLASS && topCommit != null -> topCommit.name
                     slideGame != null && slide == FEATURE_COUNTRY ->
                         featureHeadline(slideGame, slideGame.home)
+                    // The PC worked out what this fixture is worth — a title on
+                    // it, a rematch, a Heisman contender — for the same game.
+                    slideGame != null && lead?.row == slideGame.row && lead.headline.isNotBlank() ->
+                        lead.headline
                     slideGame != null -> featureHeadline(slideGame, meName)
                     else -> meName ?: "Your dynasty"
                 },
@@ -583,6 +592,9 @@ private fun FeatureWell(
                     ).joinToString(" · ")
                     slide == FEATURE_COUNTRY && slideGame != null ->
                         "The week's biggest result away from your own."
+                    // What is riding on it, worked out on the PC for this game.
+                    slideGame != null && lead?.row == slideGame.row && lead.standfirst.isNotBlank() ->
+                        lead.standfirst
                     else -> featureStandfirst(last, wins, losses)
                 },
                 12.0, c.ink2,

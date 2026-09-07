@@ -10,6 +10,42 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.72.0] - 2026-09-07
+
+### Changed
+
+- **The headline knows what the game is about.** "Penn State host USC" for a
+  conference championship was three failures at once: dull, wrong — nobody hosts
+  a neutral-site game — and blind to everything that made the fixture worth
+  leading with. The same two teams had already played in week 11. The winner
+  takes the conference. One of them has a man on the Heisman shortlist. All
+  three of those are in your save and none of them was being read.
+
+  DCC now works out what a game is: a conference title in the round after the
+  last full Saturday between two teams of one conference; a rematch, from an
+  earlier meeting this season; who is unbeaten; who is on the save's own Heisman
+  shortlist. The line becomes *"Penn State and USC again, for the Big Ten"*, with
+  *"The Big Ten goes to the winner. Penn State won the first 41-14 in week 11.
+  Quinton Martin Jr. is on the Heisman shortlist."* underneath. Nothing is
+  invented; where a fact is absent the line simply gets shorter.
+
+- **And so does the story.** Those same facts now go into the fact sheet the
+  written preview is built from, which previously held a date, a kickoff and the
+  weather — and produced what you would expect from that. The model is also told
+  never to put a team at home in a game the facts call neutral-site.
+
+- **Nobody hosts a championship.** The footer says "USC vs Penn State · neutral
+  site" rather than "vs USC" for the title game.
+
+### On finding it in the save
+
+Both apps derive the neutral site rather than read it, and `docs/SAVE-FORMAT.md`
+now records why. Sweeping the game row does turn up seven bits that mark the
+postseason — 162, 167, 168, 169, 171, 674, and 706 inverted — but in a save that
+has not reached championship weekend, every neutral-site game is also a bowl, so
+nothing there can tell "neutral site" from "postseason" apart. A save from
+championship weekend settles it in one read.
+
 ## [0.71.0] - 2026-09-06
 
 ### Fixed

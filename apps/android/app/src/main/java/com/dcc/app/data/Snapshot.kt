@@ -73,6 +73,25 @@ data class DynastySnapshot(
      * screen simply has no wire on it.
      */
     val wire: List<SnapshotWire> = emptyList(),
+    /**
+     * The game the front page leads with, and the line for it — a conference
+     * title on it, a rematch, a man in the Heisman race. Worked out on the PC
+     * so the two apps cannot disagree about what a fixture is worth. Absent on
+     * an older snapshot, and the phone writes its own plainer line.
+     */
+    val lead: SnapshotLead? = null,
+)
+
+/** What the front page leads with. Mirrors SnapshotLead in snapshot.ts. */
+@Serializable
+data class SnapshotLead(
+    /** The game's row, so the phone can tell whether it picked the same one. */
+    val row: Int = -1,
+    val headline: String = "",
+    val standfirst: String = "",
+    /** Nobody hosts a conference championship. */
+    val neutral: Boolean = false,
+    val upcoming: Boolean = false,
 )
 
 /**

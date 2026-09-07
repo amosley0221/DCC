@@ -22,6 +22,7 @@ import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
 import { buildLeague, orderByRanks, rankings, visibleGames } from './league'
 import { buildWire, type WireItem } from './wire'
+import { matchupFacts, matchupHeadline, matchupStandfirst } from './matchup'
 import { recruitingNews } from './recruitLedger'
 import type { RecruitEvent } from './recruitLedger'
 
@@ -168,6 +169,14 @@ export interface DynastySnapshot {
   ranks: Record<string, number>
   heisman: SnapshotHeisman[]
   /**
+   * The game the front page leads with, and the line to lead it with.
+   *
+   * Worked out on the PC so the two apps cannot disagree about what a fixture
+   * is worth — a conference title, a rematch, a man in the Heisman race. The
+   * phone picks its lead game by the same rule and uses this when it agrees.
+   */
+  lead: SnapshotLead | null
+  /**
    * The wire: the country's week, already written.
    *
    * It could be derived on the phone — every number it needs is in this file —
@@ -176,6 +185,17 @@ export interface DynastySnapshot {
    * and the phone renders it.
    */
   wire: WireItem[]
+}
+
+/** What the front page leads with. See electron/matchup.ts. */
+export interface SnapshotLead {
+  /** The game's row, so the phone can tell whether it picked the same one. */
+  row: number
+  headline: string
+  standfirst: string
+  /** Nobody hosts a conference championship. */
+  neutral: boolean
+  upcoming: boolean
 }
 
 /** One name on the save's Heisman shortlist. */
@@ -338,6 +358,45 @@ export function buildSnapshot(
     })),
   })
 
+  // The lead game and the line for it, by the same rule the desktop uses.
+  const lead = (() => {
+    if (!userTeamName) return null
+    const mine = seen
+      .filter((g) => g.home === userTeamName || g.away === userTeamName)
+      .sort((a, b) => a.week - b.week)
+    const last = [...mine].reverse().find((g) => g.played && !g.postseason) ?? null
+    const nextGame = mine.find((g) => !g.played) ?? null
+    let pick = last
+    let upcoming = false
+    if (nextGame) {
+      const other = (nextGame.home === userTeamName ? nextGame.away : nextGame.home) ?? ''
+      const r = rankOf.get(other)
+      if (nextGame.postseason || (r !== undefined && r <= 25)) { pick = nextGame; upcoming = true }
+    }
+    if (!pick) { pick = nextGame; upcoming = true }
+    if (!pick) return null
+    const f = matchupFacts({
+      game: pick,
+      games: seen,
+      conferenceOf: (n) => (n ? table.get(n)?.conference ?? null : null),
+      rankOf: (n) => (n ? rankOf.get(n) ?? null : null),
+      recordOf: (n) => {
+        const r = n ? table.get(n) : undefined
+        return r ? { wins: r.wins, losses: r.losses } : null
+      },
+      heisman: (extra?.heisman ?? []).map((h) => ({
+        first: h.first, last: h.last, position: h.position, team: h.team,
+      })),
+    })
+    return {
+      row: pick.row,
+      headline: upcoming ? matchupHeadline(pick, f, userTeamName) : '',
+      standfirst: upcoming ? matchupStandfirst(pick, f) : '',
+      neutral: f.neutral,
+      upcoming,
+    }
+  })()
+
   return {
     version: SNAPSHOT_VERSION,
     generated: new Date().toISOString(),
@@ -352,6 +411,7 @@ export function buildSnapshot(
     champions: extra?.champions ?? [],
     ranks: extra?.ranks ?? {},
     heisman: extra?.heisman ?? [],
+    lead,
     wire,
   }
 }
