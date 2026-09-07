@@ -189,7 +189,7 @@ export default function TeamSave() {
     <>
       <SectionHeader
         title="The program"
-        mark={<SchoolArt size={30} file={
+        mark={<SchoolArt size={38} file={
           mine ? (save.schoolArt[`${nameOf(mine.id) ?? ''}|logoLight`] ??
                   save.schoolArt[`${nameOf(mine.id) ?? ''}|icon`]) : undefined} />}
         sub={<Meta>{!roster ? (rosterBusy || save.restoring ? 'READING YOUR SAVE…' : 'ROSTER NOT READ YET')
@@ -235,7 +235,7 @@ export default function TeamSave() {
                       setNaming(null); setSchoolQuery('')
                     }}>
                     <span className="row" style={{ gap: 6, alignItems: 'center' }}>
-                      <SchoolArt size={16} file={
+                      <SchoolArt size={22} file={
                         save.schoolArt[`${sc.name}|logoLight`] ??
                         save.schoolArt[`${sc.name}|icon`] ??
                         save.schoolArt[`${sc.name}|logoGold`]} />

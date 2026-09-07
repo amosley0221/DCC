@@ -14,6 +14,14 @@ _Nothing yet._
 
 ### Changed
 
+- **Logos beside names, helmets only for games, and both bigger.** A helmet
+  shrunk to twenty pixels is a smudge; the mark you recognise at that size is
+  the logo. So the wire, the Heisman watch, the class, the Top 25, the national
+  leaders, the standings and the conference tables all carry logos now, and
+  every one of them grew — list marks from 22-24px to 28-32px, a wire item's
+  single mark to 44px. Helmets stay where two schools face each other: the
+  feature matchup, the Saturday scores, the game rows and the bowls.
+
 - **The front page moves on when the season does.** Two advances past the
   conference championship, Home was still leading with week 15's scores — a
   fortnight-old Saturday shown to somebody about to watch a playoff. In bowl

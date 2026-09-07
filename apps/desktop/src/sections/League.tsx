@@ -110,7 +110,17 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
   }, [games])
   const shownWeek = week ?? (weeks.length ? weeks[weeks.length - 1] : null)
 
+  /**
+   * A school's logo, for the places a school is a name in a list: standings,
+   * conference tables, the poll. A helmet shrunk to twenty pixels is a smudge,
+   * and none of these are games.
+   */
   const art = (name: string | null) => (name
+    ? save.schoolArt[`${name}|logoLight`] ?? save.schoolArt[`${name}|helmet`] ?? save.schoolArt[`${name}|icon`]
+    : undefined)
+
+  /** A helmet, for the two sides of an actual game. */
+  const helmet = (name: string | null) => (name
     ? save.schoolArt[`${name}|helmet`] ?? save.schoolArt[`${name}|logoLight`] ?? save.schoolArt[`${name}|icon`]
     : undefined)
 
@@ -159,7 +169,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
 
   const schoolCell = (name: string | null, onPick?: () => void) => (
     <span className="row" style={{ gap: 7, alignItems: 'center' }}>
-      <SchoolArt size={24} file={art(name)} />
+      <SchoolArt size={30} file={art(name)} />
       <button onClick={onPick} style={{
         all: 'unset', cursor: onPick ? 'pointer' : 'default',
         color: name === me ? 'var(--accent)' : 'var(--ink)',
@@ -171,7 +181,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
     <>
       <SectionHeader
         title="The league"
-        mark={<SchoolArt size={30} file={art(me)} />}
+        mark={<SchoolArt size={38} file={art(me)} />}
         sub={<Meta>{[`${table.size} PROGRAMS`, `${groups.length} CONFERENCES`,
           shownWeek ? `THROUGH WEEK ${shownWeek}` : null].filter(Boolean).join(' · ')}</Meta>}
         right={<div className="subtabs">
@@ -326,7 +336,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
                   const homeWon = g.homeScore > g.awayScore
                   const side = ([name, score, won]: [string | null, number, boolean], i: number) => (
                     <div key={i} className="row" style={{ gap: 8, alignItems: 'center' }}>
-                      <SchoolArt size={26} file={art(name)} />
+                      <SchoolArt size={32} file={art(name)} />
                       <span style={{
                         flex: 1, minWidth: 0, fontSize: 12,
                         color: name === me ? 'var(--accent)' : won ? 'var(--ink)' : 'var(--ink3)',
@@ -355,6 +365,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
             field={field}
             bowls={bowls}
             art={art}
+            helmet={helmet}
             award={(k) => save.awardArt[k]}
             me={me}
             onPick={(n) => { setPick(n); setTab('SCHEDULES') }}
@@ -449,7 +460,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
                             <td className="name">
                               <span className="row" style={{ gap: 7, alignItems: 'center' }}>
                                 <Meta size={9}>{home ? 'VS' : 'AT'}</Meta>
-                                <SchoolArt size={24} file={art(home ? g.away : g.home)} />
+                                <SchoolArt size={24} file={helmet(home ? g.away : g.home)} />
                                 <button onClick={() => setPick(home ? g.away : g.home)}
                                   style={{ all: 'unset', cursor: 'pointer' }}>
                                   {(home ? g.away : g.home) ?? 'TBD'}
@@ -485,7 +496,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
                   <button key={r.name} onClick={() => setPick(r.name)}
                     style={{ all: 'unset', cursor: 'pointer', borderTop: '1px solid var(--line)', padding: '5px 0' }}>
                     <span className="row" style={{ gap: 8, alignItems: 'center' }}>
-                      <SchoolArt size={24} file={art(r.name)} />
+                      <SchoolArt size={30} file={art(r.name)} />
                       <span style={{
                         flex: 1, fontSize: 12,
                         color: r.name === pick || r.name === me ? 'var(--accent)' : 'var(--ink)',
@@ -524,10 +535,13 @@ type SeasonGameish = {
  * own name is not decoded, so there is no Rose Bowl crest to draw. That is the
  * one thing standing between this and bowl logos.
  */
-function Postseason({ field, bowls, art, award, me, onPick }: {
+function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
   field: PlayoffField
   bowls: SeasonGameish[]
+  /** The logo, for the seeded field — a list of schools rather than a game. */
   art: (name: string | null) => string | undefined
+  /** The helmet, for the two sides of a bowl. */
+  helmet: (name: string | null) => string | undefined
   /** Art that is not a school: "playoff:round1", "bowl:rosebowl", "trophy:heisman". */
   award: (key: string) => string | undefined
   me: string | null
@@ -550,7 +564,7 @@ function Postseason({ field, bowls, art, award, me, onPick }: {
     return (
       <div className="bkt-slot">
         <span className="bkt-seed">{n}</span>
-        <SchoolArt size={22} file={art(t.row.name)} />
+        <SchoolArt size={28} file={art(t.row.name)} />
         <button
           className="bkt-name"
           onClick={() => onPick(t.row.name)}
@@ -666,7 +680,7 @@ function Postseason({ field, bowls, art, award, me, onPick }: {
             <button key={conf} onClick={() => onPick(team)}
               style={{ all: 'unset', cursor: 'pointer' }}>
               <span className="row" style={{ gap: 7, alignItems: 'center', border: '1px solid var(--line)', borderRadius: 99, padding: '5px 12px 5px 6px' }}>
-                <SchoolArt size={22} file={art(team)} />
+                <SchoolArt size={28} file={art(team)} />
                 <span style={{ fontSize: 12, color: team === me ? 'var(--accent)' : 'var(--ink)' }}>{team}</span>
                 <Meta size={9}>{conf}</Meta>
               </span>
@@ -696,7 +710,7 @@ function Postseason({ field, bowls, art, award, me, onPick }: {
                   <SchoolArt size={22} file={award('bowl:default')} />
                   <Meta size={9}>WK {g.week}</Meta>
                   <span className="row" style={{ gap: 7, alignItems: 'center', flex: 1, minWidth: 0 }}>
-                    <SchoolArt size={24} file={art(g.away)} />
+                    <SchoolArt size={24} file={helmet(g.away)} />
                     <span style={{ color: g.played && homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.away}</span>
                   </span>
                   <span className="num" style={{ color: g.played && homeWon ? 'var(--ink3)' : 'var(--ink)' }}>
@@ -704,7 +718,7 @@ function Postseason({ field, bowls, art, award, me, onPick }: {
                   </span>
                   <Meta size={9}>AT</Meta>
                   <span className="row" style={{ gap: 7, alignItems: 'center', flex: 1, minWidth: 0 }}>
-                    <SchoolArt size={24} file={art(g.home)} />
+                    <SchoolArt size={24} file={helmet(g.home)} />
                     <span style={{ color: g.played && !homeWon ? 'var(--ink3)' : 'var(--ink)' }}>{g.home}</span>
                   </span>
                   <span className="num" style={{ color: g.played && !homeWon ? 'var(--ink3)' : 'var(--ink)' }}>

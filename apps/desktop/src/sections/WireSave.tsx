@@ -491,7 +491,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
           {statLeaders.map((l, i) => (
             <div key={l.teamIndex} className="gs-row" style={{ cursor: 'default' }}>
               <span className="gs-tag gs-tag-mute">{i + 1}</span>
-              <SchoolArt size={22} file={artOf(l.school!, 'helmet')} />
+              <SchoolArt size={30} file={artOf(l.school!)} />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span className="gs-row-title">{l.school}</span>
               </span>
@@ -526,7 +526,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                   {p.position} · {p.homeState ?? p.hometown}
                 </span>
               </span>
-              {to ? <SchoolArt size={22} file={artOf(to, 'helmet')} /> : null}
+              {to ? <SchoolArt size={30} file={artOf(to)} /> : null}
               <span className="gs-tag gs-tag-mute">{rank ? `#${rank}` : '—'}</span>
             </button>
           ))}
@@ -655,7 +655,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                       {p.first} {p.last}
                       <span style={{ color: 'var(--ink3)' }}>{'  '}{p.position} · {school ?? '—'}</span>
                     </span>
-                    <SchoolArt size={24} file={artOf(school, 'helmet')} />
+                    <SchoolArt size={32} file={artOf(school)} />
                     <span className="gs-feature-num" style={{ color: 'var(--accent)' }}>{p.overall}</span>
                   </button>
                 ))}
@@ -679,7 +679,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                       {p.first} {p.last}
                       <span style={{ color: 'var(--ink3)' }}>{'  '}{p.position} · {p.homeState ?? p.hometown}</span>
                     </span>
-                    {to ? <SchoolArt size={24} file={artOf(to, 'helmet')} /> : null}
+                    {to ? <SchoolArt size={32} file={artOf(to)} /> : null}
                     <span className="gs-feature-num" style={{ color: 'var(--ink3)' }}>#{rank}</span>
                   </button>
                 ))}
@@ -717,7 +717,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                 {order.slice(0, 25).map((r, i) => (
                   <div key={r.name} className={`gs-poll-row${r.name === me ? ' is-me' : ''}`}>
                     <span className="gs-poll-rank">{i + 1}</span>
-                    <SchoolArt size={22} file={artOf(r.name, 'helmet')} />
+                    <SchoolArt size={30} file={artOf(r.name)} />
                     <span className="gs-poll-name">{r.name}</span>
                     <span className="gs-poll-rec">{r.wins}<i className="gs-dash" />{r.losses}</span>
                   </div>
@@ -863,8 +863,18 @@ function WireRow({ it, artOf, onOpen }: {
       style={{ cursor: openable ? 'pointer' : 'default' }}
     >
       <span className="gs-wire-art">
-        <SchoolArt size={34} file={artOf(it.team, 'helmet')} />
-        {it.other ? <SchoolArt size={26} file={artOf(it.other, 'helmetRight') ?? artOf(it.other, 'helmet')} /> : null}
+        {/* Two schools means a game, and a game gets the helmets facing each
+            other. Everything else — a signing, a commitment, a poll note — is
+            one school, and a logo reads better at this size than a helmet
+            shrunk down to nothing. */}
+        {it.other ? (
+          <>
+            <SchoolArt size={34} file={artOf(it.team, 'helmet')} />
+            <SchoolArt size={26} file={artOf(it.other, 'helmetRight') ?? artOf(it.other, 'helmet')} />
+          </>
+        ) : (
+          <SchoolArt size={44} file={artOf(it.team)} />
+        )}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <Meta size={9} color="var(--accent-ui)">{it.kicker.toUpperCase()}</Meta>

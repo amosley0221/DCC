@@ -605,7 +605,7 @@ function ClassRankings(
               <span style={{ width: 22, textAlign: 'right', color: 'var(--ink3)', fontSize: 12 }}>
                 {place}
               </span>
-              <SchoolArt size={17} file={crest(r.school)} />
+              <SchoolArt size={24} file={crest(r.school)} />
               <span style={{ flex: 1, minWidth: 0, color: own ? 'var(--ink)' : 'var(--ink2)' }}>
                 {r.school}
               </span>

@@ -1122,7 +1122,8 @@ body[data-theme='gold'] .hero-game .scoreboard-mark { background: transparent; b
   width: 100%; padding: 12px 0; border-bottom: 1px solid var(--line);
 }
 .gs-wire-row:last-child { border-bottom: none; }
-.gs-wire-art { display: flex; align-items: center; gap: 2px; flex: none; width: 66px; }
+.gs-wire-art { display: flex; align-items: center; justify-content: center;
+  gap: 2px; flex: none; width: 66px; }
 .gs-wire-head {
   display: block; margin-top: 3px;
   font-family: var(--serif); font-weight: 600; font-size: 17px; line-height: 1.2; color: var(--ink);

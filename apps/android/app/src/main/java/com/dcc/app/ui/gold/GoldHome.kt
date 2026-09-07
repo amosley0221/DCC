@@ -308,7 +308,7 @@ fun GoldHome(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         MonoLabel("${i + 1}", c.ink3, 11, Modifier.width(22.dp))
-                        SchoolBadge(mono(r.name), r.name, r.index == me?.index, 24.dp, "helmet")
+                        SchoolBadge(mono(r.name), r.name, r.index == me?.index, 30.dp, "logo")
                         Spacer(Modifier.width(8.dp))
                         Ui(
                             r.name, 14.0,
@@ -357,10 +357,19 @@ private fun WireRow(
         verticalAlignment = Alignment.Top,
     ) {
         val other = item.other
-        Row(Modifier.width(62.dp), verticalAlignment = Alignment.CenterVertically) {
-            SchoolBadge(mono(item.team), item.team.orEmpty(), false, 34.dp, "helmet")
+        // Two schools means a game, and a game gets the helmets facing each
+        // other. Everything else — a signing, a commitment, a poll note — is one
+        // school, and a logo reads better than a helmet shrunk to nothing.
+        Row(
+            Modifier.width(62.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             if (other != null) {
+                SchoolBadge(mono(item.team), item.team.orEmpty(), false, 34.dp, "helmet")
                 SchoolBadge(mono(other), other, false, 26.dp, "helmetRight")
+            } else {
+                SchoolBadge(mono(item.team), item.team.orEmpty(), false, 44.dp, "logo")
             }
         }
         Spacer(Modifier.width(10.dp))
@@ -761,7 +770,7 @@ private fun LeadersWell(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Label("${i + 1}", 11.0, c.ink4, 1.0, Modifier.width(16.dp))
                 Spacer(Modifier.width(4.dp))
-                SchoolHelmet(school, 22.dp)
+                SchoolMark(school, 30.dp)
                 Spacer(Modifier.width(9.dp))
                 Ui(school, 13.0, c.ink, FontWeight.SemiBold, maxLines = 1, modifier = Modifier.weight(1f))
                 Ui("${kotlin.math.round(value).toInt()}", 15.0, c.ink2, FontWeight.SemiBold)
@@ -788,11 +797,14 @@ private enum class StatBoard(val label: String, val fewestWins: Boolean) {
 
 private val STAT_BOARDS = StatBoard.entries.toList()
 
-/** One school's helmet at a small size, or nothing when the art is not there. */
+/**
+ * One school's logo beside its name. A helmet is for the two sides of a game;
+ * in a list it shrinks to a smudge, and the mark people recognise is the logo.
+ */
 @Composable
-private fun SchoolHelmet(school: String, size: Dp) {
+private fun SchoolMark(school: String, size: Dp) {
     val context = LocalContext.current
-    val file = remember(school) { ArtPack.school(context, school, "helmet") }
+    val file = remember(school) { ArtPack.school(context, school, "logo") ?: ArtPack.school(context, school, "helmet") }
     ArtImage(file, Modifier.size(size), ContentScale.Fit)
 }
 
