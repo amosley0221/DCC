@@ -105,7 +105,11 @@ fun GoldShell(
     // to the tab instead of needing state written during composition.
     val game = openGame?.let { row -> snapshot?.snapshot?.games?.firstOrNull { it.row == row } }
 
-    val week = snapshot?.meta?.currentWeek
+    // Where the dynasty is, out of the save's own calendar. The played weeks
+    // stop at championship week while the dynasty moves through the bye and into
+    // bowl season, so the bar read WEEK 15 against the game's BOWL WEEK 1 OF 4.
+    val weekLabel = snapshot?.snapshot?.calendar?.label
+        ?: snapshot?.meta?.currentWeek?.let { "Week $it" }
     val team = snapshot?.meta?.userTeamName ?: snapshot?.userTeam?.name
 
     Box(Modifier.fillMaxSize().background(c.bg0)) {
@@ -160,7 +164,7 @@ fun GoldShell(
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        listOfNotNull(team, week?.let { "WEEK $it" })
+                        listOfNotNull(team, weekLabel)
                             .joinToString(" · ").ifEmpty { "NO DYNASTY YET" }.uppercase(),
                         style = TextStyle(
                             fontFamily = Dcc.fonts.sans, fontWeight = FontWeight.Medium,

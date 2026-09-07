@@ -1,7 +1,7 @@
 import type { UpdateStatus } from './updates'
 import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
-  RankColumnView, HeismanView, PollCandidate, SavedPollView, RecruitBoard,
+  RankColumnView, HeismanView, PollCandidate, SavedPollView, RecruitBoard, SaveCalendar,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { SchemaMember } from '../electron/schema'
@@ -43,7 +43,9 @@ declare global {
             /** Whose dynasty this is, read off the save's own played games. */
             userTeam: { id: number; name: string } | null
             /** One row per team per played game, out of the save's TeamStats store. */
-            teamStats: TeamGameStatsView[] }
+            teamStats: TeamGameStatsView[]
+            /** The week and year the save itself states. */
+            calendar: SaveCalendar | null }
         | { ok: false; message: string }
       >
       /** Downloads a stadium photograph per school into the art folder. */

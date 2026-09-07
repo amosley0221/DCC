@@ -13,7 +13,7 @@ import {
   RATING_BITS, RATING_PAIRS_UNVERIFIED, readCoaches, readSeasonGames, readStores,
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
   readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman, readRecruitBoard,
-  findRankColumns, readRankField, readClassRankByName, readTeamGameStats,
+  findRankColumns, readRankField, readClassRankByName, readTeamGameStats, readCalendar,
 } from './saveAnalysis'
 import type { RankColumnView } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
@@ -478,6 +478,9 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       recruitEvents,
       // The game's own recruiting class ranking, school name to place.
       classRanks: readClassRankByName(payload),
+      // Where the dynasty is, out of the save's own SeasonInfo row rather than
+      // worked out from which games have been played — see readCalendar.
+      calendar: readCalendar(payload),
       // Team statistics, out of the save's own TeamStats store. Named by school
       // rather than by table row so the renderer never has to hold the team
       // table to read them — see electron/teamStats.ts for how the store was

@@ -1997,3 +1997,30 @@ the first header word is a used-row count rather than an offset, as it is in
 `GameOffensiveStats`. Reading a first-team All-American as a weekly honour, or
 the reverse, is exactly the kind of plausible-looking wrong answer this file
 exists to prevent, so nothing is claimed until the layout is separated.
+
+## Awards: three candidate fields, all rejected
+
+With the game's own All-American lists — National and Big Ten, first and second
+team — it is possible to test a candidate rather than admire it. Three have been
+tested and none survived:
+
+1. **Field `0/32` as an award id.** The twelve National first-teamers share no
+   value there, and neither do the twelve Big Ten first-teamers.
+2. **Bit 92 as a first/second team flag.** It fits perfectly on Penn State's six
+   all-conference selections — three on each team — and then fails league-wide:
+   3 of the 12 Big Ten first-teamers fall under the second-team value and 12 of
+   the 25 second-teamers under the first. One spurious fit across ~2,500
+   candidate positions is roughly what chance predicts for a single bit, which is
+   exactly why the six-name fit was not treated as an answer.
+3. **Bits `25/7` as a selector.** Value 29 captures 22 of the 23 National
+   second-teamers, no first-teamers, and only 30 players in total — striking on
+   its own. But there is no first-team counterpart: those players scatter across
+   31, 32, 37, 3, 2 and 30. An award field that names one honour and not its pair
+   is not an award field.
+
+So the store is understood as far as: `PlayerAward` rows carry a team reference
+at bytes 4-7, a player reference at 8-11, and a conference reference at bits
+96-127 whose presence separates all-conference selections from national ones —
+Penn State's players read conference 3 for the Big Ten, Oklahoma's and Kentucky's
+read 10 for the SEC. Which award a row represents is **not** decoded, and three
+plausible-looking answers have been thrown away rather than shipped.

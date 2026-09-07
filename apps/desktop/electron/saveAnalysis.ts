@@ -2132,6 +2132,50 @@ export function readSeasonOrdinal(payload: Buffer): number | null {
  * if nobody on either side recorded a single carry or a single tackle, which
  * does not happen in a game that was played.
  */
+/** Where the dynasty actually is, according to the save rather than its results. */
+export interface SaveCalendar {
+  /** 0-15 regular season, 16 the bye, 17 and up the bowl weeks. */
+  week: number
+  year: number
+}
+
+/**
+ * The week and year, read off `SeasonInfo` instead of inferred from the games.
+ *
+ * DCC worked out the week by finding the latest one somebody had played, which
+ * is right up until it isn't: once the regular season ends the last played game
+ * stays week 15 while the dynasty moves on through the bye and into bowl season,
+ * and the app sat on "Week 15" while the game said "Bowl Week 1 of 4". Fixing
+ * the postseason so those bowls read as unplayed made it worse, not better —
+ * there was nothing later to find.
+ *
+ * `SeasonInfo` is a single 20-byte row that states both outright. Across four
+ * saves of one dynasty the week read 15, 15, 16 and 17 against the game's own
+ * headers — championship week, championship week again, "WEEK 16, 2028" and
+ * "BOWL WEEK 1 OF 4, 2028" — and the year read 2028 throughout. Playing a game
+ * does not move it and advancing does, which is why the two week-15 saves agree.
+ */
+export function readCalendar(payload: Buffer): SaveCalendar | null {
+  const table = namedTable(payload, 'SeasonInfo')
+  if (!table || !table.rows || table.rowBytes < 20) return null
+  const at = table.data
+  if (at + table.rowBytes > payload.length) return null
+  const bit = (k: number) => (payload[at + (k >> 3)] >> (7 - (k & 7))) & 1
+  const val = (start: number, width: number) => {
+    let v = 0
+    for (let k = 0; k < width; k++) v = (v << 1) | bit(start + k)
+    return v
+  }
+  const week = val(CALENDAR_WEEK_BIT, 8)
+  const year = val(CALENDAR_YEAR_BIT, 15)
+  // A save that does not read as a plausible calendar is not one to display.
+  if (week > 40 || year < 2000 || year > 2200) return null
+  return { week, year }
+}
+
+const CALENDAR_WEEK_BIT = 120
+const CALENDAR_YEAR_BIT = 36
+
 export function playedGameRows(payload: Buffer): Set<number> {
   const seen = playedScans.get(payload)
   if (seen) return seen

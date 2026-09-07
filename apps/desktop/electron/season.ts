@@ -121,3 +121,24 @@ export function currentWeek(games: WeekGame[], team: string | null): number | nu
   const next = mine.filter((g) => !g.played).map((g) => g.week)
   return next.length ? Math.min(...next) : Math.max(...mine.map((g) => g.week))
 }
+
+
+/**
+ * What to call a week on screen.
+ *
+ * The game numbers the regular season 0 to 15 and then keeps counting, so the
+ * bye after championship week is "Week 16" and the first bowl week is 17. Its
+ * own headers read "WEEK 16, 2028" and "BOWL WEEK 1 OF 4, 2028", so 17 onwards
+ * are named as bowl weeks rather than by a number nobody in the game ever sees.
+ */
+export function weekLabel(week: number | null): string | null {
+  if (week === null || week < 0) return null
+  if (week <= REGULAR_WEEKS) return `Week ${week}`
+  const bowl = week - REGULAR_WEEKS
+  return bowl <= BOWL_WEEKS ? `Bowl week ${bowl}` : 'Postseason'
+}
+
+/** The last week the game numbers plainly; the bye after the championships. */
+const REGULAR_WEEKS = 16
+/** "BOWL WEEK 1 OF 4". */
+const BOWL_WEEKS = 4

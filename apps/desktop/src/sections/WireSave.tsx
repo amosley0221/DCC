@@ -7,7 +7,7 @@ import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
 import { buildLeague, orderByRanks, rankings, visibleGames, winPct } from '../../electron/league'
-import { currentWeek } from '../../electron/season'
+import { currentWeek, weekLabel } from '../../electron/season'
 import { leaders, seasonTotals, type StatLeaderKey } from '../../electron/teamStats'
 import { buildWire, type WireItem } from '../../electron/wire'
 import {
@@ -410,8 +410,11 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
       <aside className="gs-rail">
         <div>
           <Kicker>{season ? `${season} season` : 'The season'}</Kicker>
+          {/* Where the dynasty is, out of the save's own calendar. The rails
+              below are still labelled by the week whose results they show,
+              which is the last one played and not always this one. */}
           <h1 className="screen-title" style={{ marginTop: 10 }}>
-            {week ? `Week ${week}` : 'The country'}
+            {weekLabel(roster?.calendar?.week ?? week) ?? 'The country'}
           </h1>
           <div style={{ marginTop: 8 }}>
             <Meta>

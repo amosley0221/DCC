@@ -10,6 +10,20 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.80.0] - 2026-09-07
+
+### Fixed
+
+- **The week is read off the save instead of guessed from the games.** DCC
+  worked out where you were by finding the latest week somebody had played,
+  which is right until the regular season ends — then the last result sits at
+  championship week while the dynasty moves through the bye and into bowl
+  season, and the bar read "Week 15" against the game's own "Bowl Week 1 of 4".
+  `SeasonInfo` states the week and the year outright; across four saves of one
+  dynasty it read 15, 15, 16 and 17 against the game's own headers. Bowl weeks
+  are named as such on both apps rather than shown as a number the game never
+  prints.
+
 ## [0.79.0] - 2026-09-07
 
 ### Fixed

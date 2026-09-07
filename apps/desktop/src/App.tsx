@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StoreProvider, blankPersisted, useBootstrap, useStore } from './store'
 import { SaveProvider, useSave } from './saveStore'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
-import { currentWeek } from '../electron/season'
+import { currentWeek, weekLabel } from '../electron/season'
 import { applyTheme } from './theme'
 import type { UpdateStatus } from './updates'
 import Wire from './sections/Wire'
@@ -143,10 +143,12 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
   }, [save.path, save.roster, save.restoring, state.autoPublish, state.publishRepo,
       state.githubToken, state.teamId, dispatch])
 
-  // The week the dynasty is on, which is the one you are about to play. This
-  // used to be the last week played, so the bar said 10 while the phone said 11
-  // off the same save.
-  const week = currentWeek(save.roster?.games ?? [], me)
+  // The week the dynasty is on, out of the save's own calendar. Working it out
+  // from the games was right until the regular season ended: the last played
+  // game stays at championship week while the dynasty moves through the bye and
+  // into bowl season, so the bar read "Week 15" against the game's own "Bowl
+  // Week 1 of 4". Falls back to the games for a save too old to hold a calendar.
+  const week = save.roster?.calendar?.week ?? currentWeek(save.roster?.games ?? [], me)
 
   return (
     <div className="gs" onClick={() => games && setGames(false)}>
@@ -192,7 +194,7 @@ function Shell({ update, version }: { update: UpdateStatus | null; version: stri
 
         <div className="gs-topbar-right">
           <Search onOpen={(s) => setSection(s)} />
-          {week !== null ? <span className="gs-week">Week {week}</span> : null}
+          {weekLabel(week) ? <span className="gs-week">{weekLabel(week)}</span> : null}
           <button
             className="gs-gear"
             aria-current={isOps(section)}

@@ -40,6 +40,11 @@ data class DynastySnapshot(
      * screen that uses it checks for games played first.
      */
     val teamStats: List<SnapshotTeamStats> = emptyList(),
+    /**
+     * Where the dynasty is, stated by the save. Null on a snapshot written
+     * before DCC could read it, and the screens fall back to the played weeks.
+     */
+    val calendar: SnapshotCalendar? = null,
     val games: List<SnapshotGame> = emptyList(),
     val players: List<SnapshotPlayer> = emptyList(),
     val recruits: List<SnapshotRecruit> = emptyList(),
@@ -213,6 +218,24 @@ data class SnapshotTeam(
  * screen divides by [games] itself and a team that has played fewer of them
  * still compares fairly.
  */
+/**
+ * The save's own week and year. The game numbers the regular season 0 to 15 and
+ * keeps counting, so 16 is the bye after championship week and 17 the first bowl
+ * week — matching its own "WEEK 16, 2028" and "BOWL WEEK 1 OF 4, 2028".
+ */
+@Serializable
+data class SnapshotCalendar(
+    val week: Int = 0,
+    val year: Int = 0,
+) {
+    val label: String
+        get() = when {
+            week <= 16 -> "Week $week"
+            week - 16 <= 4 -> "Bowl week ${week - 16}"
+            else -> "Postseason"
+        }
+}
+
 @Serializable
 data class SnapshotTeamStats(
     /** Row in the team table, matching [SnapshotTeam.index]. */

@@ -15,7 +15,7 @@
  */
 import {
   RATING_BITS, readClassRanks, readCoaches, readRecruitBoard, readRoster, readSeasonGames,
-  readTeamNames, teamTableOrder, readTeamGameStats,
+  readTeamNames, teamTableOrder, readTeamGameStats, readCalendar,
 } from './saveAnalysis'
 import { seasonTotals } from './teamStats'
 import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
@@ -157,6 +157,12 @@ export interface DynastySnapshot {
     playerCount: number
   }
   teams: SnapshotTeam[]
+  /**
+   * The week and year the save itself states, which is where the dynasty is
+   * rather than where its last result was. Null on a snapshot written before
+   * DCC could read it, and the phone falls back to the played weeks.
+   */
+  calendar: { week: number; year: number } | null
   /**
    * Each team's season on the field, added up over the games the phone is
    * allowed to show. Out of the save's own `TeamStats` store — see
@@ -449,5 +455,6 @@ export function buildSnapshot(
     lead,
     wire,
     teamStats,
+    calendar: readCalendar(payload),
   }
 }

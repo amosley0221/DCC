@@ -108,3 +108,21 @@ const g = (week, home, away, extra = {}) =>
 }
 
 console.log('check-season: the save names your team from the games you played, and refuses to when it cannot')
+
+/* ------------------------------------------------ what to call a week on screen */
+{
+  // DCC worked the week out from the games, which is right until the regular
+  // season ends: the last played game stays at championship week while the
+  // dynasty moves through the bye and into bowl season. The bar read "Week 15"
+  // while the game's own header read "BOWL WEEK 1 OF 4, 2028". These are the
+  // numbers the save gave across four saves of one dynasty, against the headers
+  // the game printed for each.
+  assert.equal(S.weekLabel(15), 'Week 15', 'championship week')
+  assert.equal(S.weekLabel(16), 'Week 16', 'the bye, and the game says WEEK 16')
+  assert.equal(S.weekLabel(17), 'Bowl week 1', 'and the game says BOWL WEEK 1 OF 4')
+  assert.equal(S.weekLabel(20), 'Bowl week 4', 'four of them')
+  assert.equal(S.weekLabel(21), 'Postseason', 'past the four, name it rather than invent a fifth')
+  assert.equal(S.weekLabel(0), 'Week 0', 'week zero is a real week of the season')
+  assert.equal(S.weekLabel(null), null, 'a save with no calendar says nothing')
+  assert.equal(S.weekLabel(-1), null)
+}

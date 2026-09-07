@@ -5,6 +5,7 @@ import type {
 } from '../electron/saveAnalysis'
 import type { RecruitEvent } from '../electron/recruitLedger'
 import type { TeamGameStatsView } from '../electron/teamStats'
+import type { SaveCalendar } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
 
@@ -79,6 +80,11 @@ export interface SaveState {
      * played: a screen adds up only the games it is already showing you.
      */
     teamStats: TeamGameStatsView[]
+    /**
+     * Where the dynasty is, stated by the save rather than worked out from its
+     * results — the two part company the moment the regular season ends.
+     */
+    calendar: SaveCalendar | null
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -265,6 +271,7 @@ export function rosterPatch(
     userTeam: res.userTeam ?? null,
     classRanks: res.classRanks ?? null,
     teamStats: res.teamStats ?? [],
+    calendar: res.calendar ?? null,
   }
 }
 
