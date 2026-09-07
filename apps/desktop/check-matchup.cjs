@@ -138,4 +138,29 @@ const opts = (game, games) => ({
   assert.equal(M.matchupStandfirst(ranked, f), '', 'nothing to say is said with nothing')
 }
 
-console.log('check-matchup: a title game, a rematch, a Heisman contender, and the ordinary game that is none of those')
+/* ---------------------------------------- how much a game is worth leading with */
+{
+  const games = []
+  for (let w = 1; w <= 13; w++) for (let i = 0; i < 60; i++) games.push(g(w, `H${w}_${i}`, `A${w}_${i}`, 20, 10))
+  for (let i = 0; i < 11; i++) games.push(g(15, `X${i}`, `Y${i}`, 0, 0))
+  const title = g(15, 'Penn State', 'USC', 0, 0, { neutralSite: true })
+  const ranked = g(13, 'Iowa', 'USC')
+  const nobody = g(13, 'Rutgers', 'Maryland')
+  const classic = g(14, 'Army', 'Navy', 0, 0, { neutralSite: true })
+  const upset = g(13, 'Rutgers', 'Penn State', 30, 27)  // an unranked side beats No. 1
+  games.push(title, ranked, nobody, classic, upset)
+
+  const weigh = (x) => M.gameWeight(x, M.matchupFacts(opts(x, games)))
+  assert.ok(weigh(title) > weigh(ranked), 'a conference on the line beats two ranked sides')
+  assert.ok(weigh(ranked) > weigh(nobody), 'two ranked sides beat two nobodies')
+  assert.ok(weigh(classic) > weigh(nobody), 'a game with a name beats one without')
+  assert.ok(weigh(upset) > weigh(nobody), 'and an upset that happened is news')
+  // The ordering is the whole point: the country's front page leads with the
+  // biggest game in it, not with whichever one the reader happens to coach.
+  const order = [title, upset, ranked, classic, nobody]
+    .map((x) => ({ x, w: weigh(x) })).sort((a, b) => b.w - a.w).map((e) => e.x)
+  assert.equal(order[0], title)
+  assert.equal(order[order.length - 1], nobody)
+}
+
+console.log('check-matchup: a title game, a rematch, a contender, what a game is worth, and the one that is none of it')

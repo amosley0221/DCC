@@ -49,6 +49,8 @@ export interface Contender {
 export interface MatchupFacts {
   /** The conference whose title is on it, when this is that game. */
   title: string | null
+  /** Carried through so a weighting does not need the game beside it. */
+  postseason: boolean
   /** Nobody is at home. Straight from the save.  */
   neutral: boolean
   /** The earlier meeting this season, when there was one. */
@@ -117,6 +119,7 @@ export function matchupFacts(opts: {
 
   return {
     title,
+    postseason: g.postseason,
     neutral: g.neutralSite,
     rematch,
     homeRank: rankOf(g.home),
@@ -212,4 +215,40 @@ export function matchupLines(g: MatchGame, f: MatchupFacts): string[] {
     out.push(`${c.first} ${c.last} (${c.position}, ${c.team}) is on the save's Heisman shortlist.`)
   }
   return out
+}
+
+/**
+ * How much a game is worth leading a national front page with.
+ *
+ * Home was built around one team's last result, which is the wrong question for
+ * a page about the country. This asks the right one and answers it in the order
+ * anybody would: a conference on the line first, then two ranked sides, then the
+ * games that are their own occasion — Army-Navy, the Red River, Florida-Georgia
+ * — and then how close it was.
+ *
+ * Higher is bigger. Nothing here is a tiebreak on the reader's own team: that is
+ * what The Program is for.
+ */
+export function gameWeight(g: MatchGame, f: MatchupFacts): number {
+  const rank = (n: number | null) => (n && n <= 25 ? n : 60)
+  let w = 0
+  if (f.title) w += 1000
+  // A neutral site in the regular season is a game with a name.
+  if (f.neutral && !f.postseason) w += 200
+  if (f.rematch) w += 60
+  // Two ranked sides beat one, and the better the ranks the bigger the game.
+  w += 120 - (rank(f.homeRank) + rank(f.awayRank))
+  if (f.homeUnbeaten) w += 25
+  if (f.awayUnbeaten) w += 25
+  w += f.contenders.length * 15
+  // An upset that has happened is news; a close finish is a story.
+  if (g.played) {
+    const margin = Math.abs(g.homeScore - g.awayScore)
+    const homeWon = g.homeScore > g.awayScore
+    const winnerRank = rank(homeWon ? f.homeRank : f.awayRank)
+    const loserRank = rank(homeWon ? f.awayRank : f.homeRank)
+    if (loserRank <= 25 && winnerRank - loserRank >= 8) w += 150
+    if (margin <= 3) w += 60
+  }
+  return w
 }

@@ -10,7 +10,7 @@ import { buildLeague, orderByRanks, rankings, visibleGames, winPct } from '../..
 import { currentWeek } from '../../electron/season'
 import { buildWire, type WireItem } from '../../electron/wire'
 import {
-  matchupFacts, matchupHeadline, matchupLines, matchupStandfirst,
+  gameWeight, matchupFacts, matchupHeadline, matchupLines, matchupStandfirst,
 } from '../../electron/matchup'
 import type { MatchupFacts } from '../../electron/matchup'
 
@@ -105,13 +105,6 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
   const [rail, setRail] = useState<'CONF' | 'TOP25'>('CONF')
 
   const games = roster?.games ?? []
-  const mine = useMemo(
-    () => games.filter((g) => g.home === me || g.away === me).sort((a, b) => a.week - b.week),
-    [games, me],
-  )
-  const last = [...mine].reverse().find((g) => g.played) ?? null
-  const next = mine.find((g) => !g.played) ?? null
-
   /** The league table, the same one the League screen stands on. */
   const teams = useMemo(() => (roster?.coaches ?? [])
     .map((c) => ({ name: nameOf(c.teamId) ?? '', conference: c.conference, division: c.division }))
@@ -124,6 +117,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
     () => buildLeague(visibleGames(games, me, holdFrom), teams),
     [games, teams, me, holdFrom],
   )
+  const season = save.roster?.season ?? null
   const poll = usePoll()
   const order = useMemo(
     () => (poll.ranks ? orderByRanks(table, poll.ranks) : rankings(table)),
@@ -137,19 +131,58 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
 
   const record = me ? table.get(me) : undefined
   const conference = record?.conference ?? null
-  const nationalRank = me ? rankOf.get(me) ?? null : null
 
   /** The week you have reached, and everyone else's results from it. */
+  /**
+   * The week the *country* has reached, not the week you last played.
+   *
+   * Those are the same thing until championship weekend, when nine conferences
+   * settle their titles and yours has not kicked off yet. The page said week 13
+   * while its own title bar said 15, because it was reporting the last Saturday
+   * this one team had a result from. A page about the sport takes the latest
+   * week anybody has a result in, held back the same way everything else is.
+   */
   const week = useMemo(() => {
-    const played = games.filter((g) => g.played && !g.postseason)
+    const played = visibleGames(games, me, holdFrom).filter((g) => g.played && !g.postseason)
     if (!played.length) return null
-    return last ? last.week : Math.max(...played.map((g) => g.week))
-  }, [games, last])
+    return Math.max(...played.map((g) => g.week))
+  }, [games, me, holdFrom])
 
   const weekGames = useMemo(
-    () => games.filter((g) => g.played && !g.postseason && g.week === week),
-    [games, week],
+    () => visibleGames(games, me, holdFrom).filter((g) => g.played && !g.postseason && g.week === week),
+    [games, me, holdFrom, week],
   )
+
+  /** Everybody still without a loss, best-ranked first. */
+  const unbeaten = useMemo(
+    () => [...table.values()]
+      .filter((r) => r.wins + r.losses > 0 && r.losses === 0)
+      .sort((a, b) => (rankOf.get(a.name) ?? 999) - (rankOf.get(b.name) ?? 999)),
+    [table, rankOf],
+  )
+
+  /**
+   * The best of next year's class, wherever they are going.
+   *
+   * The rail used to be your eight. This is the country's, in the game's own
+   * order, with the school leading each one beside them — which is the version
+   * of that list a front page would run.
+   */
+  const national = useMemo(() => {
+    const byIndex = new Map((roster?.players ?? []).map((p) => [p.index, p]))
+    return (roster?.recruitBoard ?? [])
+      .filter((b) => b.nationalRank && b.nationalRank > 0)
+      .sort((a, b) => (a.nationalRank ?? 9999) - (b.nationalRank ?? 9999))
+      .slice(0, 10)
+      .map((b) => ({
+        p: byIndex.get(b.playerIndex),
+        rank: b.nationalRank,
+        to: b.stage === 'SoftCommitted' || b.stage === 'HardCommitted' || b.stage === 'Signed'
+          ? b.topSchools[0]?.school ?? null
+          : null,
+      }))
+      .filter((x): x is { p: RosterPlayer; rank: number; to: string | null } => !!x.p)
+  }, [roster])
 
   const bestRank = (g: { home: string | null; away: string | null }) =>
     Math.min(rankOf.get(g.home ?? '') ?? 999, rankOf.get(g.away ?? '') ?? 999)
@@ -239,25 +272,20 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
    * from a fortnight ago is not — and that is what every front page in the
    * sport does with the same two facts.
    */
-  const feature = useMemo((): { g: SeasonGame; upcoming: boolean } | null => {
-    if (next) {
-      const other = (next.home === me ? next.away : next.home) ?? ''
-      const rank = rankOf.get(other)
-      if (next.postseason || (rank !== undefined && rank <= 25)) return { g: next, upcoming: true }
-    }
-    if (last) return { g: last, upcoming: false }
-    return next ? { g: next, upcoming: true } : null
-  }, [last, next, rankOf, me])
-
   /**
-   * What the lead game is about — a conference on it, a rematch, who is
-   * unbeaten, who is in the Heisman race. See electron/matchup.ts.
+   * The game the country would lead with.
+   *
+   * Not yours. Every game of the week is weighed the way anybody would weigh
+   * them — a conference on the line, two ranked sides, a fixture that is its own
+   * occasion, an upset that has happened — and the biggest wins. See
+   * gameWeight in electron/matchup.ts. Yours is still one turn of the feature,
+   * and all of it in full is what The Program is for.
    */
-  const facts = useMemo(() => {
-    if (!feature) return null
-    return matchupFacts({
-      game: feature.g,
-      games,
+  const factsOf = useMemo(() => {
+    const seen = visibleGames(games, me, holdFrom)
+    return (g: SeasonGame) => matchupFacts({
+      game: g,
+      games: seen,
       conferenceOf: (n) => (n ? table.get(n)?.conference ?? null : null),
       rankOf: (n) => (n ? rankOf.get(n) ?? null : null),
       recordOf: (n) => {
@@ -269,22 +297,30 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
         team: h.team === null ? null : nameOf(h.team),
       })),
     })
-  }, [feature, games, table, rankOf, roster, state.teamNames])
+  }, [games, me, holdFrom, table, rankOf, roster, state.teamNames])
 
-  const scouted = (p: RosterPlayer) => state.revealAllRecruits || state.revealedRecruits.includes(p.playerId)
+  const feature = useMemo((): { g: SeasonGame; upcoming: boolean } | null => {
+    if (week === null) return null
+    const seen = visibleGames(games, me, holdFrom)
+      .filter((g) => !g.postseason && (g.week === week || (!g.played && g.week >= week)))
+    if (!seen.length) return null
+    const scored = seen
+      .map((g) => ({ g, w: gameWeight(g, factsOf(g)) + (g.played ? 0 : 40) }))
+      .sort((a, b) => b.w - a.w)
+    const best = scored[0].g
+    return { g: best, upcoming: !best.played }
+  }, [games, me, holdFrom, week, factsOf])
 
-  const board = useMemo(
-    () => (roster?.players ?? [])
-      .filter((p) => p.team === UNASSIGNED && p.recruitFlag && /^Generic_/.test(p.assetId ?? ''))
-      .sort((a, b) => b.stars - a.stars || b.overall - a.overall || a.last.localeCompare(b.last))
-      .slice(0, 8),
-    [roster],
+  /**
+   * What the lead game is about — a conference on it, a rematch, who is
+   * unbeaten, who is in the Heisman race. See electron/matchup.ts.
+   */
+  const facts = useMemo(
+    () => (feature ? factsOf(feature.g) : null),
+    [feature, factsOf],
   )
 
-  const squad = useMemo(
-    () => (roster?.players ?? []).filter((p) => p.team === state.teamId).sort((a, b) => b.overall - a.overall),
-    [roster, state.teamId],
-  )
+
 
   // The feature turns over on its own until you pick a story, and never while
   // something is open in the middle column — that is the one thing you asked for.
@@ -334,55 +370,55 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
   return (
     <div className="gs-shell">
       {/* ── your program ────────────────────────────────────────────── */}
+      {/* ── the country ─────────────────────────────────────────────────
+          Home is about the sport, not about you. Your own program — its record,
+          its board, its next game, its best players — is a tab of its own now,
+          because a front page that leads with one team out of a hundred and
+          forty is a team page wearing a newspaper's clothes. */}
       <aside className="gs-rail">
         <div>
-          <Kicker>Your program</Kicker>
-          <h1 className="screen-title" style={{ marginTop: 10 }}>{me ?? 'Pick your team'}</h1>
+          <Kicker>{season ? `${season} season` : 'The season'}</Kicker>
+          <h1 className="screen-title" style={{ marginTop: 10 }}>
+            {week ? `Week ${week}` : 'The country'}
+          </h1>
           <div style={{ marginTop: 8 }}>
             <Meta>
-              {[record ? `${record.wins}-${record.losses}` : null, conference,
-                nationalRank ? `No. ${nationalRank} by record` : null]
-                .filter(Boolean).join(' · ')}
+              {[`${order.length} programs`,
+                unbeaten.length ? `${unbeaten.length} unbeaten` : null,
+                me ? `you coach ${me}` : null].filter(Boolean).join(' · ')}
             </Meta>
           </div>
         </div>
 
         <div className="grid-2" style={{ gap: 12 }}>
-          {/* The conference tile opens the League screen: it is a standing, and
-              a standing is a table you should be able to walk into. */}
-          <button onClick={onOpenLeague}
-            style={{ all: 'unset', cursor: onOpenLeague ? 'pointer' : 'default', display: 'block' }}>
-            <div className="card card-pad" style={{ height: '100%' }}>
-              <div className="card-head">
-                <Kicker>Conference</Kicker>
-                {onOpenLeague ? <Meta size={9} color="var(--accent-ui)">TABLE →</Meta> : null}
-              </div>
-              <div className="gs-tile-val is-high" style={{ fontSize: 32 }}>
-                {record ? <>{record.confWins}<i className="gs-dash" />{record.confLosses}</> : '—'}
-              </div>
-              <div style={{ marginTop: 6 }}><Meta size={10}>{conference ?? 'Not read'}</Meta></div>
-            </div>
-          </button>
           <div className="card card-pad">
-            <Kicker>Scoring</Kicker>
-            <div className="gs-tile-val is-mid" style={{ fontSize: 32 }}>{record ? record.pointsFor : '—'}</div>
+            <Kicker>Still perfect</Kicker>
+            <div className="gs-tile-val is-high" style={{ fontSize: 32 }}>{unbeaten.length}</div>
             <div style={{ marginTop: 6 }}>
-              <Meta size={10}>{record ? `${record.pointsAgainst} allowed` : 'Not read'}</Meta>
+              <Meta size={10}>{unbeaten[0]?.name.toUpperCase() ?? 'NOBODY'}</Meta>
             </div>
+          </div>
+          <div className="card card-pad">
+            <Kicker>Played</Kicker>
+            <div className="gs-tile-val is-mid" style={{ fontSize: 32 }}>{weekGames.length}</div>
+            <div style={{ marginTop: 6 }}><Meta size={10}>GAMES THIS WEEK</Meta></div>
           </div>
         </div>
 
+        {/* The best players in the country's next class, wherever they are
+            going — not the eight on one school's board. */}
         <div className="card card-pad" style={{ flex: 1, minHeight: 0 }}>
           <div className="card-head">
-            <Kicker>The board</Kicker>
-            <Meta size={10}>{board.length} of the class</Meta>
+            <Kicker>The class</Kicker>
+            <Meta size={10}>BEST IN THE COUNTRY</Meta>
           </div>
-          {board.map((p) => (
+          {national.map(({ p, rank, to }) => (
             <button
               key={p.index}
               className="gs-row"
               aria-selected={open?.kind === 'player' && open.index === p.index}
-              onClick={() => setOpen(open?.kind === 'player' && open.index === p.index ? null : { kind: 'player', index: p.index })}
+              onClick={() => setOpen(open?.kind === 'player' && open.index === p.index
+                ? null : { kind: 'player', index: p.index })}
             >
               <Face p={p} size={36} />
               <span style={{ flex: 1, minWidth: 0 }}>
@@ -392,11 +428,11 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                   {p.position} · {p.homeState ?? p.hometown}
                 </span>
               </span>
-              <span className={`gs-tag ${scouted(p) ? 'gs-tag-accent' : 'gs-tag-mute'}`}>
-                {scouted(p) ? p.overall : 'Scout'}
-              </span>
+              {to ? <SchoolArt size={22} file={artOf(to, 'helmet')} /> : null}
+              <span className="gs-tag gs-tag-mute">{rank ? `#${rank}` : '—'}</span>
             </button>
           ))}
+          {!national.length ? <Meta size={10}>NO CLASS READ</Meta> : null}
         </div>
       </aside>
 
@@ -514,13 +550,15 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
             ) : (
               <FeatureList
                 kicker="The class"
-                headline={board.length ? `${board[0].first} ${board[0].last}` : 'Nobody on the board'}
-                standfirst={'Your board, best first. Who has committed is not decoded out of the save yet, ' +
-                  'so this is the class as it stands rather than a signing list.'}
-                bg={artOf(me)}
-                tint={save.schoolColors[me ?? ''] ?? null}
+                headline={national.length
+                  ? `${national[0].p.first} ${national[0].p.last}`
+                  : 'No class read'}
+                standfirst={'The best players in next year\'s class, in the game\'s own order, and where ' +
+                  'each of them is leaning. Not one school\'s board — the country\'s.'}
+                bg={artOf(national[0]?.to ?? me)}
+                tint={save.schoolColors[national[0]?.to ?? me ?? ''] ?? null}
               >
-                {board.slice(0, 5).map((p) => (
+                {national.slice(0, 5).map(({ p, rank, to }) => (
                   <button key={p.index} className="gs-feature-row"
                     onClick={() => setOpen({ kind: 'player', index: p.index })}>
                     <Face p={p} size={36} />
@@ -528,10 +566,8 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                       {p.first} {p.last}
                       <span style={{ color: 'var(--ink3)' }}>{'  '}{p.position} · {p.homeState ?? p.hometown}</span>
                     </span>
-                    <span className="gs-stars">{'★'.repeat(p.stars)}</span>
-                    <span className="gs-feature-num" style={{ color: scouted(p) ? 'var(--accent)' : 'var(--ink3)' }}>
-                      {scouted(p) ? p.overall : '—'}
-                    </span>
+                    {to ? <SchoolArt size={24} file={artOf(to, 'helmet')} /> : null}
+                    <span className="gs-feature-num" style={{ color: 'var(--ink3)' }}>#{rank}</span>
                   </button>
                 ))}
               </FeatureList>
@@ -581,16 +617,15 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
       </div>
 
       {/* ── the week, and what is next ────────────────────────────────── */}
+      {/* ── Saturday, everywhere ─────────────────────────────────────── */}
       <aside className="gs-rail-right">
-        {/* The tab names the league rather than saying "mine", and there is no
-            kicker repeating it beside them. */}
         <div className="row" style={{ gap: 4, justifyContent: 'flex-end' }}>
-          <Tab on={rail === 'CONF'} onClick={() => setRail('CONF')}>
-            {(conference ?? 'Saturday').toUpperCase()}
-          </Tab>
           <Tab on={rail === 'TOP25'} onClick={() => setRail('TOP25')}>TOP 25</Tab>
+          <Tab on={rail === 'CONF'} onClick={() => setRail('CONF')}>
+            {(conference ?? 'YOURS').toUpperCase()}
+          </Tab>
         </div>
-        {railGames.slice(0, 9).map((g) => {
+        {railGames.slice(0, 14).map((g) => {
           const homeWon = g.homeScore > g.awayScore
           const row = (name: string | null, score: number, lost: boolean) => (
             <div className={`gs-score-row${lost ? ' is-lost' : ''}`}>
@@ -617,56 +652,6 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
         })}
         {!railGames.length ? (
           <Meta size={10}>{rail === 'CONF' ? 'NOTHING IN YOUR LEAGUE THAT WEEK' : 'NO RANKED GAME THAT WEEK'}</Meta>
-        ) : null}
-
-        {next ? (
-          <>
-            <div style={{ marginTop: 6 }}><Kicker>Next up</Kicker></div>
-            <div className="card card-pad">
-              <div className="row" style={{ gap: 9, alignItems: 'center' }}>
-                <SchoolArt size={34} file={artOf(next.home === me ? next.away : next.home, 'helmet')} />
-                <div className="gs-row-title" style={{ fontSize: 22, fontFamily: 'var(--serif)', fontWeight: 600 }}>
-                  {(next.home === me ? next.away : next.home) ?? 'TBD'}
-                </div>
-              </div>
-              <div style={{ marginTop: 6 }}>
-                <Meta size={10}>
-                  {next.home === me ? 'HOME' : 'AWAY'} · WEEK {next.week} · {dateLabel(next.month, next.day)}
-                </Meta>
-              </div>
-              <div className="row" style={{ gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
-                {[kickoffLabel(next.kickoff), weatherName(next.weather) ? `${next.temperatureF}°F ${weatherName(next.weather)}` : null]
-                  .filter(Boolean).map((t) => <Meta key={t as string} size={10}>{t}</Meta>)}
-              </div>
-            </div>
-          </>
-        ) : null}
-
-        {squad.length ? (
-          <>
-            <div style={{ marginTop: 6 }}><Kicker>Top of the roster</Kicker></div>
-            <div className="card card-pad">
-              {/* These open the player, and they carry his face. Both were
-                  missing: the one list on the page that did neither. */}
-              {squad.slice(0, 5).map((p) => (
-                <button key={p.index} className="gs-row"
-                  aria-selected={open?.kind === 'player' && open.index === p.index}
-                  onClick={() => setOpen(open?.kind === 'player' && open.index === p.index
-                    ? null : { kind: 'player', index: p.index })}>
-                  <Face p={p} size={36} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span className="gs-row-title">{p.first} {p.last}</span>
-                    <span className="gs-row-sub" style={{ display: 'block' }}>
-                      {[p.position, p.classYear].filter(Boolean).join(' · ')}
-                    </span>
-                  </span>
-                  <span className="gs-tile-val is-high" style={{ fontSize: 18, margin: 0, minWidth: 28, textAlign: 'right' }}>
-                    {p.overall}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
         ) : null}
       </aside>
     </div>

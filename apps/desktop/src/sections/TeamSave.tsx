@@ -7,8 +7,14 @@ import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import Schedule from './Schedule'
 import DepthChart from './DepthChart'
 import Roster from './Roster'
+import { buildLeague, visibleGames } from '../../electron/league'
+import { currentWeek } from '../../electron/season'
+import { dateLabel, kickoffLabel } from '../../electron/gameEnums'
 
-const TABS = ['ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
+// OVERVIEW is first because it is what the front page used to be: your record,
+// your board, your next game, your best players. Home is the country's page now
+// and this is yours, which is the split that was wanted all along.
+const TABS = ['OVERVIEW', 'ROSTER', 'DEPTH', 'TEAMS', 'SCHEDULE', 'TRADE'] as const
 type TabName = (typeof TABS)[number]
 
 const GROUPS: [string, string[]][] = [
@@ -51,7 +57,7 @@ export default function TeamSave() {
     return m
   }, [roster])
   const [schoolQuery, setSchoolQuery] = useState('')
-  const [tab, setTab] = useState<TabName>('ROSTER')
+  const [tab, setTab] = useState<TabName>('OVERVIEW')
   const [query, setQuery] = useState('')
   const [pos, setPos] = useState<string | null>(null)
   const [open, setOpen] = useState<number | null>(null)
@@ -85,6 +91,23 @@ export default function TeamSave() {
   }, [roster])
 
   const mine = useMemo(() => teams.find((t) => t.id === myTeam) ?? null, [teams, myTeam])
+
+  // What the front page used to work out for one team, worked out here instead.
+  const myName = myTeam === null ? null : nameOf(myTeam)
+  const table = useMemo(() => buildLeague(
+    visibleGames(roster?.games ?? [], myName, currentWeek(roster?.games ?? [], myName)),
+    (roster?.coaches ?? [])
+      .map((c) => ({ name: nameOf(c.teamId) ?? '', conference: c.conference, division: c.division }))
+      .filter((t) => t.name),
+  ), [roster, myName, names])
+  const record = myName ? table.get(myName) ?? null : null
+  const next = useMemo(() => (roster?.games ?? [])
+    .filter((g) => (g.home === myName || g.away === myName) && !g.played)
+    .sort((a, b) => a.week - b.week)[0] ?? null, [roster, myName])
+  const board = useMemo(() => (roster?.players ?? [])
+    .filter((p) => p.team === UNASSIGNED && p.recruitFlag && /^Generic_/.test(p.assetId ?? ''))
+    .sort((a, b) => b.stars - a.stars || b.overall - a.overall)
+    .slice(0, 8), [roster])
 
   // The press needs names to write about and a record to set the scene, both
   // keyed by school name because that is what a game row carries.
@@ -235,7 +258,90 @@ export default function TeamSave() {
           </Card>
         ) : null}
 
-        {tab === 'TEAMS' && roster ? (
+        {/* Everything the front page used to carry about one team. Home is
+            the country's page now, and this is where your own belongs. */}
+        {tab === 'OVERVIEW' && mine ? (
+          <div className="col" style={{ gap: 12 }}>
+            <div className="grid-2" style={{ gap: 12 }}>
+              <div className="card card-pad">
+                <Kicker>Record</Kicker>
+                <div className="gs-tile-val is-high" style={{ fontSize: 32 }}>
+                  {record ? <>{record.wins}<i className="gs-dash" />{record.losses}</> : '—'}
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <Meta size={10}>
+                    {[record?.conference ?? null,
+                      record ? `${record.confWins}-${record.confLosses} in it` : null]
+                      .filter(Boolean).join(' · ') || 'NOT READ'}
+                  </Meta>
+                </div>
+              </div>
+              <div className="card card-pad">
+                <Kicker>Scoring</Kicker>
+                <div className="gs-tile-val is-mid" style={{ fontSize: 32 }}>
+                  {record ? record.pointsFor : '—'}
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <Meta size={10}>{record ? `${record.pointsAgainst} ALLOWED` : 'NOT READ'}</Meta>
+                </div>
+              </div>
+            </div>
+
+            {next ? (
+              <div className="card card-pad">
+                <div className="card-head"><Kicker>Next up</Kicker><Meta size={9}>WEEK {next.week}</Meta></div>
+                <div className="row" style={{ gap: 9, alignItems: 'center', marginTop: 6 }}>
+                  <SchoolArt size={34} file={
+                    save.schoolArt[`${(next.home === myName ? next.away : next.home) ?? ''}|helmet`]} />
+                  <div className="gs-row-title" style={{ fontSize: 22, fontFamily: 'var(--serif)', fontWeight: 600 }}>
+                    {(next.home === myName ? next.away : next.home) ?? 'TBD'}
+                  </div>
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <Meta size={10}>
+                    {[next.neutralSite ? 'NEUTRAL SITE' : next.home === myName ? 'HOME' : 'AWAY',
+                      dateLabel(next.month, next.day), kickoffLabel(next.kickoff)]
+                      .filter(Boolean).join(' · ')}
+                  </Meta>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid-2" style={{ gap: 12, alignItems: 'start' }}>
+              <div className="card card-pad">
+                <div className="card-head"><Kicker>The board</Kicker><Meta size={10}>{board.length} OF THE CLASS</Meta></div>
+                {board.map((p) => (
+                  <div key={p.index} className="gs-row" style={{ cursor: 'default' }}>
+                    <PlayerFace first={p.first} last={p.last} file={save.facePaths[p.assetId ?? '']} size={36} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span className="gs-row-title">{p.first} {p.last}</span>
+                      <span className="gs-row-sub" style={{ display: 'block' }}>
+                        <span className="gs-stars">{'★'.repeat(p.stars)}</span>{' '}
+                        {p.position} · {p.homeState ?? p.hometown}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+                {!board.length ? <Meta size={10}>NOBODY ON THE BOARD</Meta> : null}
+              </div>
+              <div className="card card-pad">
+                <div className="card-head"><Kicker>Top of the roster</Kicker><Meta size={10}>{mine.list.length} PLAYERS</Meta></div>
+                {mine.list.slice(0, 8).map((p) => (
+                  <div key={p.index} className="gs-row" style={{ cursor: 'default' }}>
+                    <PlayerFace first={p.first} last={p.last} file={save.facePaths[p.assetId ?? '']} size={36} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span className="gs-row-title">{p.first} {p.last}</span>
+                      <span className="gs-row-sub" style={{ display: 'block' }}>
+                        {[p.position, p.classYear].filter(Boolean).join(' · ')}
+                      </span>
+                    </span>
+                    <span className="gs-tile-val is-high" style={{ fontSize: 18, margin: 0 }}>{p.overall}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : tab === 'TEAMS' && roster ? (
           <Card className="card-pad">
             <Kicker>All {teams.length} programs</Kicker>
             <p className="body-serif" style={{ marginTop: 7 }}>

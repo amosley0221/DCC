@@ -10,6 +10,39 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.74.0] - 2026-09-07
+
+### Changed
+
+- **Home is the country's page. The Program is yours.** The front page led with
+  one team out of a hundred and forty, which is a team page wearing a
+  newspaper's clothes. Everything about your own program — the record and
+  scoring tiles, your board, your next game, the top of your roster — has moved
+  to **The Program → Overview**, which opens on it, above everything that tab
+  already had.
+
+  What Home carries instead:
+
+  - **The biggest game in the country**, chosen rather than assumed. Every game
+    of the week is weighed the way anyone would weigh them — a conference on the
+    line, two ranked sides, a fixture that is its own occasion, an upset that
+    has happened, a finish inside a possession — and the biggest leads. Yours is
+    still one turn of the feature; it just no longer owns the page.
+  - **The class, nationally.** The ten best players in next year's class in the
+    game's own order, with the school leading each one, in place of the eight on
+    your board.
+  - **The season, not your season.** How many programs, how many are still
+    unbeaten, how many games were played this week.
+  - The scores rail opens on the **top 25** rather than your conference.
+
+### Fixed
+
+- **"Around the country · week 13" while the title bar said week 15.** The
+  header was reporting the last Saturday *your* team had a result from. Nine
+  conferences had settled their titles in week 15 and yours had not kicked off,
+  so the two disagreed by two weeks. A page about the sport takes the latest
+  week anybody has a result in.
+
 ## [0.73.0] - 2026-09-07
 
 ### Added
