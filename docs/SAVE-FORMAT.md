@@ -1866,3 +1866,62 @@ reference but no season, and nothing else in it distinguishes the two years.
 championship, when the game schedules season 3's own postseason. Whatever
 changes in those 36 rows between the two saves is the discriminator. Guessing at
 one from a single save is how the neutral-site flag went wrong twice.
+
+## Per-player statistics: the fields, and the one row that is missing
+
+The game's own Player Stats screen for Penn State-USC pinned the per-game
+fields. `GameOffensiveStats` rows are 32 bytes; bits 0-95 are the row's own
+references and everything below is the stat line:
+
+| Bits | Field | Checked against |
+| --- | --- | --- |
+| 118/10 | passing yards | USC 169, Penn State 245 |
+| 165/8 | pass attempts | 32 and 32 |
+| 150/10 **signed** | rushing yards | USC 57, Penn State 151 |
+| 202/7 | carries | USC 27, Penn State 28 |
+| 182/10 | receiving yards | Penn State 245 |
+| 237/6 | receptions | 23 and 17 |
+| 139/10 | yards after the catch | per receiver |
+| 106/10 | yards after contact | per rusher |
+| 131/7 | longest catch | per receiver |
+| 98/7 | longest run | per rusher |
+
+The offsets were found on Penn State's twelve rows and then **verified on USC's
+fifteen**, which were not used to find them. Rushing is signed and that is what
+makes it add up: USC's six ball carriers read 53, 13, 6, 1, −1 and −15, and the
+two negatives are the sacks charged to DiMarco and Fette. They sum to 57, which
+is the box score. Read unsigned they sum to 2,105.
+
+Remember the team reference in one of these rows is the **opponent**, not the
+player's team, which is why rows tagged USC hold Penn State's players.
+
+One caveat found and not explained: T. Wilkerson's line for USC — one catch, 12
+yards — has no row in the store. USC's receiving adds to 157 rather than 169,
+and that single line is the whole difference. Every other total is exact.
+
+### Career rows are the same 16-bit words as `TeamStats`
+
+`CareerOffensiveStats` is 148 bytes of 16-bit words with the same top-bit marker
+and 15-bit signed value. Only one game was played between the two saves, so a
+career row's change *is* that game's line, which pins fields without any further
+anchor:
+
+| Word | Field | The one-game delta |
+| --- | --- | --- |
+| 5 | passing yards | 245, 118, 51 |
+| 19 | receiving yards | 77, 71, 69, 50, 32, 24, 21, 21, 15, 9, 8, 1 |
+| 25 | rushing yards **signed** | 56, 53, 13, 8, 6, 1, −1, −15 |
+
+`SeasonOffensiveStats` (40 bytes) carries passing yards in word 5 as well.
+
+### A player has exactly one career record, and it is not always the obvious one
+
+Quinn Martin Jr. rushed for 87 yards in that game and **no** `CareerOffensiveStats`
+row moved by 87. His 87 is in `CareerOffensiveKPReturnStats`, word 29.
+
+That is the rule, not an exception: `Player` byte +12 holds a single handle, its
+tag names one of the six career stores, and every offensive number that player
+records goes into that one record. A running back who returns kicks keeps his
+rushing yards in the return store. So a rushing leaderboard has to read all six,
+each with its own word layout — reading `CareerOffensiveStats` alone silently
+drops the returners, who are exactly the players a Heisman list cares about.
