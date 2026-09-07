@@ -22,7 +22,7 @@ import { TEAM_ID_NAMES } from './teamIds'
 import { currentWeek } from './season'
 import { buildLeague, orderByRanks, rankings, visibleGames } from './league'
 import { buildWire, type WireItem } from './wire'
-import { matchupFacts, matchupHeadline, matchupStandfirst } from './matchup'
+import { gameWeight, matchupFacts, matchupHeadline, matchupStandfirst } from './matchup'
 import { recruitingNews } from './recruitLedger'
 import type { RecruitEvent } from './recruitLedger'
 
@@ -358,25 +358,13 @@ export function buildSnapshot(
     })),
   })
 
-  // The lead game and the line for it, by the same rule the desktop uses.
+  // The lead game and the line for it, by the same rule the desktop uses: the
+  // biggest game in the country this week, not the reader's own. See
+  // gameWeight in matchup.ts.
   const lead = (() => {
-    if (!userTeamName) return null
-    const mine = seen
-      .filter((g) => g.home === userTeamName || g.away === userTeamName)
-      .sort((a, b) => a.week - b.week)
-    const last = [...mine].reverse().find((g) => g.played && !g.postseason) ?? null
-    const nextGame = mine.find((g) => !g.played) ?? null
-    let pick = last
-    let upcoming = false
-    if (nextGame) {
-      const other = (nextGame.home === userTeamName ? nextGame.away : nextGame.home) ?? ''
-      const r = rankOf.get(other)
-      if (nextGame.postseason || (r !== undefined && r <= 25)) { pick = nextGame; upcoming = true }
-    }
-    if (!pick) { pick = nextGame; upcoming = true }
-    if (!pick) return null
-    const f = matchupFacts({
-      game: pick,
+    if (wireWeek === null) return null
+    const facts = (g: SeasonGame) => matchupFacts({
+      game: g,
       games: seen,
       conferenceOf: (n) => (n ? table.get(n)?.conference ?? null : null),
       rankOf: (n) => (n ? rankOf.get(n) ?? null : null),
@@ -388,11 +376,19 @@ export function buildSnapshot(
         first: h.first, last: h.last, position: h.position, team: h.team,
       })),
     })
+    const pool = seen.filter((g) =>
+      !g.postseason && (g.week === wireWeek || (!g.played && g.week >= wireWeek)))
+    if (!pool.length) return null
+    const best = pool
+      .map((g) => ({ g, f: facts(g), w: 0 }))
+      .map((x) => ({ ...x, w: gameWeight(x.g, x.f) + (x.g.played ? 0 : 40) }))
+      .sort((a, b) => b.w - a.w)[0]
+    const upcoming = !best.g.played
     return {
-      row: pick.row,
-      headline: upcoming ? matchupHeadline(pick, f, userTeamName) : '',
-      standfirst: upcoming ? matchupStandfirst(pick, f) : '',
-      neutral: f.neutral,
+      row: best.g.row,
+      headline: upcoming ? matchupHeadline(best.g, best.f, null) : '',
+      standfirst: upcoming ? matchupStandfirst(best.g, best.f) : '',
+      neutral: best.f.neutral,
       upcoming,
     }
   })()

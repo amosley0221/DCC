@@ -10,6 +10,32 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 _Nothing yet._
 
+## [0.75.0] - 2026-09-07
+
+### Changed
+
+- **Android's home page is the country's too.** 0.74.0 did this on Windows and
+  left the phone leading with your team. It no longer does:
+
+  - **The lead game is the biggest in the country.** The PC weighs every game of
+    the week and names the winner in the snapshot, so the two apps cannot
+    disagree about what the week's story was.
+  - **"The board" was never your board.** The list has always been the whole
+    country's next class in the game's own national order — only the label said
+    otherwise. It now says **The class · best in the country**.
+  - **Saturday's rail opens on the top 25** rather than your conference.
+  - **The week is the country's week**, the same fix Windows got: the latest
+    week anybody has a result in, not the last Saturday your team played.
+
+### Fixed
+
+- **Neither app assumes you are in the game any more.** The headline, the
+  standfirst and the footer were all written from the reader's side — "Penn
+  State 16, UCLA 24" for a game Penn State was not in, "vs" and "at" for
+  neither team. A national front page cannot do that, so a game you are not in
+  is now reported: winner first, the fixture as it stands, and your record left
+  out of the line under it.
+
 ## [0.74.0] - 2026-09-07
 
 ### Changed

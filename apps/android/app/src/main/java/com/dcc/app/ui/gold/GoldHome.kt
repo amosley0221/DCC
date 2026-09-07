@@ -97,10 +97,23 @@ fun GoldHome(
     val me = snap.userTeam
     val mine = me?.let { snap.scheduleOf(it.index) }.orEmpty()
     val last = mine.lastOrNull { it.played && !it.postseason }
-    val week = last?.week ?: snap.weeks.lastOrNull()
+    /**
+     * The week the *country* has reached, not the week you last played.
+     *
+     * Those agree until championship weekend, when nine conferences settle
+     * their titles and yours has not kicked off yet — and then the page said
+     * one thing and its own title bar said another, two weeks apart.
+     */
+    val week = remember(snap) {
+        snap.snapshot.games
+            .filter { it.played && !it.postseason && !snap.holds(it, false) }
+            .maxOfOrNull { it.week } ?: last?.week ?: snap.weeks.lastOrNull()
+    }
     val saturday = week?.let { snap.gamesIn(it) }.orEmpty()
         .filter { it.played && !snap.holds(it, false) }
         .sortedByDescending { snap.isUserGame(it) }
+    // The country's class, in the game's own national order — not one school's
+    // board, which is what this list was called and never was.
     val board = snap.recruits.take(6)
 
     /**
@@ -111,7 +124,7 @@ fun GoldHome(
      * your conference by default, the top 25 on a tap. Both are ordered with
      * your own game first.
      */
-    var ranked by rememberSaveable { mutableStateOf(false) }
+    var ranked by rememberSaveable { mutableStateOf(true) }
 
     // The feature turns over the way the desktop's does, and for the same
     // reason: one scoreline is the week's news for about a day, and the phone is
@@ -136,17 +149,21 @@ fun GoldHome(
     val recordOf = remember(table) { table.mapValues { (_, r) -> r.wins to r.losses } }
 
     /**
-     * The game the front page leads with: the last result, unless the next one
-     * is bigger. A conference championship on Saturday is the story and a win
-     * from a fortnight ago is not, which is what every front page in the sport
-     * does with the same two facts. Kept to the same rule as the desktop's.
+     * The game the front page leads with — the biggest in the country, not
+     * yours.
+     *
+     * The PC weighs every game of the week (a conference on the line, two
+     * ranked sides, a fixture that is its own occasion, an upset, a
+     * one-possession finish) and names the winner in the snapshot, so the two
+     * apps cannot disagree about what the week's story was. Where the snapshot
+     * is older than that and says nothing, the phone falls back to your own
+     * last result rather than inventing a second rule.
      */
     val nextUp = mine.firstOrNull { !it.played }
-    val leadGame = remember(last, nextUp, rankOf, me) {
-        val opponent = nextUp?.let { if (it.home == me?.name) it.awayIndex else it.homeIndex }
-        val rank = opponent?.let { rankOf[it] }
-        if (nextUp != null && (nextUp.postseason || (rank != null && rank <= 25))) nextUp
-        else last ?: nextUp
+    val leadGame = remember(snap, last, nextUp) {
+        snap.snapshot.lead?.row
+            ?.let { row -> snap.snapshot.games.firstOrNull { it.row == row } }
+            ?: last ?: nextUp
     }
     val bestRank = { g: SnapshotGame ->
         minOf(rankOf[g.homeIndex] ?: 999, rankOf[g.awayIndex] ?: 999)
@@ -595,6 +612,9 @@ private fun FeatureWell(
                     // What is riding on it, worked out on the PC for this game.
                     slideGame != null && lead?.row == slideGame.row && lead.standfirst.isNotBlank() ->
                         lead.standfirst
+                    // Only your own game gets your record in the line under it.
+                    slideGame != null && slideGame.home != meName && slideGame.away != meName ->
+                        featureStandfirst(slideGame, null, null)
                     else -> featureStandfirst(last, wins, losses)
                 },
                 12.0, c.ink2,
@@ -670,7 +690,13 @@ private fun MatchupSide(
     }
 }
 
-/** Your board, as far down it as a glance is worth. */
+/**
+ * The best of next year's class, as far down it as a glance is worth.
+ *
+ * This was labelled "the board" and never was one: the list is the country's,
+ * in the game's own national order. Home is the sport's page, so it now says
+ * what it is and shows where each of them is leaning.
+ */
 @Composable
 private fun BoardWell(
     board: List<SnapshotRecruit>,
@@ -691,7 +717,9 @@ private fun BoardWell(
                 Modifier.clickable(onClick = onOpenBoard),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Label("THE BOARD", 10.0, c.ink3, 2.0)
+                Label("THE CLASS", 10.0, c.ink3, 2.0)
+                Spacer(Modifier.width(8.dp))
+                Label("BEST IN THE COUNTRY", 9.0, c.ink4, 1.5)
                 Spacer(Modifier.weight(1f))
                 Label("ALL →", 10.0, c.accent, 1.5)
             }
@@ -762,6 +790,16 @@ private fun CrestWash(schools: List<String>) {
 }
 
 private fun featureHeadline(g: SnapshotGame, me: String?): String {
+    // Home leads with the country's biggest game, which is usually not one of
+    // yours, so nothing here may assume the reader is in it.
+    val mine = g.home == me || g.away == me
+    if (!mine) {
+        val winner = if (g.homeScore >= g.awayScore) g.home else g.away
+        val loser = if (g.homeScore >= g.awayScore) g.away else g.home
+        if (!g.played) return "${g.away ?: "TBD"} at ${g.home ?: "TBD"}"
+        return "${winner ?: "?"} ${maxOf(g.homeScore, g.awayScore)}, " +
+            "${loser ?: "?"} ${minOf(g.homeScore, g.awayScore)}"
+    }
     val home = g.home == me
     val us = if (home) g.homeScore else g.awayScore
     val them = if (home) g.awayScore else g.homeScore

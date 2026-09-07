@@ -826,11 +826,17 @@ function Feature({ g, upcoming, facts, team, apiKey, log, onBoxScore, bg, tint, 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Home leads with the country's biggest game, which is usually not one of
+  // yours, so nothing here may assume the reader is in it. `mine` is what
+  // decides whether the page speaks in the second person or reports a result.
+  const mine = g.home === team || g.away === team
   const home = g.home === team
   const us = home ? g.homeScore : g.awayScore
   const them = home ? g.awayScore : g.homeScore
   const other = (home ? g.away : g.home) ?? 'their opponent'
   const won = us > them
+  const winner = g.homeScore >= g.awayScore ? g.home : g.away
+  const loser = g.homeScore >= g.awayScore ? g.away : g.home
 
   const write = async () => {
     setBusy(true); setError(null)
@@ -870,7 +876,12 @@ function Feature({ g, upcoming, facts, team, apiKey, log, onBoxScore, bg, tint, 
       >
         <FeatureGround bg={bg} tint={tint} field photo={artOf(g.home, 'stadium')} />
         <div className="gs-figure-kicker" style={{ zIndex: 1 }}>
-          <Kicker>{upcoming ? 'Next up' : won ? 'Won' : 'Lost'} · week {g.week}</Kicker>
+          <Kicker>
+            {facts?.title ? `The ${facts.title}`
+              : upcoming ? 'Next up'
+              : mine ? (won ? 'Won' : 'Lost')
+              : 'Around the country'} · week {g.week}
+          </Kicker>
         </div>
         {/*
           A matchup, not a bare scoreline. Each side stands under its own
@@ -898,7 +909,9 @@ function Feature({ g, upcoming, facts, team, apiKey, log, onBoxScore, bg, tint, 
           />
         </div>
         <div className="gs-figure-caption" style={{ zIndex: 1 }}>
-          {[facts?.neutral ? `${g.away} vs ${g.home}` : home ? `vs ${other}` : `at ${other}`,
+          {[facts?.neutral ? `${g.away} vs ${g.home}`
+            : !mine ? `${g.away} at ${g.home}`
+            : home ? `vs ${other}` : `at ${other}`,
             facts?.neutral ? 'neutral site' : null,
             dateLabel(g.month, g.day),
             // Before kickoff the crowd is not a number yet, and the time is.
@@ -912,9 +925,11 @@ function Feature({ g, upcoming, facts, team, apiKey, log, onBoxScore, bg, tint, 
       <div style={{ paddingTop: 20 }}>
         <h2 className="hero-headline" style={{ maxWidth: 560 }}>
           {story ? story.headline
-            : upcoming && facts ? matchupHeadline(g, facts, team)
+            : upcoming && facts ? matchupHeadline(g, facts, mine ? team : null)
             : upcoming ? `${team ?? 'You'} ${home ? 'host' : 'travel to'} ${other}`
-            : `${team ?? 'You'} ${us}, ${other} ${them}`}
+            : mine ? `${team ?? 'You'} ${us}, ${other} ${them}`
+            : `${winner} ${Math.max(g.homeScore, g.awayScore)}, ` +
+              `${loser} ${Math.min(g.homeScore, g.awayScore)}`}
         </h2>
         {!story && upcoming && facts && matchupStandfirst(g, facts) ? (
           <p className="body-serif" style={{ margin: '12px 0 0', maxWidth: 520 }}>
