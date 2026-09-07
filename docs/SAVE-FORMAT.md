@@ -1770,9 +1770,48 @@ That is not a guess: a ten-bit field at bit 118 sums to 245 across the rows tagg
 USC and 169 across the rows tagged Penn State, which is each team's passing yards
 attached to the other team's tag.
 
-What is not yet solved is **which player** a row belongs to. The row holds no
-player reference, so the link runs the other way and has not been found. The
-`Player` row carries a handle at byte +24 (tag `0x210e`) that is allocated
-sequentially — player row 0 to index 0, row 1 to index 1 — so it points at a
-per-player object rather than at a per-game stat line. Until that link is found,
-team statistics are readable and per-player leaders are not.
+### The link from a player to their statistics: `Player` byte +12
+
+The stat rows hold no player reference, so the link runs the other way, and it is
+**byte +12 of a `Player` row**: a handle whose **tag names the class** and whose
+index is the row within it.
+
+| Tag | Store | Players carrying it |
+| --- | --- | --- |
+| `0x20b6` | `CareerDefensiveStats` | 3,974 |
+| `0x2202` | `CareerOffensiveStats` | 2,202 |
+| `0x20f4` | `CareerOLineStats` | 1,678 |
+| `0x21b2` | `CareerOffensiveKPReturnStats` | 390 |
+| `0x21f6` | `CareerKickingStats` | 311 |
+| `0x2098` | `CareerDefensiveKPReturnStats` | 61 |
+
+Each was assigned by the save pair rather than by guessing which name sounded
+right. Playing one game changes a known set of career rows and a known set of
+player rows; following +12 from the changed players lands on the changed rows of
+exactly one store per tag — 43 of 53 for defence, 25 of 28 for offence, 16 of 21
+for the line, and 4 of 4 and 5 of 5 for the two smallest. The shortfalls are
+players whose row changed for some other reason and whose statistics did not,
+which is ordinary. Every tag's player count also fits under its store's row count,
+six for six.
+
+Per-game rows reach a player the same way, through a heap array: the region after
+`Player[]` holds runs of `GameOffensiveStats` handles (tag `0x201c`), 1,392 of
+them twelve long and 23 thirteen long, which is a season of games each. Playing
+the championship appended exactly 27 handles, one per new stat row. The runs are
+not inside any store — they are heap-allocated and reached by pointer — so they
+are read through the player rather than scanned for.
+
+### What is still not decoded
+
+The **fields inside** a career or season stat row. The row is 148 bytes and 86
+members and its member offsets have the same off-by-one as everywhere else, and
+the one-game delta — a career row after minus the same row before is exactly that
+game's line — narrows a field but does not pin it: a search for "sums to 414
+passing yards across 27 players" and one for "sums to 208 rushing yards" both
+answer with windows ending at bit 95, which means they are shifted reads of one
+field and at most one of them is right.
+
+That wants a per-player anchor, the way the team box score anchored `TeamStats`:
+the game's own Player Stats screen for a game whose save is held on both sides.
+Without it this is pattern-matching, which is how the neutral-site flag went wrong
+twice before it went right.
