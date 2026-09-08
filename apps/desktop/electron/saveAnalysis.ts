@@ -2911,3 +2911,186 @@ export function topSchools(payload: Buffer, nationalRank: number): { school: str
   }
   return out
 }
+
+/* ----------------------------------------------------------- the carousel */
+
+/** A coach, as the save spells them out. */
+export interface CoachName {
+  /** Row in the coach table, which is what a `0x20a6` reference points at. */
+  slot: number
+  first: string
+  last: string
+  /** "B. Bielema" — the form every screen in the game shows. */
+  display: string
+  /** Portrait asset, `Unique_C_BielemaBret_545` or a `Generic_` head. */
+  asset: string
+}
+
+/** Bytes per coach record: first name, surname, portrait asset, display name. */
+const COACH_NAME_STRIDE = 130
+const COACH_FIRST_LEN = 17
+const COACH_LAST_AT = 17
+const COACH_LAST_LEN = 21
+const COACH_ASSET_AT = 38
+const COACH_ASSET_LEN = 74
+const COACH_DISPLAY_AT = 112
+const COACH_DISPLAY_LEN = 18
+
+/**
+ * Every coach in the save, including the ones nobody employs.
+ *
+ * The per-team table `readCoaches` walks holds only the 138 sitting head
+ * coaches, which is no use to the carousel: half of a staff-moves screen is
+ * men who were just fired and have not been hired yet. This is the other
+ * table — 130-byte records carrying a first name, a surname, the portrait
+ * asset id and the "B. Bielema" display form.
+ *
+ * It is found by the asset id rather than by walking a stride from an anchor.
+ * The records sit in several blocks — one run covers A to De and stops — so a
+ * stride walk finds a fifth of them and quietly reports success. Every record
+ * has a portrait id beginning `Unique_C_` or `Generic_`, so scanning for that
+ * and stepping back to the record start finds all of them wherever they sit.
+ *
+ * A reference resolves by slot, counted in strides from the first record, not
+ * by position in this array: a handful of slots are empty and skipping them
+ * would shift every coach after the gap onto somebody else's name.
+ */
+export function readCoachNames(payload: Buffer): CoachName[] {
+  const at: number[] = []
+  const seen = new Set<number>()
+  for (const tag of ['Unique_C_', 'Generic_']) {
+    const probe = Buffer.from(tag, 'latin1')
+    for (let i = 0; (i = payload.indexOf(probe, i)) !== -1; i++) {
+      const base = i - COACH_ASSET_AT
+      if (base < 0 || seen.has(base)) continue
+      seen.add(base)
+      at.push(base)
+    }
+  }
+  at.sort((a, b) => a - b)
+
+  const rows: { base: number; rec: Omit<CoachName, 'slot'> }[] = []
+  for (const base of at) {
+    const rec = {
+      first: text(payload, base, COACH_FIRST_LEN) || '',
+      last: text(payload, base + COACH_LAST_AT, COACH_LAST_LEN) || '',
+      asset: text(payload, base + COACH_ASSET_AT, COACH_ASSET_LEN) || '',
+      display: text(payload, base + COACH_DISPLAY_AT, COACH_DISPLAY_LEN) || '',
+    }
+    // The display name is the test: a real record carries "B. Bielema" exactly
+    // where the layout says, and an asset id that happens to sit near other
+    // text does not.
+    if (!/^[A-Z]\. ?\S/.test(rec.display)) continue
+    if (!/^[A-Za-z][A-Za-z'.\- ]*$/.test(rec.last)) continue
+    rows.push({ base, rec })
+  }
+  if (!rows.length) return []
+
+  const first = rows[0].base
+  const out: CoachName[] = []
+  for (const { base, rec } of rows) {
+    const slot = (base - first) / COACH_NAME_STRIDE
+    if (!Number.isInteger(slot)) continue
+    out.push({ slot, ...rec })
+  }
+  return out
+}
+
+/** Why a job came open, in the game's own words. */
+export type JobOpenReason =
+  | 'None' | 'Fired' | 'Retired' | 'Pro' | 'NewJob' | 'ContractEnding'
+
+const JOB_REASONS: JobOpenReason[] =
+  ['None', 'Fired', 'Retired', 'Pro', 'NewJob', 'ContractEnding']
+
+/** Which chair opened. The save carries coordinators as well as head coaches. */
+export type StaffRole = 'HC' | 'OC' | 'DC'
+
+const STAFF_ROLES: StaffRole[] = ['HC', 'OC', 'DC']
+
+export interface StaffMove {
+  /** Row in `JobOpening`, so a screen can tell two identical-looking moves apart. */
+  row: number
+  /** The school whose job it is. */
+  school: string | null
+  teamIndex: number
+  role: StaffRole
+  /** Who left. Null when the save has no previous holder. */
+  outgoing: CoachName | null
+  /** Who took it, or null while the job is still open. */
+  incoming: CoachName | null
+  reason: JobOpenReason
+}
+
+/** `JobOpening` row layout, all verified against a real staff-moves screen. */
+const JOB_REASON_AT = 0
+const JOB_TEAM_AT = 4
+const JOB_INCOMING_AT = 8
+const JOB_OUTGOING_AT = 12
+const JOB_ROLE_BIT = 198
+const JOB_ROLE_WIDTH = 4
+const COACH_TAG = 0x20a6
+
+/**
+ * The coaching carousel: who was fired, who was hired, and what is still open.
+ *
+ * `JobOpening` is named in the game's own schema and its members are the
+ * columns of the staff-moves screen — `Team`, `PrevCoach`, `SelectedCoach`,
+ * `Position` and `Reason`. Finding them was a matter of joining, not guessing:
+ * every field here is pinned against a screenshot of that screen, and the
+ * pairs it names — Fitzgerald out and Bielema in at Michigan State, Carty out
+ * and Alford in at Delaware, Pritchard out and Mullen in at Stanford — all
+ * land on the right school.
+ *
+ * Two traps are worth recording. The two coach references are the other way
+ * round from the order the schema lists them: the *incoming* coach is at byte
+ * 8 and the one who left is at byte 12. And a team reference indexes
+ * `TeamRecord.tableIndex`, not the position of a team in `readTeamNames`,
+ * which sorts itself alphabetically before returning — reading it as an array
+ * index puts every move at the school next door.
+ *
+ * The carousel does not wait for the national championship. It ran between a
+ * bowl-week-1 save and a bowl-week-2 save, and the head-coach jobs still open
+ * in the second — Indiana, Duke and UNLV — are exactly the three the game's
+ * own carousel screen was offering.
+ */
+export function readStaffMoves(payload: Buffer): StaffMove[] {
+  const t = namedTable(payload, 'JobOpening')
+  if (!t || t.rowBytes < 16) return []
+
+  const schools: (TeamRecord | undefined)[] = []
+  for (const s of readTeamNames(payload)) schools[s.tableIndex] = s
+  const bySlot = new Map(readCoachNames(payload).map((c) => [c.slot, c]))
+
+  const out: StaffMove[] = []
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes
+    if (o + t.rowBytes > payload.length) break
+
+    const reason = JOB_REASONS[payload.readUInt32BE(o + JOB_REASON_AT)]
+    // Most rows are spare capacity rather than a job: no reason, no opening.
+    if (!reason || reason === 'None') continue
+
+    if (payload.readUInt16BE(o + JOB_TEAM_AT) !== TEAM_TAG) continue
+    const teamIndex = payload.readUInt16BE(o + JOB_TEAM_AT + 2)
+
+    const coachAt = (byte: number) =>
+      (payload.readUInt16BE(o + byte) === COACH_TAG
+        ? bySlot.get(payload.readUInt16BE(o + byte + 2)) ?? null
+        : null)
+
+    const role = STAFF_ROLES[bitsFrom(payload, o, JOB_ROLE_BIT, JOB_ROLE_WIDTH)]
+    if (!role) continue
+
+    out.push({
+      row: r,
+      school: schools[teamIndex]?.name ?? null,
+      teamIndex,
+      role,
+      outgoing: coachAt(JOB_OUTGOING_AT),
+      incoming: coachAt(JOB_INCOMING_AT),
+      reason,
+    })
+  }
+  return out
+}

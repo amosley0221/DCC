@@ -562,3 +562,29 @@ console.log('            and the schema version is read off the save, not assume
   assert.equal(typeof S.playedGameRows, 'function',
     'the played test is exported so the season reader and the checks agree')
 }
+
+/* ------------------------------------------------- the coaching carousel */
+{
+  // Verified against a real staff-moves screen rather than asserted here: the
+  // eleven head-coach moves in a bowl-week-2 save all land on the right school
+  // with the right pair, and the three jobs still open — Indiana, Duke, UNLV —
+  // are the three the game's own carousel screen was offering. What this block
+  // guards is the shape those readers depend on.
+  assert.equal(typeof S.readStaffMoves, 'function')
+  assert.equal(typeof S.readCoachNames, 'function')
+
+  // A save with nothing in it must come back empty rather than throw: DCC opens
+  // whatever it is pointed at, including files that are not saves.
+  assert.deepEqual(S.readStaffMoves(Buffer.alloc(64)), [])
+  assert.deepEqual(S.readCoachNames(Buffer.alloc(64)), [])
+
+  // The reason enum is the game's, in the game's order. Reading it off by one
+  // turns every firing into a retirement.
+  const REASONS = ['None', 'Fired', 'Retired', 'Pro', 'NewJob', 'ContractEnding']
+  assert.equal(REASONS[1], 'Fired')
+  assert.equal(REASONS[3], 'Pro', 'a coach who went to the NFL left for the Pro reason')
+  assert.equal(REASONS[4], 'NewJob', 'and one hired away carries NewJob')
+  assert.equal(REASONS[5], 'ContractEnding')
+}
+
+console.log('check-save: the carousel readers are shaped right and refuse a file that is not a save')

@@ -2119,11 +2119,82 @@ so nothing shows it.
 
 ## Hires and fires
 
-Not built, and not buildable from the saves in hand: a `readCoaches` diff
-between the week-16 save and the bowl-week-1 save shows **zero coach name
-changes**. The carousel has not fired in either file, so there is nothing to
-decode against and nothing to verify a decode with. It needs a save from after
-the coaching carousel resolves.
+Decoded, and verified against the game's own staff-moves screen.
+
+**The carousel does not wait for the national championship.** It ran between a
+bowl-week-1 save and a bowl-week-2 save. An earlier note here said it needed a
+post-championship save; that was wrong, and it cost a round trip.
+
+It also does not show up in the per-team coach table. A `readCoaches` diff
+across those two saves reports **zero changes** even though eleven head coaches
+moved, because that table holds the sitting head coach and is not rewritten
+until later. The moves live in `JobOpening`, which the game's schema names
+outright.
+
+### `JobOpening`
+
+408 rows of 28 bytes. Every field below is pinned against a screenshot of the
+staff-moves screen, not inferred.
+
+| Field | At | Notes |
+| --- | --- | --- |
+| Reason | byte 0, 32-bit | `0` None, `1` Fired, `2` Retired, `3` Pro, `4` NewJob, `5` ContractEnding |
+| Team | byte 4 | `0x319e` reference |
+| SelectedCoach — the incoming one | byte 8 | `0x20a6` reference |
+| PrevCoach — the one who left | byte 12 | `0x20a6` reference |
+| Position | bit 198, 4 bits | `0` head coach, `1` offensive coordinator, `2` defensive coordinator |
+
+Two traps, both of which produce a confident wrong answer rather than an error:
+
+**The two coach references are the reverse of the schema's listing order.** The
+incoming coach is at byte 8 and the departing one at byte 12. Read the other way
+round, every move runs backwards and still looks plausible.
+
+**A team reference indexes `TeamRecord.tableIndex`, not the array position in
+`readTeamNames`,** which sorts itself alphabetically before returning. Using the
+array index put Stanford's move at Syracuse, Michigan State's at Minnesota and
+Delaware's at Duke — each one school along, which reads as a subtle off-by-one
+rather than as a bug.
+
+Rows whose reason is `None` are spare capacity, not jobs. In the bowl-week-2
+save 137 openings carry a reason, 53 of them head-coach jobs.
+
+Verification: the eleven head-coach moves visible on the screen all resolve to
+the right school with the right pair — Fitzgerald out and Bielema in at Michigan
+State, Bielema out and Fitzgerald in at Missouri, Pritchard out and Mullen in at
+Stanford, Freeman (to the NFL) out and Cignetti in at Notre Dame, Key out and
+Diaz in at Georgia Tech, Silverfield out and Key in at Arkansas, Morris out and
+Brennan in at Oklahoma State, Brown out and Potter in at Syracuse, Carty out and
+Alford in at Delaware, Simmons out and Wayne in at FIU, Chadwell out and Morris
+in at Purdue. The three head-coach jobs still open — Indiana, Duke, UNLV — are
+exactly the three the game's carousel screen was offering.
+
+One display note: the screen's Reason column shows "Fired" for both `Fired` and
+`ContractEnding`, so the two are not distinguishable from a screenshot. DCC
+keeps the game's own distinction rather than collapsing it.
+
+### The coach name table
+
+The per-team table `readCoaches` walks holds only the 138 sitting head coaches,
+which is useless here — half a staff-moves screen is men who have just been
+fired and not yet hired. There is a second table of 130-byte records:
+
+| Field | At | Length |
+| --- | --- | --- |
+| First name | 0 | 17 |
+| Surname | 17 | 21 |
+| Portrait asset | 38 | 74 |
+| Display name, "B. Bielema" | 112 | 18 |
+
+492 coaches in the bowl-week-2 save. It is found by scanning for the portrait
+asset id — every record has one beginning `Unique_C_` or `Generic_` — rather
+than by walking the stride from an anchor: the records sit in several blocks and
+one run covers only A to De, so a stride walk finds 109 of them and reports
+success.
+
+A `0x20a6` reference resolves by **slot**, counted in strides from the first
+record, not by position in the parsed array. A handful of slots are empty, and
+skipping them shifts every coach after the gap onto somebody else's name.
 
 ## Predictions
 
