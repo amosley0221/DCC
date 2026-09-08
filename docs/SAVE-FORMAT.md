@@ -2024,3 +2024,54 @@ at bytes 4-7, a player reference at 8-11, and a conference reference at bits
 Penn State's players read conference 3 for the Big Ten, Oklahoma's and Kentucky's
 read 10 for the SEC. Which award a row represents is **not** decoded, and three
 plausible-looking answers have been thrown away rather than shipped.
+
+## Awards: the schema names the field, and DCC already ships the schema
+
+The earlier section listed three rejected guesses at the award field. That was
+the wrong approach entirely — the game publishes its own type schema, and DCC
+has been shipping a slim index of it in `shared/data/schema-index.json.gz`
+since the schema work. It names `PlayerAward`'s members outright:
+
+| Member | Type | Width |
+| --- | --- | --- |
+| AwardScore | int | 16 |
+| **AwardType** | **AwardType (enum)** | **6** |
+| Conference | Conference | ref |
+| Period | StatPeriod | 4 |
+| PeriodIndex | int | 11 |
+| Player | Player | ref |
+| Position | PositionE | 7 |
+| Team | Team | ref |
+
+And `AwardType`'s enum carries every name worth showing: `ALL_AM_1ST`,
+`ALL_AM_2ND`, `ALL_AM_FR`, `ALL_AM_1ST_CONF`, `ALL_AM_2ND_CONF`, `HEISMAN`,
+`BEST_HC`, `BEST_QB`, `BEST_RB`, `BEST_POTY`, the four weekly player-of-the-week
+awards, and `LeagueLeader_Rush_Yards` and friends. `CoachAward` shares the enum.
+
+So the data is there and named, and three of the eight members are placed by
+their references: **Team at bit 32, Player at 64, Conference at 96**.
+
+### What still blocks it
+
+The bit offset of `AwardType`. Two things get in the way, and both are worth
+writing down because they cost an evening:
+
+The schema's member index `i` is **alphabetical within the type**, not layout
+order — `AwardScore` is 0 and `Team` is 7 purely by spelling — so it cannot be
+used to index the store header's word array. And that array does not appear to
+hold this store's member offsets either: its words are `3461, 128, 123, 96, 64,
+112, 32, 135`, the first being a used-row count (there are 3,460 rows with a
+player reference), and reading a 6-bit field at any of `112`, `123`, `128`,
+`135` gives a value that is 0 almost everywhere or that tracks the conference
+rather than the award.
+
+The way in is calibration rather than search: `TeamStats` and
+`GameOffensiveStats` are both fully decoded against real box scores *and* named
+in the schema, so laying the schema's member list beside the offsets already
+proven for those two will show how the header's array is ordered. That rule then
+applies to `PlayerAward` without guessing.
+
+Enum values cannot be counted off the list either — it is full of aliasing
+sentinels (`First_`, `FirstWeekly_`, `LastWeekly_`, `FirstAnnual_`,
+`FirstAllAmerican_`) which share ordinals with their neighbours, so
+`ALL_AM_1ST` is not simply its position in the array.
