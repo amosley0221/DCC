@@ -296,3 +296,41 @@ console.log('check-league: records, bowls, a school\'s season, the order, the st
 }
 
 console.log('check-league: the conference championship counts for a record but not a conference record')
+
+/* ------------------------ a scheduled bowl takes a team out of the playoff */
+{
+  // The bug this rule exists for: an 11-2 Boise State projected as the fifth
+  // seed in a save whose own schedule had them playing Baylor in a bowl.
+  const games = []
+  const names = new Set()
+  const add = (name, wins, losses) => {
+    names.add(name)
+    for (let i = 0; i < wins; i++) { games.push({ week: i, home: name, away: `W${name}${i}`, homeScore: 30, awayScore: 10, played: true, postseason: false }); names.add(`W${name}${i}`) }
+    for (let i = 0; i < losses; i++) { games.push({ week: 20 + i, home: name, away: `L${name}${i}`, homeScore: 10, awayScore: 30, played: true, postseason: false }); names.add(`L${name}${i}`) }
+  }
+  for (let i = 1; i <= 20; i++) add(`Team ${i}`, 13 - Math.ceil(i / 2), Math.ceil(i / 2))
+  const teams = [...names].map((name) => ({ name, conference: 'Big Ten', division: null }))
+
+  const open = L.projectPlayoff(L.buildLeague(games, teams))
+  assert.equal(open.teams.length, 12, 'with nothing scheduled the field fills')
+
+  // Now send the second-best team to a bowl and it must lose its place.
+  const placed = open.teams[1].row.name
+  const withBowl = games.concat([{ week: 30, home: placed, away: 'Team 20', homeScore: 0, awayScore: 0, played: false, postseason: true }])
+  const after = L.projectPlayoff(L.buildLeague(withBowl, teams), new Set([placed, 'Team 20']))
+  assert.ok(!after.teams.some((t) => t.row.name === placed),
+    `${placed} is playing a bowl and cannot also be in the playoff`)
+  assert.ok(![...after.leaders.values()].includes(placed), 'nor can it hold its conference bid')
+}
+
+/* --------------------- and a field it cannot fill honestly is marked as such */
+{
+  const games = [{ week: 0, home: 'Alpha', away: 'Beta', homeScore: 30, awayScore: 10, played: true, postseason: false }]
+  const teams = [{ name: 'Alpha', conference: 'Big Ten', division: null }, { name: 'Beta', conference: 'Big Ten', division: null }]
+  const thin = L.projectPlayoff(L.buildLeague(games, teams))
+  assert.equal(thin.credible, false, 'two teams is not a twelve-team playoff')
+  // A credible field never contains a losing record, however empty the pool is.
+  assert.ok(!(thin.credible && thin.teams.some((t) => t.row.losses > t.row.wins)))
+}
+
+console.log('check-league: a bowl place and a playoff place are not the same place')

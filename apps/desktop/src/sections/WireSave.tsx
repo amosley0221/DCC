@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useKit, usePoll, useSave } from '../saveStore'
 import { useStore } from '../store'
 import { Btn, Kicker, Meta, PlayerFace, SchoolArt, Tab } from '../ui'
@@ -8,6 +8,7 @@ import { dateLabel, kickoffLabel, weatherName } from '../../electron/gameEnums'
 import type { RosterPlayer, SeasonGame } from '../../electron/saveAnalysis'
 import { buildLeague, orderByRanks, rankings, visibleGames, winPct } from '../../electron/league'
 import { currentWeek, isPostseason, weekLabel } from '../../electron/season'
+import { predict, predictionLine } from '../../electron/predict'
 import { leaders, seasonTotals, type StatLeaderKey } from '../../electron/teamStats'
 import { buildWire, type WireItem } from '../../electron/wire'
 import {
@@ -155,6 +156,21 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
     () => (poll.ranks ? orderByRanks(table, poll.ranks) : rankings(table)),
     [table, poll.ranks],
   )
+  /**
+   * DCC's call on a game that has not been played.
+   *
+   * Only ever shown beside a fixture, never beside a result, and worded so it
+   * cannot be mistaken for the game's own line — the save carries no line, and
+   * this is record, scoring margin and the poll where you have found one.
+   */
+  const callFor = useCallback((g: { played: boolean; home: string | null; away: string | null; neutralSite?: boolean }) => {
+    if (g.played) return null
+    return predictionLine(predict(
+      table.get(g.home ?? ''), table.get(g.away ?? ''), !!g.neutralSite,
+      { home: poll.ranks?.[g.home ?? ''] ?? null, away: poll.ranks?.[g.away ?? ''] ?? null },
+    ))
+  }, [table, poll.ranks])
+
   const rankOf = useMemo(() => {
     const m = new Map<string, number>()
     order.forEach((r, i) => m.set(r.name, i + 1))
@@ -564,6 +580,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
               <Feature
                 g={feature.g}
                 upcoming={feature.upcoming}
+                call={callFor(feature.g)}
                 team={me}
                 bg={artOf(feature.g.home)}
                 tint={save.schoolColors[feature.g.home ?? ''] ?? null}
@@ -628,6 +645,12 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
                       <span className="gs-feature-num" style={{ color: dim(true) }}>
                         {g.played ? g.homeScore : dateLabel(g.month, g.day)}
                       </span>
+                      {callFor(g) ? (
+                        <span
+                          style={{ color: 'var(--accent)', fontSize: 10, letterSpacing: '.04em', whiteSpace: 'nowrap' }}
+                          title="DCC's call, not the game's line"
+                        >{callFor(g)}</span>
+                      ) : null}
                     </button>
                   )
                 })}
@@ -924,10 +947,12 @@ function MatchupSide({ name, art, rank, record, score, won }: {
  * the save has no images, and a fabricated one would be the only invented thing
  * on the page.
  */
-function Feature({ g, upcoming, facts, team, apiKey, log, onBoxScore, bg, tint, season, artOf, rankOf, recordOf }: {
+function Feature({ g, upcoming, call, facts, team, apiKey, log, onBoxScore, bg, tint, season, artOf, rankOf, recordOf }: {
   g: SeasonGame
   /** The game has not been played: this is a preview, not a result. */
   upcoming: boolean
+  /** DCC's call on it, where there is one. Null on a game already played. */
+  call: string | null
   /** What the game is about, when the season says anything about it. */
   facts: MatchupFacts | null
   team: string | null; apiKey: string
@@ -1039,6 +1064,8 @@ function Feature({ g, upcoming, facts, team, apiKey, log, onBoxScore, bg, tint, 
             dateLabel(g.month, g.day),
             // Before kickoff the crowd is not a number yet, and the time is.
             upcoming ? kickoffLabel(g.kickoff) : null,
+            // And DCC's own call, which only ever sits on a game still to come.
+            upcoming && call ? `DCC's call: ${call.toLowerCase()}` : null,
             !upcoming && g.attendance ? `${g.attendance.toLocaleString()} in attendance` : null,
             weatherName(g.weather) ? `${g.temperatureF}°F ${weatherName(g.weather)?.toLowerCase()}` : null]
             .filter(Boolean).join('  ·  ')}

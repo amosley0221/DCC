@@ -2075,3 +2075,90 @@ Enum values cannot be counted off the list either — it is full of aliasing
 sentinels (`First_`, `FirstWeekly_`, `LastWeekly_`, `FirstAnnual_`,
 `FirstAllAmerican_`) which share ordinals with their neighbours, so
 `ALL_AM_1ST` is not simply its position in the array.
+
+## A coach's career record
+
+`CareerCoachStats` is 464 rows of 28 bytes and holds the win-loss line the
+coach screen shows. Two fields are placed and verified:
+
+| Field | Bit | Width |
+| --- | --- | --- |
+| Wins | 42 | 11 |
+| Losses | 106 | 11 |
+
+Matt Campbell is row 16, and reads **146-74** — the number on his coach card,
+and the one the game's own derived 66.4% win rate is computed from
+(146 ÷ 220 = 66.36%). Both fields are unique within the row at that width, so
+the fit is not one of several.
+
+League-wide the shape holds: 435 of the 464 rows carry a record, wins top out
+at 208 and losses at 131, no career exceeds 700 games, and exactly one row has
+conference titles exceeding career wins.
+
+The schema gives the store 26 members — `BowlWins` 7 bits, `BowlLosses` 7,
+`ConfChampWins` 6, `NCWins` 6, `Wins` 11, `Losses` 11, `TimesFired` 5 and the
+rest — so the remaining fields are named but unplaced. **`ConfChampWins` at bit
+98 is rejected**: it gives a 206-71 coach 24 conference titles, which no
+~21-season career can hold.
+
+### What blocks showing it
+
+There is no route from a school to its coach's row. The `Coach` store is 632
+rows × 184 bytes with 138 members, and a scan of every 2-byte-aligned offset
+with member index < 143 found **no `0x319e` team reference in a coach row at
+all** — the link is not a direct team pointer. What the row does carry is
+`+24 0x20e6` in 465 rows against `CareerCoachStats`' 464, which is the
+strongest candidate for the coach → career link; the missing half is
+team → coach. The other ref-shaped slots are `+16 0x2124` (419 rows),
+`+40 0x2048` (419) and `+64 0x2d78` (373). The remaining route not yet tried is
+matching `readCoaches`' name table — 414 records of 58 bytes in three blocks of
+138 in team-id order — against the `Coach` store directly.
+
+Until that link exists the career record is decoded but cannot be attributed,
+so nothing shows it.
+
+## Hires and fires
+
+Not built, and not buildable from the saves in hand: a `readCoaches` diff
+between the week-16 save and the bowl-week-1 save shows **zero coach name
+changes**. The carousel has not fired in either file, so there is nothing to
+decode against and nothing to verify a decode with. It needs a save from after
+the coaching carousel resolves.
+
+## Predictions
+
+There is no line, no win probability and no simulation in the save. Anything
+DCC says about a game that has not been played is its own arithmetic, and every
+screen that prints one labels it as a call rather than a number the game holds.
+
+The estimate stands on `power` — the same score that orders the rankings screen
+— rather than on rank, record and margin separately, because `power` is already
+built from record and margin and feeding those in beside it counts the same
+evidence three times. Where the user has pointed DCC at a poll column, the
+poll's view is weighed equally against `power`: that is genuinely independent,
+because a poll knows who a team played and `power` cannot tell an unbeaten
+schedule of nobody from an unbeaten schedule of everybody.
+
+See `apps/desktop/electron/predict.ts` for the constants and
+`check-predict.cjs` for the rules that hold it honest.
+
+### The playoff is not in the save
+
+Projecting the bracket surfaced a real finding. In the bowl-week-1 save the
+game has scheduled 36 postseason fixtures covering 72 teams, and none of them
+is a playoff game: Penn State (13-0), Oklahoma (12-1), Florida State (12-1) and
+Tennessee (11-2) appear in no fixture at all, while eight of the twelve teams
+DCC had been projecting into the field — Boise State, Memphis, Texas Tech,
+Texas A&M, App State, UConn, South Carolina and Bowling Green — are each
+scheduled into an ordinary bowl. Boise State plays Baylor.
+
+So two things changed. `projectPlayoff` now takes the set of teams the save has
+already placed in a bowl and strikes them out, because the save's own schedule
+beats DCC's guess. And because that usually leaves too few credible teams to
+fill twelve places, the field carries a `credible` flag: when it is false the
+League screen shows the teams still unplaced with winning records and says the
+bracket is not in the file, rather than drawing a playoff with 5-7 teams in it.
+
+Where the real bracket does exist the projection fills, and DCC plays it out
+round by round to a champion — eleven stacked predictions, which the screen
+marks as calls because an upset in the first round rewrites everything below it.

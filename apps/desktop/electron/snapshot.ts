@@ -24,6 +24,7 @@ import { currentWeek } from './season'
 import { buildLeague, orderByRanks, rankings, visibleGames } from './league'
 import { buildWire, type WireItem } from './wire'
 import { gameWeight, matchupFacts, matchupHeadline, matchupStandfirst } from './matchup'
+import { predict, predictionLine } from './predict'
 import { recruitingNews } from './recruitLedger'
 import type { RecruitEvent } from './recruitLedger'
 
@@ -208,6 +209,13 @@ export interface DynastySnapshot {
    * phone picks its lead game by the same rule and uses this when it agrees.
    */
   lead: SnapshotLead | null
+  /**
+   * DCC's call on each game still to come, keyed by game row — "Penn State by
+   * 10", or "Too close to call". A game already played has no entry.
+   *
+   * The desktop works these out so both apps agree; the phone only prints them.
+   */
+  calls: Record<number, string>
   /**
    * The wire: the country's week, already written.
    *
@@ -438,6 +446,24 @@ export function buildSnapshot(
     }
   })()
 
+  /**
+   * DCC's call on every game still to come, by game row.
+   *
+   * Worked out here rather than on the phone so that both apps say the same
+   * thing about the same game — a prediction that differed between the two
+   * would be a bug nobody could see. Games already played are absent, which is
+   * how a screen knows not to print one beside a result.
+   */
+  const calls: Record<number, string> = {}
+  for (const g of seen) {
+    if (g.played || !g.home || !g.away) continue
+    const line = predictionLine(predict(
+      table.get(g.home), table.get(g.away), !!g.neutralSite,
+      { home: rankOf.get(g.home) ?? null, away: rankOf.get(g.away) ?? null },
+    ))
+    if (line) calls[g.row] = line
+  }
+
   return {
     version: SNAPSHOT_VERSION,
     generated: new Date().toISOString(),
@@ -453,6 +479,7 @@ export function buildSnapshot(
     ranks: extra?.ranks ?? {},
     heisman: extra?.heisman ?? [],
     lead,
+    calls,
     wire,
     teamStats,
     calendar: readCalendar(payload),

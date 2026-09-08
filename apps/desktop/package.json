@@ -31,6 +31,7 @@
     "check:recruits": "esbuild electron/recruitLedger.ts --bundle --platform=node --format=cjs --outfile=.tmp-recruits.cjs --log-level=error && node check-recruits.cjs ./.tmp-recruits.cjs",
     "check:wire": "esbuild electron/wire.ts --bundle --platform=node --format=cjs --outfile=.tmp-wire.cjs --log-level=error && esbuild electron/league.ts --bundle --platform=node --format=cjs --outfile=.tmp-league.cjs --log-level=error && node check-wire.cjs ./.tmp-wire.cjs ./.tmp-league.cjs",
     "check:teamstats": "esbuild electron/teamStats.ts --bundle --platform=node --format=cjs --outfile=.tmp-teamstats.cjs --log-level=error && node check-teamstats.cjs ./.tmp-teamstats.cjs",
+    "check:predict": "esbuild electron/predict.ts --bundle --platform=node --format=cjs --outfile=.tmp-predict.cjs --log-level=error && node check-predict.cjs ./.tmp-predict.cjs",
     "check:classes": "esbuild electron/recruiting.ts --bundle --platform=node --format=cjs --outfile=.tmp-rec.cjs --log-level=error && node check-classes.cjs ./.tmp-rec.cjs"
   },
   "dependencies": {

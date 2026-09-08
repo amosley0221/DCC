@@ -91,6 +91,16 @@ data class DynastySnapshot(
      * an older snapshot, and the phone writes its own plainer line.
      */
     val lead: SnapshotLead? = null,
+    /**
+     * DCC's call on each game still to come, keyed by the game's row — "Penn
+     * State by 10", or "Too close to call".
+     *
+     * Worked out on the PC, like the lead line, so the two apps cannot disagree
+     * about the same fixture. A game already played has no entry, which is how
+     * a screen knows not to print a prediction beside a result. Empty on an
+     * older snapshot, and every screen reads correctly without it.
+     */
+    val calls: Map<String, String> = emptyMap(),
 )
 
 /** What the front page leads with. Mirrors SnapshotLead in snapshot.ts. */

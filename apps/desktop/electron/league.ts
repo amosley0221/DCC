@@ -285,6 +285,17 @@ export interface PlayoffField {
   leaders: Map<string, string>
   /** True while this is a projection rather than a bracket the save has played. */
   projected: boolean
+  /**
+   * Whether the field is worth showing as a bracket.
+   *
+   * False once the bowls are scheduled and there are no longer twelve credible
+   * teams left unplaced — which is the normal state of a save in bowl week,
+   * because the game keeps the playoff somewhere DCC has not found and the
+   * teams left over are the ones nobody invited anywhere. A field padded out
+   * with 5-7 teams is not a playoff, and a screen that draws one is lying more
+   * loudly than a screen that admits it does not know.
+   */
+  credible: boolean
 }
 
 /**
@@ -298,12 +309,25 @@ export interface PlayoffField {
  * "Champion" is the program leading its conference, because a conference title
  * game has not been played in November and the save cannot be asked who will
  * win one. Every screen that shows this says it is a projection.
+ *
+ * `ineligible` is the one place where the save overrules the projection. Once
+ * the bowls are scheduled, a team playing one is not in the playoff, whatever
+ * its record says — and without this the field filled up with teams the save
+ * had already sent somewhere else: an 11-2 Boise State projected as the fifth
+ * seed while the schedule had them playing Baylor in a bowl. A team named here
+ * is skipped and the next one down takes the place.
  */
-export function projectPlayoff(table: Map<string, LeagueRow>): PlayoffField {
-  const order = rankings(table)
+export function projectPlayoff(
+  table: Map<string, LeagueRow>,
+  ineligible?: Set<string>,
+): PlayoffField {
+  const order = rankings(table).filter((r) => !ineligible?.has(r.name))
   const leaders = new Map<string, string>()
   for (const [name, rows] of conferences(table)) {
-    if (rows.length) leaders.set(name, rows[0].name)
+    // The leader shown is the real one; the bid goes to the best team the
+    // postseason has not already placed elsewhere.
+    const eligible = rows.find((r) => !ineligible?.has(r.name))
+    if (eligible) leaders.set(name, eligible.name)
   }
   const isLeader = new Set(leaders.values())
 
@@ -327,12 +351,14 @@ export function projectPlayoff(table: Map<string, LeagueRow>): PlayoffField {
   const rank = new Map(order.map((r, i) => [r.name, i]))
   chosen.sort((a, b) => (rank.get(a.row.name) ?? 999) - (rank.get(b.row.name) ?? 999))
 
+  const teams = chosen.map((c, i) => ({
+    seed: i + 1, row: c.row, champion: c.champion, bye: i < 4,
+  }))
   return {
     leaders,
     projected: true,
-    teams: chosen.map((c, i) => ({
-      seed: i + 1, row: c.row, champion: c.champion, bye: i < 4,
-    })),
+    credible: teams.length === PLAYOFF_SIZE && teams.every((t) => t.row.wins > t.row.losses),
+    teams,
   }
 }
 

@@ -268,6 +268,7 @@ fun GoldHome(
                         mine = snap.isUserGame(g),
                         awayRank = rankOf[g.awayIndex],
                         homeRank = rankOf[g.homeIndex],
+                        call = snap.snapshot.calls[g.row.toString()],
                     ) { onOpenGame(g) }
                 }
             }
@@ -941,7 +942,15 @@ private fun featureStandfirst(g: SnapshotGame?, wins: Int?, losses: Int?): Strin
 
 /** One Saturday result, sized for a thumb to scroll past. */
 @Composable
-private fun ScoreCard(g: SnapshotGame, mine: Boolean, awayRank: Int?, homeRank: Int?, onOpen: () -> Unit) {
+private fun ScoreCard(
+    g: SnapshotGame,
+    mine: Boolean,
+    awayRank: Int?,
+    homeRank: Int?,
+    /** DCC's call, on a game still to come. Null on one already played. */
+    call: String?,
+    onOpen: () -> Unit,
+) {
     val c = Dcc.colors
     val homeWon = g.homeScore > g.awayScore
     Column(
@@ -956,6 +965,12 @@ private fun ScoreCard(g: SnapshotGame, mine: Boolean, awayRank: Int?, homeRank: 
         ScoreLine(g.away ?: "", g.awayScore, dim = homeWon, rank = awayRank)
         Spacer(Modifier.height(4.dp))
         ScoreLine(g.home ?: "", g.homeScore, dim = !homeWon, rank = homeRank)
+        if (call != null) {
+            Spacer(Modifier.height(5.dp))
+            // Marked as a call so it cannot read as a result or as a line the
+            // game itself set. See predict.ts on the PC, which works it out.
+            Label(call.uppercase(), 9.0, c.accent, 1.0)
+        }
     }
 }
 

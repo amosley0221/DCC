@@ -8,7 +8,36 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **DCC calls the games it has not seen.** Every fixture still to come now
+  carries a prediction — on Home beside the Saturday cards and under the
+  feature, on the League screen's bowl list, and on the phone's score cards.
+  It reads "Penn State by 10", or "Too close to call" when it is, and it is
+  labelled as DCC's call everywhere it appears. The save holds no line, no win
+  probability and nothing to simulate against, so this is arithmetic over the
+  ranking DCC already computes, weighed against the game's own poll wherever
+  you have pointed DCC at one. The desktop works them out and the phone only
+  prints them, so the two apps cannot disagree about the same game.
+
+- **The playoff, played out.** Where the bracket can be filled, DCC runs it
+  round by round to a champion, and each slot beyond the first round shows the
+  team it expects there rather than "Winner of 8 v 9". The first round is on a
+  campus and everything after it is neutral, which the calls account for.
+
+### Fixed
+
+- **A team playing a bowl is no longer also in the playoff.** The projected
+  field was picking teams the save had already scheduled somewhere else — an
+  11-2 Boise State sitting as the fifth seed while the schedule had them
+  playing Baylor in a bowl. Once bowl season is set, a team with a bowl is out
+  of the field and the next team down takes the place.
+
+- **And DCC now admits when it cannot fill the bracket.** Striking out the
+  bowl-bound teams usually leaves fewer than twelve credible ones, because the
+  game keeps the playoff somewhere DCC has not found yet. Rather than padding
+  the field out with 5-7 teams, the League screen shows who is still unplaced
+  with a winning record and says plainly that the bracket is not in the file.
 
 ## [0.81.0] - 2026-09-07
 

@@ -9,6 +9,7 @@ import {
 } from '../../electron/league'
 import type { LeagueRow, PlayoffField } from '../../electron/league'
 import { currentWeek } from '../../electron/season'
+import { bowlBound, predict, predictBracket, predictionLine } from '../../electron/predict'
 
 const TABS = ['STANDINGS', 'RANKINGS', 'SCORES', 'POSTSEASON', 'STATS', 'SCHEDULES'] as const
 
@@ -96,8 +97,24 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
    * The twelve-team field. A projection until the save has played one — there is
    * no bracket in a November file, and no conference title game has happened
    * yet, so its "champions" are the programs leading their conferences.
+   *
+   * Teams the save has already scheduled into a bowl are struck out of it: once
+   * bowl season is set, a team playing one is not in the playoff whatever its
+   * record says. That usually leaves too few teams to fill twelve places, and
+   * the field says so rather than padding itself out — see `credible`.
    */
-  const field = useMemo(() => projectPlayoff(table), [table])
+  const field = useMemo(() => projectPlayoff(table, bowlBound(all)), [table, all])
+
+  /**
+   * The poll as a lookup, for the screens that ask about one team at a time.
+   *
+   * Empty until the user has found a poll column in their save, which is the
+   * normal state — every screen that reads this works without it.
+   */
+  const pollPlaces = useMemo(
+    () => new Map<string, number | null>(Object.entries(poll.ranks ?? {})),
+    [poll.ranks],
+  )
   const bowls = useMemo(
     () => all.filter((g) => g.postseason).sort((a, b) => a.week - b.week || a.row - b.row),
     [all],
@@ -364,6 +381,8 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
           <Postseason
             field={field}
             bowls={bowls}
+            table={table}
+            ranks={pollPlaces}
             art={art}
             helmet={helmet}
             award={(k) => save.awardArt[k]}
@@ -535,9 +554,13 @@ type SeasonGameish = {
  * own name is not decoded, so there is no Rose Bowl crest to draw. That is the
  * one thing standing between this and bowl logos.
  */
-function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
+function Postseason({ field, bowls, table, ranks, art, helmet, award, me, onPick }: {
   field: PlayoffField
   bowls: SeasonGameish[]
+  /** Every program's season, for the arithmetic behind a prediction. */
+  table: Map<string, LeagueRow>
+  /** The game's own poll, where the user has pointed DCC at one. */
+  ranks: Map<string, number | null>
   /** The logo, for the seeded field — a list of schools rather than a game. */
   art: (name: string | null) => string | undefined
   /** The helmet, for the two sides of a bowl. */
@@ -550,7 +573,49 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
   const bySeed = new Map(field.teams.map((t) => [t.seed, t]))
   const seed = (n: number) => bySeed.get(n) ?? null
 
-  const Slot = ({ n, note }: { n: number | null; note?: string }) => {
+  /**
+   * DCC playing the bracket out to a champion.
+   *
+   * Eleven predictions stacked on each other, so an upset in the first round
+   * rewrites everything under it and the champion at the end is the least
+   * reliable thing on the screen. Each slot says it is a call rather than a
+   * result, which is the only way to show this honestly.
+   */
+  const proj = useMemo(() => predictBracket(field, ranks), [field, ranks])
+  const winners = useMemo(() => {
+    const m = new Map<string, string | null>()
+    for (const g of proj.games) {
+      // Keyed by the pairing rather than by round, because a round holds four.
+      m.set(g.key, g.prediction?.favourite ?? null)
+    }
+    return m
+  }, [proj])
+  const byName = useMemo(
+    () => new Map(field.teams.map((t) => [t.row.name, t])),
+    [field],
+  )
+
+  const Slot = ({ n, note, call }: { n: number | null; note?: string; call?: string | null }) => {
+    // A predicted team is shown in its own seed's place, marked as a call.
+    const picked = call ? byName.get(call) ?? null : null
+    if (picked) {
+      return (
+        <div className="bkt-slot">
+          <span className="bkt-seed">{picked.seed}</span>
+          <SchoolArt size={28} file={art(picked.row.name)} />
+          <button
+            className="bkt-name"
+            onClick={() => onPick(picked.row.name)}
+            style={{
+              all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0,
+              color: picked.row.name === me ? 'var(--accent)' : 'var(--ink2)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >{picked.row.name}</button>
+          <Meta size={9} color="var(--accent)">CALL</Meta>
+        </div>
+      )
+    }
     const t = n === null ? null : seed(n)
     if (!t) {
       return (
@@ -580,8 +645,51 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
     )
   }
 
+  /**
+   * Who is left for the playoff once the bowls have taken everyone else.
+   *
+   * This is the whole of what the save actually says about the field in bowl
+   * week: these teams have a winning record and no bowl to go to, so whatever
+   * the bracket turns out to be, it is drawn from here. DCC does not know the
+   * seeding — the bracket is not in the file — and does not guess at it.
+   */
+  const unplaced = field.teams.filter((t) => t.row.wins > t.row.losses)
+
   return (
     <>
+      {!field.credible ? (
+        <Card className="card-pad">
+          <div className="card-head">
+            <span className="row" style={{ gap: 9, alignItems: 'center' }}>
+              <SchoolArt size={26} file={award('playoff:nationalchampionship')} />
+              <Kicker>The playoff — not in the save</Kicker>
+            </span>
+            <Meta size={10}>{unplaced.length} STILL UNPLACED</Meta>
+          </div>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            Bowl season is scheduled and the playoff is not part of it. Every team below has a
+            winning record and no bowl to go to, so the bracket will come from this group — but
+            the file does not carry the bracket itself, and DCC will not invent a seeding for it.
+            Filling twelve places from what is left would mean putting 5-7 teams in the playoff,
+            which would look authoritative and be wrong.
+          </p>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            {unplaced.map((t) => (
+              <button key={t.row.name} onClick={() => onPick(t.row.name)}
+                style={{ all: 'unset', cursor: 'pointer' }}>
+                <span className="row" style={{ gap: 7, alignItems: 'center', border: '1px solid var(--line)', borderRadius: 99, padding: '5px 12px 5px 6px' }}>
+                  <SchoolArt size={28} file={art(t.row.name)} />
+                  <span style={{ fontSize: 12, color: t.row.name === me ? 'var(--accent)' : 'var(--ink)' }}>{t.row.name}</span>
+                  <Meta size={9}>{t.row.wins}-{t.row.losses}</Meta>
+                </span>
+              </button>
+            ))}
+            {unplaced.length === 0 ? <Empty>nobody left unplaced</Empty> : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {field.credible ? (<>
       <Card className="card-pad">
         <div className="card-head">
           <span className="row" style={{ gap: 9, alignItems: 'center' }}>
@@ -627,7 +735,11 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
                     <div className="bkt-cell" key={q.seed}>
                       <div className="bkt-game">
                         <Slot n={q.seed} />
-                        <Slot n={null} note={`Winner of ${q.from[0]} v ${q.from[1]}`} />
+                        <Slot
+                          n={null}
+                          note={`Winner of ${q.from[0]} v ${q.from[1]}`}
+                          call={winners.get(`first:${q.from[0]}v${q.from[1]}`)}
+                        />
                       </div>
                     </div>
                   )
@@ -644,8 +756,10 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
               {SEMIFINALS.map(([a, b]) => (
                 <div className="bkt-cell" key={a}>
                   <div className="bkt-game">
-                    <Slot n={null} note={`Winner of the ${a} bracket`} />
-                    <Slot n={null} note={`Winner of the ${b} bracket`} />
+                    <Slot n={null} note={`Winner of the ${a} bracket`}
+                      call={winners.get(`quarter:${a}`)} />
+                    <Slot n={null} note={`Winner of the ${b} bracket`}
+                      call={winners.get(`quarter:${b}`)} />
                   </div>
                 </div>
               ))}
@@ -661,14 +775,18 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
             <div className="bkt-pair">
               <div className="bkt-cell">
                 <div className="bkt-game is-title">
-                  <Slot n={null} note="Winner of the top half" />
-                  <Slot n={null} note="Winner of the bottom half" />
+                  <Slot n={null} note="Winner of the top half"
+                    call={winners.get(`semi:${SEMIFINALS[0][0]}v${SEMIFINALS[0][1]}`)} />
+                  <Slot n={null} note="Winner of the bottom half"
+                    call={winners.get(`semi:${SEMIFINALS[1][0]}v${SEMIFINALS[1][1]}`)} />
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      </>) : null}
 
       <Card className="card-pad">
         <div className="card-head">
@@ -694,6 +812,11 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
           <Kicker>Bowl season</Kicker>
           <Meta size={10}>{bowls.length} GAMES IN THE SAVE</Meta>
         </div>
+        <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
+          A game still to come carries DCC's own call beside it, worked out from the poll where you
+          have found one and from record and scoring margin where you have not. The save holds no
+          line and no simulation to ask, so this is an opinion and nothing more.
+        </p>
         {bowls.length === 0 ? (
           <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
             Nothing yet — the save's December rows fill in as you play the postseason, and they
@@ -704,6 +827,12 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
           <div className="col" style={{ gap: 0, marginTop: 8 }}>
             {bowls.map((g) => {
               const homeWon = g.homeScore > g.awayScore
+              // A bowl is played somewhere neither team lives, so nobody gets
+              // the home edge. A game already played needs no prediction.
+              const line = g.played ? null : predictionLine(predict(
+                table.get(g.home ?? ''), table.get(g.away ?? ''), true,
+                { home: ranks.get(g.home ?? '') ?? null, away: ranks.get(g.away ?? '') ?? null },
+              ))
               return (
                 <div key={g.row} className="row"
                   style={{ gap: 10, alignItems: 'center', borderTop: '1px solid var(--line)', padding: '8px 0' }}>
@@ -724,6 +853,11 @@ function Postseason({ field, bowls, art, helmet, award, me, onPick }: {
                   <span className="num" style={{ color: g.played && !homeWon ? 'var(--ink3)' : 'var(--ink)' }}>
                     {g.played ? g.homeScore : ''}
                   </span>
+                  {line ? (
+                    <span title="DCC's estimate, not the game's">
+                      <Meta size={9} color="var(--accent)">{line.toUpperCase()}</Meta>
+                    </span>
+                  ) : null}
                 </div>
               )
             })}
