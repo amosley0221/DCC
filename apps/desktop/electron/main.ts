@@ -14,6 +14,7 @@ import {
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
   readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman, readRecruitBoard,
   findRankColumns, readRankField, readClassRankByName, readTeamGameStats, readCalendar,
+  readStaffMoves,
 } from './saveAnalysis'
 import type { RankColumnView } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
@@ -493,6 +494,11 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
         const school = order[g.teamIndex]?.name
         return school ? [{ ...g, school }] : []
       }),
+      // The coaching carousel: who was fired, who was hired, and which jobs
+      // are still open. Out of the save's own JobOpening store — see
+      // readStaffMoves, and docs/SAVE-FORMAT.md for how each field was pinned
+      // against the game's staff-moves screen.
+      staffMoves: readStaffMoves(payload),
       // Whose dynasty this is, read off the save rather than remembered. The
       // save marks the games the user played rather than simulated, and their
       // team is in all of them — see electron/season.ts. Null when a dynasty

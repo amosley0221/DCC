@@ -2,6 +2,7 @@ import type { UpdateStatus } from './updates'
 import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
   RankColumnView, HeismanView, PollCandidate, SavedPollView, RecruitBoard, SaveCalendar,
+  StaffMove,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { SchemaMember } from '../electron/schema'
@@ -45,7 +46,9 @@ declare global {
             /** One row per team per played game, out of the save's TeamStats store. */
             teamStats: TeamGameStatsView[]
             /** The week and year the save itself states. */
-            calendar: SaveCalendar | null }
+            calendar: SaveCalendar | null
+            /** Every job that came open this offseason, and who filled it. */
+            staffMoves: StaffMove[] }
         | { ok: false; message: string }
       >
       /** Downloads a stadium photograph per school into the art folder. */

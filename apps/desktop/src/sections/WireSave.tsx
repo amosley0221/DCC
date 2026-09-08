@@ -329,6 +329,7 @@ export default function WireSave({ onOpenLeague }: { onOpenLeague?: () => void }
   const wire = useMemo(() => buildWire({
     games: visibleGames(games, me, holdFrom).filter((g) => g.played || !g.postseason),
     week, table, ranks: rankOf, me,
+    staff: roster?.staffMoves ?? [],
     events: roster?.recruitEvents ?? [],
     recruits: (roster?.recruitBoard ?? []).map((r) => {
       const p = (roster?.players ?? []).find((x) => x.index === r.playerIndex)

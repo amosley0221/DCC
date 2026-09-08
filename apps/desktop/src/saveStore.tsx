@@ -5,7 +5,7 @@ import type {
 } from '../electron/saveAnalysis'
 import type { RecruitEvent } from '../electron/recruitLedger'
 import type { TeamGameStatsView } from '../electron/teamStats'
-import type { SaveCalendar } from '../electron/saveAnalysis'
+import type { SaveCalendar, StaffMove } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
 
@@ -85,6 +85,12 @@ export interface SaveState {
      * results — the two part company the moment the regular season ends.
      */
     calendar: SaveCalendar | null
+    /**
+     * The coaching carousel — every job that came open this offseason, who
+     * left it and who took it. Empty until the carousel runs, which is bowl
+     * season rather than after the championship.
+     */
+    staffMoves: StaffMove[]
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -272,6 +278,7 @@ export function rosterPatch(
     classRanks: res.classRanks ?? null,
     teamStats: res.teamStats ?? [],
     calendar: res.calendar ?? null,
+    staffMoves: res.staffMoves ?? [],
   }
 }
 

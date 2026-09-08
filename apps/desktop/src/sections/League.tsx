@@ -8,10 +8,11 @@ import {
   played, projectPlayoff, QUARTERFINALS, rankings, SEMIFINALS, visibleGames, winPct,
 } from '../../electron/league'
 import type { LeagueRow, PlayoffField } from '../../electron/league'
+import type { StaffMove } from '../../electron/saveAnalysis'
 import { currentWeek } from '../../electron/season'
 import { bowlBound, predict, predictBracket, predictionLine } from '../../electron/predict'
 
-const TABS = ['STANDINGS', 'RANKINGS', 'SCORES', 'POSTSEASON', 'STATS', 'SCHEDULES'] as const
+const TABS = ['STANDINGS', 'RANKINGS', 'SCORES', 'POSTSEASON', 'COACHES', 'STATS', 'SCHEDULES'] as const
 
 /** The conference picker's "no conference" option. Not a conference name. */
 const ALL = '\u0000all'
@@ -391,6 +392,10 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
           />
         ) : null}
 
+        {tab === 'COACHES' ? (
+          <Carousel moves={roster.staffMoves} art={art} me={me} onPick={(n) => { setPick(n); setTab('SCHEDULES') }} />
+        ) : null}
+
         {tab === 'STATS' ? (
           <Card className="card-pad">
             <div className="card-head">
@@ -554,6 +559,142 @@ type SeasonGameish = {
  * own name is not decoded, so there is no Rose Bowl crest to draw. That is the
  * one thing standing between this and bowl logos.
  */
+/** How the game words the reason a job came open. */
+const REASON_LABEL: Record<StaffMove['reason'], string> = {
+  None: '',
+  Fired: 'Fired',
+  Retired: 'Retired',
+  Pro: 'Left for the NFL',
+  NewJob: 'Hired away',
+  ContractEnding: 'Contract ended',
+}
+
+/** The chairs, in the order a staff is listed. */
+const ROLE_LABEL: Record<StaffMove['role'], string> = {
+  HC: 'Head coach',
+  OC: 'Offensive coordinator',
+  DC: 'Defensive coordinator',
+}
+
+/**
+ * The coaching carousel.
+ *
+ * Open jobs first, because a job nobody has taken is the live story and a move
+ * already made is history. Head coaches lead each list: the save carries
+ * coordinator moves too and there are twice as many of them, which would bury
+ * the hires anybody actually talks about.
+ *
+ * Everything here is read, not guessed. See readStaffMoves in saveAnalysis.ts,
+ * and docs/SAVE-FORMAT.md for how each field was pinned against the game's own
+ * staff-moves screen.
+ */
+function Carousel({ moves, art, me, onPick }: {
+  moves: StaffMove[]
+  art: (name: string | null) => string | undefined
+  me: string | null
+  onPick: (name: string) => void
+}) {
+  const [role, setRole] = useState<StaffMove['role']>('HC')
+  const shown = useMemo(() => moves.filter((m) => m.role === role), [moves, role])
+  // A job with nobody in it, and one where the same name is on both sides —
+  // a coach who re-signed — are not the same thing and do not belong together.
+  const open = shown.filter((m) => !m.incoming)
+  const hires = shown.filter((m) => m.incoming && m.incoming.slot !== m.outgoing?.slot)
+  const held = shown.filter((m) => m.incoming && m.incoming.slot === m.outgoing?.slot)
+
+  if (!moves.length) {
+    return (
+      <Card className="card-pad">
+        <Kicker>Nothing has moved</Kicker>
+        <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
+          The carousel has not run in this save. It goes during bowl season rather than after the
+          championship, so a file from before then carries no openings — every chair is still filled
+          and there is nothing to report.
+        </p>
+      </Card>
+    )
+  }
+
+  const Row = ({ m }: { m: StaffMove }) => (
+    <div className="row" style={{
+      gap: 10, alignItems: 'center', borderTop: '1px solid var(--line)', padding: '9px 0',
+    }}>
+      <SchoolArt size={30} file={art(m.school)} />
+      <button onClick={() => m.school && onPick(m.school)} style={{
+        all: 'unset', cursor: m.school ? 'pointer' : 'default', width: 150, flex: '0 0 auto',
+        color: m.school === me ? 'var(--accent)' : 'var(--ink)',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{m.school ?? 'Unknown'}</button>
+      <span style={{ flex: 1, minWidth: 0, color: 'var(--ink3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {m.outgoing ? m.outgoing.display : '—'}
+      </span>
+      <Meta size={9}>{m.incoming ? '→' : 'OPEN'}</Meta>
+      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {m.incoming ? m.incoming.display : ''}
+      </span>
+      <Meta size={9}>{REASON_LABEL[m.reason].toUpperCase()}</Meta>
+    </div>
+  )
+
+  return (
+    <>
+      <Card className="card-pad">
+        <div className="card-head">
+          <Kicker>The carousel</Kicker>
+          <div className="row" style={{ gap: 6 }}>
+            {(['HC', 'OC', 'DC'] as const).map((r) => (
+              <Chip key={r} on={role === r} onClick={() => setRole(r)}>{r}</Chip>
+            ))}
+          </div>
+        </div>
+        <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
+          {ROLE_LABEL[role]} jobs that came open this offseason, read out of the save. The left
+          name left the job; the right name took it.
+        </p>
+      </Card>
+
+      {open.length ? (
+        <Card className="card-pad">
+          <div className="card-head">
+            <Kicker>Still open</Kicker>
+            <Meta size={10}>{open.length} {open.length === 1 ? 'JOB' : 'JOBS'}</Meta>
+          </div>
+          <div className="col" style={{ gap: 0, marginTop: 4 }}>
+            {open.map((m) => <Row key={m.row} m={m} />)}
+          </div>
+        </Card>
+      ) : null}
+
+      <Card className="card-pad">
+        <div className="card-head">
+          <Kicker>Hired</Kicker>
+          <Meta size={10}>{hires.length} {hires.length === 1 ? 'MOVE' : 'MOVES'}</Meta>
+        </div>
+        {hires.length ? (
+          <div className="col" style={{ gap: 0, marginTop: 4 }}>
+            {hires.map((m) => <Row key={m.row} m={m} />)}
+          </div>
+        ) : <Empty>nobody has been hired yet</Empty>}
+      </Card>
+
+      {held.length ? (
+        <Card className="card-pad">
+          <div className="card-head">
+            <Kicker>Stayed put</Kicker>
+            <Meta size={10}>{held.length} RE-SIGNED</Meta>
+          </div>
+          <p className="body-serif" style={{ marginTop: 7, marginBottom: 0 }}>
+            The job came open and the same man took it back — a contract renewed rather than a move.
+          </p>
+          <div className="col" style={{ gap: 0, marginTop: 8 }}>
+            {held.map((m) => <Row key={m.row} m={m} />)}
+          </div>
+        </Card>
+      ) : null}
+    </>
+  )
+}
+
 function Postseason({ field, bowls, table, ranks, art, helmet, award, me, onPick }: {
   field: PlayoffField
   bowls: SeasonGameish[]

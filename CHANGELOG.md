@@ -10,6 +10,21 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The coaching carousel is on screen.** League has a Coaches tab: the jobs
+  still open, then the hires, then the coaches who re-signed, filterable to
+  head coaches, offensive or defensive coordinators. It is read out of the
+  save's own `JobOpening` store and checked field by field against the game's
+  staff-moves screen.
+
+- **And hiring leads the front page in bowl season.** An open job outranks a
+  filled one and both outrank a game played a fortnight ago — "Indiana needs a
+  head coach: C. Cignetti left for Notre Dame". Where a departing coach turns
+  up at another school in the same carousel, the wire follows him there rather
+  than repeating the save's reason code, which does not always match what the
+  game's own screen says. Coordinator moves stay off the front page; there are
+  twice as many and they would bury the hires. The desktop and the phone read
+  the same wire, so both carry it.
+
 - **DCC calls the games it has not seen.** Every fixture still to come now
   carries a prediction — on Home beside the Saturday cards and under the
   feature, on the League screen's bowl list, and on the phone's score cards.

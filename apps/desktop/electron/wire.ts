@@ -38,7 +38,7 @@ export interface WireItem {
   /** Stable across re-reads of the same save, so a list can key on it. */
   key: string
   kind: 'upset' | 'thriller' | 'statement' | 'unbeaten' | 'commit' | 'battle' | 'poll'
-    | 'decommit' | 'flip'
+    | 'decommit' | 'flip' | 'hire' | 'vacancy'
   /** "UPSET · WEEK 11" — small caps above the line. */
   kicker: string
   headline: string
@@ -52,6 +52,19 @@ export interface WireItem {
   row?: number
   /** A roster row, so the desktop can open the player. */
   playerIndex?: number
+}
+
+/**
+ * What the wire needs to know about a coaching move. Any wider type satisfies
+ * it, so `StaffMove` from the save reader passes straight in.
+ */
+export interface WireStaffMove {
+  row: number
+  school: string | null
+  role: 'HC' | 'OC' | 'DC'
+  outgoing: { display: string } | null
+  incoming: { display: string } | null
+  reason: 'None' | 'Fired' | 'Retired' | 'Pro' | 'NewJob' | 'ContractEnding'
 }
 
 /** What the wire needs to know about a prospect. Any wider type satisfies it. */
@@ -95,6 +108,29 @@ const withRank = (name: string | null, rank: number | undefined) =>
  * scores, so a save with no ranking simply produces fewer items rather than
  * pretending to a story it cannot tell.
  */
+/**
+ * How a departure is put in a sentence.
+ *
+ * The save's own reason is not always what the game's screen shows: it files
+ * several plainly-sacked coaches under `ContractEnding`, and files a coach who
+ * left for a better job the same way. So where the moves themselves say more
+ * than the reason does — the man is standing at another school's podium in the
+ * same carousel — that is used instead, and the enum only answers for the
+ * departures nothing else explains.
+ *
+ * `ContractEnding` deliberately reads as a plain "left". Writing "reached the
+ * end of their contract" beside a coach the game says was fired is worse than
+ * saying nothing, and DCC cannot tell the two apart.
+ */
+const LEAVING: Record<WireStaffMove['reason'], string> = {
+  None: 'left',
+  Fired: 'was let go',
+  Retired: 'retired',
+  Pro: 'left for the NFL',
+  NewJob: 'was hired away',
+  ContractEnding: 'left',
+}
+
 export function buildWire(opts: {
   games: Game[]
   week: number | null
@@ -107,11 +143,17 @@ export function buildWire(opts: {
    * behind them, for the weeks when nothing has moved.
    */
   events?: RecruitEvent[]
+  /**
+   * The coaching carousel, when the save has run one. Only head-coach jobs
+   * reach the wire: the save carries twice as many coordinator moves and
+   * nobody reads a front page for a defensive coordinator.
+   */
+  staff?: WireStaffMove[]
   /** Your own program, which never leads the wire — the wire is the country. */
   me?: string | null
   limit?: number
 }): WireItem[] {
-  const { games, week, table, ranks, recruits, events = [], me = null } = opts
+  const { games, week, table, ranks, recruits, events = [], staff = [], me = null } = opts
   const rank = (n: string | null) => (n ? ranks.get(n) : undefined)
   const out: WireItem[] = []
 
@@ -294,12 +336,66 @@ export function buildWire(opts: {
     }
   }
 
+  // The carousel. A job standing open is a bigger story than one already
+  // filled, and both outrank a game played a fortnight ago — which is the whole
+  // reason these are here: in bowl season the scores are stale and the hiring
+  // is not.
+  const bigJob = (m: WireStaffMove) => (rank(m.school) ?? 999)
+  const hcMoves = staff.filter((m) => m.role === 'HC')
+
+  // Where a departing coach turned up, when he turned up somewhere in this same
+  // carousel. This is what lets the wire say "left for Notre Dame" instead of
+  // repeating a reason code that does not match the game's own screen.
+  const landedAt = new Map<string, string>()
+  for (const m of hcMoves) {
+    if (!m.incoming || !m.school) continue
+    if (m.outgoing && m.outgoing.display === m.incoming.display) continue
+    landedAt.set(m.incoming.display, m.school)
+  }
+  /** "left for Notre Dame", or the reason the save gives when nothing better is known. */
+  const departure = (m: WireStaffMove): string => {
+    const to = m.outgoing ? landedAt.get(m.outgoing.display) : undefined
+    if (to && to !== m.school) return `left for ${to}`
+    return LEAVING[m.reason]
+  }
+  const vacancies = hcMoves
+    .filter((m) => !m.incoming && m.school)
+    .sort((a, b) => bigJob(a) - bigJob(b))
+    .slice(0, 3)
+  for (const m of vacancies) {
+    out.push({
+      key: `vacancy:${m.row}`,
+      kind: 'vacancy',
+      kicker: 'THE CAROUSEL · JOB OPEN',
+      headline: `${m.school} needs a head coach`,
+      line: m.outgoing
+        ? `${m.outgoing.display} ${departure(m)}, and the job has not been filled.`
+        : 'The job is open and nobody has taken it.',
+      team: m.school,
+    })
+  }
+
+  const hires = hcMoves
+    .filter((m) => m.incoming && m.outgoing && m.incoming.display !== m.outgoing.display && m.school)
+    .sort((a, b) => bigJob(a) - bigJob(b))
+    .slice(0, 4)
+  for (const m of hires) {
+    out.push({
+      key: `hire:${m.row}`,
+      kind: 'hire',
+      kicker: 'THE CAROUSEL · HIRED',
+      headline: `${m.school} hires ${m.incoming!.display}`,
+      line: `${m.outgoing!.display} ${departure(m)}.`,
+      team: m.school,
+    })
+  }
+
   // Yours is a story, but it is never the top one — that is the whole point of
   // the wire. Anything of yours drops below the country's.
   const mine = (i: WireItem) => (i.team === me || i.other === me ? 1 : 0)
   const weight: Record<WireItem['kind'], number> = {
-    upset: 0, flip: 1, decommit: 2, thriller: 3, commit: 4,
-    statement: 5, battle: 6, unbeaten: 7, poll: 8,
+    vacancy: 0, hire: 1, upset: 2, flip: 3, decommit: 4, thriller: 5, commit: 6,
+    statement: 7, battle: 8, unbeaten: 9, poll: 10,
   }
   out.sort((x, y) => mine(x) - mine(y) || weight[x.kind] - weight[y.kind])
   return out.slice(0, opts.limit ?? 12)

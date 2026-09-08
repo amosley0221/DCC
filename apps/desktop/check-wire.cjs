@@ -163,3 +163,60 @@ const by = (kind) => wire.filter((i) => i.kind === kind)
 }
 
 console.log('check-wire: upsets, one-possession games, statements, the unbeaten, commitments, decommitments, flips, battles and the order')
+
+/* --------------------------------------------------------- the carousel */
+{
+  // In bowl season the scores are a fortnight old and the hiring is not, which
+  // is the whole reason these reach the front page at all.
+  const staff = [
+    { row: 1, school: 'Indiana', role: 'HC', outgoing: { display: 'C. Cignetti' }, incoming: null, reason: 'NewJob' },
+    { row: 2, school: 'Michigan State', role: 'HC', outgoing: { display: 'P. Fitzgerald' }, incoming: { display: 'B. Bielema' }, reason: 'Fired' },
+    { row: 3, school: 'Notre Dame', role: 'HC', outgoing: { display: 'M. Freeman' }, incoming: { display: 'C. Cignetti' }, reason: 'Pro' },
+    // A coordinator move, which is real but is not front-page news.
+    { row: 4, school: 'Purdue', role: 'DC', outgoing: { display: 'M. Alford' }, incoming: { display: 'X. Someone' }, reason: 'Fired' },
+    // A job that opened and closed on the same man: re-signed, not a move.
+    { row: 5, school: 'Iowa', role: 'HC', outgoing: { display: 'J. Bobbit' }, incoming: { display: 'J. Bobbit' }, reason: 'ContractEnding' },
+  ]
+  const items = W.buildWire({
+    games: [], week: null, table: new Map(), ranks: new Map(), recruits: [], staff,
+  })
+  const kinds = items.map((i) => i.kind)
+
+  assert.ok(kinds.includes('vacancy'), 'an open job is news')
+  assert.ok(kinds.includes('hire'), 'and so is a hire')
+
+  // An open job outranks a filled one: nobody knows how it ends yet.
+  assert.equal(kinds[0], 'vacancy', 'the vacancy leads')
+
+  // Coordinators stay off the page.
+  assert.ok(!items.some((i) => i.headline.includes('Purdue')),
+    'a defensive coordinator is not a front-page story')
+
+  // A coach who re-signed did not move, and reporting it as a hire is wrong.
+  assert.ok(!items.some((i) => i.kind === 'hire' && i.headline.includes('Iowa')),
+    'Iowa kept their man; that is not a hire')
+
+  const hire = items.find((i) => i.kind === 'hire')
+  assert.equal(hire.headline, 'Michigan State hires B. Bielema')
+  assert.equal(hire.team, 'Michigan State', 'the mark beside it is the hiring school')
+
+  // The reason is put in words, and the words differ by reason.
+  assert.ok(hire.line.includes('was let go'), `fired should read as let go, got: ${hire.line}`)
+  const nd = items.find((i) => i.headline.includes('Notre Dame'))
+  assert.ok(nd.line.includes('NFL'), `a coach who went pro should say so, got: ${nd.line}`)
+  // Cignetti is standing at Notre Dame's podium in this same carousel, so the
+  // wire follows him there rather than repeating Indiana's reason code — which
+  // the save files as ContractEnding and the game's own screen does not.
+  const open = items.find((i) => i.kind === 'vacancy')
+  assert.ok(open.line.includes('left for Notre Dame'),
+    `a coach who turned up elsewhere should be followed there, got: ${open.line}`)
+
+  // And a save whose carousel has not run adds nothing at all.
+  assert.deepEqual(
+    W.buildWire({ games: [], week: null, table: new Map(), ranks: new Map(), recruits: [] })
+      .filter((i) => i.kind === 'hire' || i.kind === 'vacancy'),
+    [],
+  )
+}
+
+console.log('check-wire: the carousel leads with the job nobody has taken')

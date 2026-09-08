@@ -15,7 +15,7 @@
  */
 import {
   RATING_BITS, readClassRanks, readCoaches, readRecruitBoard, readRoster, readSeasonGames,
-  readTeamNames, teamTableOrder, readTeamGameStats, readCalendar,
+  readTeamNames, teamTableOrder, readTeamGameStats, readCalendar, readStaffMoves,
 } from './saveAnalysis'
 import { seasonTotals } from './teamStats'
 import type { RosterPlayer, SeasonGame, TeamRecord } from './saveAnalysis'
@@ -396,6 +396,9 @@ export function buildSnapshot(
   })()
   const wire = buildWire({
     games: seen, week: wireWeek, table, ranks: rankOf, me: userTeamName,
+    // The carousel, so the phone's wire carries the hiring too rather than
+    // only what the desktop happened to be looking at.
+    staff: readStaffMoves(payload),
     // The snapshot has no season field of its own, and the events carry theirs,
     // so the newest season recorded is the one this save belongs to.
     events: (() => {
