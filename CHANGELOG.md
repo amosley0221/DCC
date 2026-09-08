@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.82.0] - 2026-09-08
+
 ### Added
 
 - **The coaching carousel is on screen.** League has a Coaches tab: the jobs
