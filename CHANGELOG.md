@@ -16,6 +16,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   save's own `JobOpening` store and checked field by field against the game's
   staff-moves screen.
 
+- **And the jobs sounding out your staff.** The Coaches tab shows which schools
+  have approached one of your coaches, and lists who each open job is talking
+  to — Indiana's six candidates come out as Campbell, Smart, Swinney, Beamer,
+  McGuire and Cloud, each under their current school, which is the game's own
+  top-six for that job. The order is the save's rather than the game's ranked
+  one, and the panel says so: DCC cannot yet read how the game ranks them.
+
 - **And hiring leads the front page in bowl season.** An open job outranks a
   filled one and both outrank a game played a fortnight ago — "Indiana needs a
   head coach: C. Cignetti left for Notre Dame". Where a departing coach turns

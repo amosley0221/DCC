@@ -2173,6 +2173,36 @@ One display note: the screen's Reason column shows "Fired" for both `Fired` and
 `ContractEnding`, so the two are not distinguishable from a screenshot. DCC
 keeps the game's own distinction rather than collapsing it.
 
+### Who the open jobs are calling
+
+`StaffPersonContractOffer`, 804 rows of 28 bytes, of which only the live
+approaches carry a school. Three references place it:
+
+| Field | At | Notes |
+| --- | --- | --- |
+| Team — the school making the approach | byte 4 | `0x319e` |
+| StaffPersonTeam — where the coach works now | byte 8 | `0x319e`, absent for a man out of a job |
+| StaffPerson — the coach approached | byte 12 | `0x20a6` |
+
+This is both panels the carousel screen shows that DCC could not fill: the
+ranked candidate list under a job, and "schools interested in me". The second
+needs no idea who your coach is — it is the approaches whose
+`StaffPersonTeam` is already your program.
+
+Verified against the carousel screen: Indiana's six approaches read back as
+Campbell (Penn State), Smart (Georgia), Swinney (Clemson), Beamer (South
+Carolina), McGuire (Texas Tech) and Cloud (Iowa) — the game's own top-six for
+that job, each with the right current school — and the only approach aimed at
+a Penn State coach is Indiana's, which is the single school the screen listed
+as interested.
+
+**The ranking is not decoded.** The game orders candidates and DCC cannot
+reproduce that order, so they come back as the save keeps them and the screen
+says so rather than implying a ranking it does not have. `StaffPersonContractOffer`
+carries `AdjustedStaffPersonInterestInOffer` (7 bits) and
+`TeamInterestInStaffPerson` (9 bits), which is where the order presumably comes
+from; neither is placed.
+
 ### The coach name table
 
 The per-team table `readCoaches` walks holds only the 138 sitting head coaches,

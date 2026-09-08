@@ -8,7 +8,7 @@ import {
   played, projectPlayoff, QUARTERFINALS, rankings, SEMIFINALS, visibleGames, winPct,
 } from '../../electron/league'
 import type { LeagueRow, PlayoffField } from '../../electron/league'
-import type { StaffMove } from '../../electron/saveAnalysis'
+import type { CoachOffer, StaffMove } from '../../electron/saveAnalysis'
 import { currentWeek } from '../../electron/season'
 import { bowlBound, predict, predictBracket, predictionLine } from '../../electron/predict'
 
@@ -393,7 +393,10 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
         ) : null}
 
         {tab === 'COACHES' ? (
-          <Carousel moves={roster.staffMoves} art={art} me={me} onPick={(n) => { setPick(n); setTab('SCHEDULES') }} />
+          <Carousel
+            moves={roster.staffMoves} offers={roster.coachOffers}
+            art={art} me={me} onPick={(n) => { setPick(n); setTab('SCHEDULES') }}
+          />
         ) : null}
 
         {tab === 'STATS' ? (
@@ -588,13 +591,36 @@ const ROLE_LABEL: Record<StaffMove['role'], string> = {
  * and docs/SAVE-FORMAT.md for how each field was pinned against the game's own
  * staff-moves screen.
  */
-function Carousel({ moves, art, me, onPick }: {
+function Carousel({ moves, offers, art, me, onPick }: {
   moves: StaffMove[]
+  /** Every approach an open job has made — the candidate lists, and yours. */
+  offers: CoachOffer[]
   art: (name: string | null) => string | undefined
   me: string | null
   onPick: (name: string) => void
 }) {
   const [role, setRole] = useState<StaffMove['role']>('HC')
+  /**
+   * The schools sounding out your own staff.
+   *
+   * An offer records where the coach works now, so this needs no idea who your
+   * coach is — it is every approach aimed at somebody already working for you.
+   */
+  const wantYou = useMemo(
+    () => (me ? offers.filter((o) => o.from === me && o.school) : []),
+    [offers, me],
+  )
+  /** Who a given job has approached. */
+  const candidates = useMemo(() => {
+    const m = new Map<string, CoachOffer[]>()
+    for (const o of offers) {
+      if (!o.school) continue
+      const list = m.get(o.school) ?? []
+      list.push(o)
+      m.set(o.school, list)
+    }
+    return m
+  }, [offers])
   const shown = useMemo(() => moves.filter((m) => m.role === role), [moves, role])
   // A job with nobody in it, and one where the same name is on both sides —
   // a coach who re-signed — are not the same thing and do not belong together.
@@ -653,6 +679,30 @@ function Carousel({ moves, art, me, onPick }: {
         </p>
       </Card>
 
+      {wantYou.length ? (
+        <Card className="card-pad">
+          <div className="card-head">
+            <Kicker>Interested in your staff</Kicker>
+            <Meta size={10}>{wantYou.length} {wantYou.length === 1 ? 'APPROACH' : 'APPROACHES'}</Meta>
+          </div>
+          <div className="col" style={{ gap: 0, marginTop: 4 }}>
+            {wantYou.map((o) => (
+              <div key={o.row} className="row" style={{
+                gap: 10, alignItems: 'center', borderTop: '1px solid var(--line)', padding: '9px 0',
+              }}>
+                <SchoolArt size={30} file={art(o.school)} />
+                <button onClick={() => o.school && onPick(o.school)} style={{
+                  all: 'unset', cursor: 'pointer', width: 150, flex: '0 0 auto', color: 'var(--ink)',
+                }}>{o.school}</button>
+                <span style={{ flex: 1, minWidth: 0, color: 'var(--ink3)' }}>
+                  have approached {o.coach?.display ?? 'one of your coaches'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       {open.length ? (
         <Card className="card-pad">
           <div className="card-head">
@@ -660,8 +710,38 @@ function Carousel({ moves, art, me, onPick }: {
             <Meta size={10}>{open.length} {open.length === 1 ? 'JOB' : 'JOBS'}</Meta>
           </div>
           <div className="col" style={{ gap: 0, marginTop: 4 }}>
-            {open.map((m) => <Row key={m.row} m={m} />)}
+            {open.map((m) => {
+              const talking = (m.school ? candidates.get(m.school) : undefined) ?? []
+              return (
+                <div key={m.row}>
+                  <Row m={m} />
+                  {talking.length ? (
+                    <div className="row" style={{
+                      gap: 6, flexWrap: 'wrap', padding: '0 0 9px 40px', alignItems: 'center',
+                    }}>
+                      <Meta size={9}>TALKING TO</Meta>
+                      {talking.map((o) => (
+                        <span key={o.row} className="row" style={{
+                          gap: 6, alignItems: 'center', border: '1px solid var(--line)',
+                          borderRadius: 99, padding: '3px 10px 3px 4px',
+                        }}>
+                          <SchoolArt size={20} file={art(o.from)} />
+                          <span style={{
+                            fontSize: 11,
+                            color: o.from === me ? 'var(--accent)' : 'var(--ink2)',
+                          }}>{o.coach?.display ?? '—'}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
           </div>
+          <p className="body-serif" style={{ marginTop: 8, marginBottom: 0, color: 'var(--ink3)' }}>
+            The game ranks these candidates and DCC cannot yet read that ranking, so they are in
+            the order the save keeps rather than the order the game would put them in.
+          </p>
         </Card>
       ) : null}
 

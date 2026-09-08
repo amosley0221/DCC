@@ -14,7 +14,7 @@ import {
   readDepthCharts, DEPTH_SLOTS, readSeasonOrdinal, TEAM_UNASSIGNED,
   readChampions, teamTableOrder, dumpStore, findTeamRanks, readHeisman, readRecruitBoard,
   findRankColumns, readRankField, readClassRankByName, readTeamGameStats, readCalendar,
-  readStaffMoves,
+  readStaffMoves, readCoachOffers,
 } from './saveAnalysis'
 import type { RankColumnView } from './saveAnalysis'
 import { buildRecord, fileRecord, moves, paths, yearOf } from './transfers'
@@ -499,6 +499,9 @@ ipcMain.handle('save:roster', (_e, path: string, teamId?: number | null) => {
       // readStaffMoves, and docs/SAVE-FORMAT.md for how each field was pinned
       // against the game's staff-moves screen.
       staffMoves: readStaffMoves(payload),
+      // Who each open job is talking to, which is also how DCC knows which
+      // schools are sounding out your coach — see readCoachOffers.
+      coachOffers: readCoachOffers(payload),
       // Whose dynasty this is, read off the save rather than remembered. The
       // save marks the games the user played rather than simulated, and their
       // team is in all of them — see electron/season.ts. Null when a dynasty

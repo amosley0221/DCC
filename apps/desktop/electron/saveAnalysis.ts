@@ -3094,3 +3094,68 @@ export function readStaffMoves(payload: Buffer): StaffMove[] {
   }
   return out
 }
+
+/** A school's approach to a coach: one row of a job's candidate list. */
+export interface CoachOffer {
+  /** Row in `StaffPersonContractOffer`. */
+  row: number
+  /** The school doing the hiring. */
+  school: string | null
+  schoolIndex: number
+  /** Where the coach works now, which is empty for a man out of a job. */
+  from: string | null
+  coach: CoachName | null
+}
+
+/** `StaffPersonContractOffer` row layout. */
+const OFFER_SCHOOL_AT = 4
+const OFFER_FROM_AT = 8
+const OFFER_COACH_AT = 12
+
+/**
+ * Who each open job is talking to — and so, which of them are talking to you.
+ *
+ * The game's carousel screen has two panels DCC could not fill: "schools
+ * interested in me", and the ranked candidate list under a job. Both are this
+ * store. A row names the school making the approach, the coach receiving it,
+ * and the school that coach currently works for, so the interest in *you* is
+ * simply the rows whose coach already works at your program — no need to
+ * identify your coach by name at all.
+ *
+ * Read against a real bowl-week save it lands exactly: Indiana's six approaches
+ * are Campbell, Smart, Swinney, Beamer, McGuire and Cloud, which is the
+ * game's own top-candidates list for that job, and the only offer to a Penn
+ * State coach is Indiana's — the one school the carousel screen listed as
+ * interested.
+ *
+ * What is *not* decoded is the order. The game ranks candidates and DCC cannot
+ * yet reproduce that ranking, so these come back in the order the save keeps
+ * them and no screen claims otherwise.
+ */
+export function readCoachOffers(payload: Buffer): CoachOffer[] {
+  const t = namedTable(payload, 'StaffPersonContractOffer')
+  if (!t || t.rowBytes < 16) return []
+
+  const schools: (TeamRecord | undefined)[] = []
+  for (const s of readTeamNames(payload)) schools[s.tableIndex] = s
+  const bySlot = new Map(readCoachNames(payload).map((c) => [c.slot, c]))
+
+  const out: CoachOffer[] = []
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes
+    if (o + t.rowBytes > payload.length) break
+    // Most of the store is spare capacity: an offer has a school making it.
+    if (payload.readUInt16BE(o + OFFER_SCHOOL_AT) !== TEAM_TAG) continue
+
+    const schoolIndex = payload.readUInt16BE(o + OFFER_SCHOOL_AT + 2)
+    const from = payload.readUInt16BE(o + OFFER_FROM_AT) === TEAM_TAG
+      ? schools[payload.readUInt16BE(o + OFFER_FROM_AT + 2)]?.name ?? null
+      : null
+    const coach = payload.readUInt16BE(o + OFFER_COACH_AT) === COACH_TAG
+      ? bySlot.get(payload.readUInt16BE(o + OFFER_COACH_AT + 2)) ?? null
+      : null
+
+    out.push({ row: r, school: schools[schoolIndex]?.name ?? null, schoolIndex, from, coach })
+  }
+  return out
+}

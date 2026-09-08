@@ -5,7 +5,7 @@ import type {
 } from '../electron/saveAnalysis'
 import type { RecruitEvent } from '../electron/recruitLedger'
 import type { TeamGameStatsView } from '../electron/teamStats'
-import type { SaveCalendar, StaffMove } from '../electron/saveAnalysis'
+import type { CoachOffer, SaveCalendar, StaffMove } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import { TEAM_ID_NAMES } from '../electron/teamIds'
 
@@ -91,6 +91,11 @@ export interface SaveState {
      * season rather than after the championship.
      */
     staffMoves: StaffMove[]
+    /**
+     * Every approach an open job has made, which is where "schools interested
+     * in you" comes from: the offers whose coach already works for you.
+     */
+    coachOffers: CoachOffer[]
   } | null
   rosterBusy: boolean
   /** The game install, for reading the art the save does not carry. */
@@ -279,6 +284,7 @@ export function rosterPatch(
     teamStats: res.teamStats ?? [],
     calendar: res.calendar ?? null,
     staffMoves: res.staffMoves ?? [],
+    coachOffers: res.coachOffers ?? [],
   }
 }
 

@@ -2,7 +2,7 @@ import type { UpdateStatus } from './updates'
 import type {
   SaveReport, SaveDiff, DictScan, RosterPlayer, TeamRecord, CoachRecord, StoreRecord, SeasonGame,
   RankColumnView, HeismanView, PollCandidate, SavedPollView, RecruitBoard, SaveCalendar,
-  StaffMove,
+  StaffMove, CoachOffer,
 } from '../electron/saveAnalysis'
 import type { InstallReport, TableReport, ArtFind } from '../electron/gameAssets'
 import type { SchemaMember } from '../electron/schema'
@@ -48,7 +48,9 @@ declare global {
             /** The week and year the save itself states. */
             calendar: SaveCalendar | null
             /** Every job that came open this offseason, and who filled it. */
-            staffMoves: StaffMove[] }
+            staffMoves: StaffMove[]
+            /** Which coaches each open job has approached, yours included. */
+            coachOffers: CoachOffer[] }
         | { ok: false; message: string }
       >
       /** Downloads a stadium photograph per school into the art folder. */

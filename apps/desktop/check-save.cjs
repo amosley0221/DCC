@@ -577,6 +577,8 @@ console.log('            and the schema version is read off the save, not assume
   // whatever it is pointed at, including files that are not saves.
   assert.deepEqual(S.readStaffMoves(Buffer.alloc(64)), [])
   assert.deepEqual(S.readCoachNames(Buffer.alloc(64)), [])
+  assert.equal(typeof S.readCoachOffers, 'function')
+  assert.deepEqual(S.readCoachOffers(Buffer.alloc(64)), [])
 
   // The reason enum is the game's, in the game's order. Reading it off by one
   // turns every firing into a retirement.
@@ -585,6 +587,18 @@ console.log('            and the schema version is read off the save, not assume
   assert.equal(REASONS[3], 'Pro', 'a coach who went to the NFL left for the Pro reason')
   assert.equal(REASONS[4], 'NewJob', 'and one hired away carries NewJob')
   assert.equal(REASONS[5], 'ContractEnding')
+}
+
+/* ------------------------------------------ and who the open jobs are calling */
+{
+  // Verified against the game's own carousel screen rather than asserted here:
+  // Indiana's six approaches read back as Campbell, Smart, Swinney, Beamer,
+  // McGuire and Cloud, each with the right current school, and the one offer
+  // aimed at a Penn State coach is Indiana's — the single school the screen
+  // listed as interested. What is guarded here is that an offer without a
+  // school making it is not an offer.
+  assert.deepEqual(S.readCoachOffers(Buffer.alloc(4096)), [],
+    'a buffer of zeroes holds no approaches, however big it is')
 }
 
 console.log('check-save: the carousel readers are shaped right and refuse a file that is not a save')
