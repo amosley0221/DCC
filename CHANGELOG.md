@@ -8,6 +8,10 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.83.0] - 2026-09-18
+
 ### Fixed
 
 - **The playoff was in your save all along, and DCC said it wasn't.** 0.82.0
