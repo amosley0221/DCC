@@ -2101,21 +2101,61 @@ rest — so the remaining fields are named but unplaced. **`ConfChampWins` at bi
 98 is rejected**: it gives a 206-71 coach 24 conference titles, which no
 ~21-season career can hold.
 
-### What blocks showing it
+### A program's staff
 
-There is no route from a school to its coach's row. The `Coach` store is 632
-rows × 184 bytes with 138 members, and a scan of every 2-byte-aligned offset
-with member index < 143 found **no `0x319e` team reference in a coach row at
-all** — the link is not a direct team pointer. What the row does carry is
-`+24 0x20e6` in 465 rows against `CareerCoachStats`' 464, which is the
-strongest candidate for the coach → career link; the missing half is
-team → coach. The other ref-shaped slots are `+16 0x2124` (419 rows),
-`+40 0x2048` (419) and `+64 0x2d78` (373). The remaining route not yet tried is
-matching `readCoaches`' name table — 414 records of 58 bytes in three blocks of
-138 in team-id order — against the `Coach` store directly.
+`TeamStore` carries three coach references on every team's row, all tagged
+`0x20a6` and so resolving through the coach name table:
 
-Until that link exists the career record is decoded but cannot be attributed,
-so nothing shows it.
+| Chair | At |
+| --- | --- |
+| Defensive coordinator | byte 12 |
+| Head coach | byte 68 |
+| Offensive coordinator | byte 116 |
+
+Which chair is which was settled against the staff-moves screen rather than
+assumed: Purdue's `+12` is M. Alford, whom that screen lists as their defensive
+coordinator, and Michigan State's `+116` is B. Brennan, listed as their
+offensive coordinator. All 143 team rows resolve a head coach, and the ones
+that can be checked are right — Penn State to M. Campbell, Notre Dame to
+M. Freeman, Georgia Tech to B. Key, Indiana to C. Cignetti, Delaware to
+R. Carty, Purdue to J. Chadwell.
+
+Note that `TeamStore` is **not** rewritten when the carousel runs. A save from
+after the hiring still lists the old staff; the moves live in `JobOpening`
+until the offseason applies them.
+
+### What still blocks the career record
+
+The record is decoded and the team's coach is known, but the two cannot be
+joined, because **the coach name table and the `Coach` store are different
+orderings of different populations.**
+
+- A `0x20a6` reference resolves into the name table — ~492 records, verified
+  against every carousel screen.
+- `Coach` is a 632-row store, and `Coach + 24` is a `0x20e6` reference to
+  `CareerCoachStats`. Following it lands correctly: Coach row 118 gives
+  Campbell's 146-74, row 43 Carty's 19-32, row 444 Morris's 36-39.
+- But those Coach rows are 118, 43 and 444 where the same men are name slots
+  70, 76 and 278. There is no offset between them, the order is not
+  alphabetical (Campbell precedes Carty by name and follows him by row), and
+  the populations differ in size.
+
+Routes tried and rejected:
+
+- The name slot is not the `Coach` row — reading it that way gives another
+  coach's record, which looks plausible and is wrong.
+- No `0x20a6` reference appears anywhere in a `Coach` row (one stray hit in 632
+  rows), so the store does not point back at the name.
+- No `Coach` row holds its coach's name slot as a bare value at any aligned
+  offset.
+- `TeamStore` has no `0x20e6` reference, so there is no team → career shortcut.
+- The other references a `Coach` row does carry — `+16 0x2124`, `+40 0x2048`,
+  `+64 0x2d78` — are none of them the name slot.
+
+What is left untried is identifying the store `0x2124` and `0x2048` index. One
+of them is plausibly the `StaffPerson` base record the schema says `Coach`
+derives from, and if the name table is row-aligned with that, it closes the
+gap.
 
 ## Hires and fires
 

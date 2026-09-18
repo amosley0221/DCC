@@ -601,4 +601,17 @@ console.log('            and the schema version is read off the save, not assume
     'a buffer of zeroes holds no approaches, however big it is')
 }
 
+/* --------------------------------------------------- a program's staff */
+{
+  // Verified against the game's screens rather than asserted here: all 143
+  // teams resolve a head coach, and Penn State reads M. Campbell, Notre Dame
+  // M. Freeman, Georgia Tech B. Key, Michigan State P. Fitzgerald. Which chair
+  // is which was settled the same way — Purdue's +12 is M. Alford, whom the
+  // staff-moves screen calls their defensive coordinator.
+  assert.equal(typeof S.readTeamStaff, 'function')
+  assert.deepEqual(S.readTeamStaff(Buffer.alloc(64)), [])
+  assert.deepEqual(S.readTeamStaff(Buffer.alloc(8192)), [],
+    'a buffer of zeroes has no teams and therefore no staff')
+}
+
 console.log('check-save: the carousel readers are shaped right and refuse a file that is not a save')

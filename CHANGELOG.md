@@ -8,7 +8,13 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Every program's full coaching staff is now read from the save** — head
+  coach, offensive coordinator and defensive coordinator, followed through the
+  references on the team's own row rather than scraped from a table of names.
+  All 143 teams resolve. Nothing shows the coordinators yet; the reader is in
+  place for the screens that will.
 
 ## [0.83.0] - 2026-09-18
 

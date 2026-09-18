@@ -3159,3 +3159,69 @@ export function readCoachOffers(payload: Buffer): CoachOffer[] {
   }
   return out
 }
+
+/** A program's coaching staff, as the save links it. */
+export interface TeamStaff {
+  /** Row in `TeamStore`, which is also `TeamRecord.tableIndex`. */
+  teamIndex: number
+  school: string | null
+  headCoach: CoachName | null
+  offensiveCoordinator: CoachName | null
+  defensiveCoordinator: CoachName | null
+}
+
+/**
+ * `TeamStore` byte offsets of the three coach references on a team's row.
+ *
+ * All three are `0x20a6`, the same tag the carousel uses, so they resolve
+ * through the coach name table. Which chair is which was settled against the
+ * staff-moves screen rather than assumed: Purdue's `+12` is M. Alford, whom the
+ * screen lists as their defensive coordinator, and Michigan State's `+116` is
+ * B. Brennan, listed as their offensive coordinator.
+ */
+const TEAM_DC_AT = 12
+const TEAM_HC_AT = 68
+const TEAM_OC_AT = 116
+
+/**
+ * Every program's coaching staff, read through the save's own references.
+ *
+ * `readCoaches` already names head coaches, but it does so by walking a display
+ * table of strings; this follows the reference on the team's row instead, which
+ * also reaches the two coordinators that table does not carry.
+ *
+ * Verified against the game's screens: Penn State to M. Campbell, Notre Dame to
+ * M. Freeman, Georgia Tech to B. Key, Indiana to C. Cignetti, Michigan State to
+ * P. Fitzgerald, Delaware to R. Carty, Purdue to J. Chadwell.
+ */
+export function readTeamStaff(payload: Buffer): TeamStaff[] {
+  const t = namedTable(payload, 'TeamStore')
+  if (!t || t.rowBytes < TEAM_OC_AT + 4) return []
+
+  const schools: (TeamRecord | undefined)[] = []
+  for (const s of readTeamNames(payload)) schools[s.tableIndex] = s
+  const bySlot = new Map(readCoachNames(payload).map((c) => [c.slot, c]))
+
+  const out: TeamStaff[] = []
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes
+    if (o + t.rowBytes > payload.length) break
+    const school = schools[r]?.name ?? null
+    // A row with no school is a slot the league is not using.
+    if (!school) continue
+
+    const at = (byte: number) =>
+      (payload.readUInt16BE(o + byte) === COACH_TAG
+        ? bySlot.get(payload.readUInt16BE(o + byte + 2)) ?? null
+        : null)
+
+    out.push({
+      teamIndex: r,
+      school,
+      headCoach: at(TEAM_HC_AT),
+      offensiveCoordinator: at(TEAM_OC_AT),
+      defensiveCoordinator: at(TEAM_DC_AT),
+    })
+  }
+  return out
+}
