@@ -2051,7 +2051,53 @@ awards, and `LeagueLeader_Rush_Yards` and friends. `CoachAward` shares the enum.
 So the data is there and named, and three of the eight members are placed by
 their references: **Team at bit 32, Player at 64, Conference at 96**.
 
-### What still blocks it
+### Found: `AwardType` is at bit 26
+
+**The field is not at any offset the store header names**, which is why every
+earlier attempt failed. `PlayerAward` is 8,505 rows of 20 bytes and its header
+array is `[3484, 128, 123, 96, 64, 112, 32, 135]` — the first entry is a
+used-row count (3,484 rows carry a player, exactly), leaving seven offsets for
+eight members. `AwardType` is the member it leaves out, and it lives in the four
+bytes none of the listed offsets covers.
+
+Bits 16-18 and 25 of a row are always zero, which leaves two six-bit fields: one
+at bit 19 and one at **bit 26**. Bit 26 is the award type.
+
+It is verified by what the values do across four saves of one season, not by a
+single row:
+
+| Values | Rows each | Repeats a player? | What that makes them |
+| --- | --- | --- | --- |
+| 0-3 | 37-367 | yes, up to 6 | the weekly awards |
+| 4-5 | **none** | — | the coach awards, which live in `CoachAward` |
+| 6-27 | 1-2 | never | the season's individual trophies |
+| 28-30 | 34-69 | never | the national teams |
+| 31-33 | 415-749 | yes, up to 4 | the same teams per conference |
+| 34-37 | 33-432 | — | the preseason selections |
+
+The empty pair at 4-5 is the clincher: `BEST_HC` and `BEST_AC` are coach awards,
+and under any other alignment of the field those two ordinals would be full of
+players. The All-American first team also fills from 10 names in a week-16 save
+to a complete 25 at bowl week 1, which is when the game announces it.
+
+`AwardScore` is the tail field — a read at bit 152 gives 225 distinct values
+across the rows, which is a score and not an enum.
+
+### What still blocks the names
+
+The value-to-name mapping. The schema lists 55 `AwardType` entries, but several
+are markers (`First_`, `FirstWeekly_`, `LastWeekly_`, `FirstAnnual_`,
+`FirstAllAmerican_`, …) that alias their neighbour instead of taking an ordinal
+of their own, and **no collapse of them lines the list up with the data**.
+Every alignment tried puts a receiver on Best Quarterback and a punter on the
+Heisman. DCC therefore reports the number and the shape, and prints no name it
+cannot stand behind.
+
+What would settle it in one step is a screenshot of an awards screen — the
+All-American first team, or the individual trophies — read against the
+decoded rows. The field is already known; only the labels are missing.
+
+### The earlier blocker, for the record
 
 The bit offset of `AwardType`. Two things get in the way, and both are worth
 writing down because they cost an evening:

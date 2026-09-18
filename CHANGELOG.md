@@ -10,6 +10,14 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Every award the save has handed out is now read.** The award type was the
+  last field standing between DCC and the Heisman, the All-American teams and
+  the season's trophies. It is not at any offset the store's own header names —
+  it sits in the four bytes none of them covers — which is why several earlier
+  attempts came up empty. The awards are read and grouped; what is still missing
+  is the game's *names* for them, which no alignment of the schema's enum
+  matches, so nothing prints a label DCC cannot stand behind.
+
 - **Every program's full coaching staff is now read from the save** — head
   coach, offensive coordinator and defensive coordinator, followed through the
   references on the team's own row rather than scraped from a table of names.

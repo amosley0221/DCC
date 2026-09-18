@@ -614,4 +614,26 @@ console.log('            and the schema version is read off the save, not assume
     'a buffer of zeroes has no teams and therefore no staff')
 }
 
+/* -------------------------------------------------------------- awards */
+{
+  // The field is at bit 26 of a PlayerAward row, six bits wide — not one of the
+  // offsets the store header lists, which is what hid it. Verified by what the
+  // values do across four saves of one season rather than by one lucky row:
+  // the trophies have one winner each and never repeat a player, the national
+  // teams are all-different names, the weekly awards repeat, and the two coach
+  // awards come back empty because they are not player awards.
+  assert.equal(typeof S.readPlayerAwards, 'function')
+  assert.deepEqual(S.readPlayerAwards(Buffer.alloc(64)), [])
+
+  assert.equal(S.awardShape(0), 'weekly')
+  assert.equal(S.awardShape(3), 'weekly')
+  assert.equal(S.awardShape(4), 'unknown', 'the coach awards are not player awards')
+  assert.equal(S.awardShape(5), 'unknown')
+  assert.equal(S.awardShape(23), 'trophy')
+  assert.equal(S.awardShape(28), 'team')
+  assert.equal(S.awardShape(33), 'conferenceTeam')
+  assert.equal(S.awardShape(37), 'preseason')
+  assert.equal(S.awardShape(63), 'unknown', 'an unset row is not an award')
+}
+
 console.log('check-save: the carousel readers are shaped right and refuse a file that is not a save')

@@ -3225,3 +3225,114 @@ export function readTeamStaff(payload: Buffer): TeamStaff[] {
   }
   return out
 }
+
+/* ------------------------------------------------------------------ awards */
+
+/**
+ * What a `PlayerAward` row's type value means, as far as it is actually known.
+ *
+ * The field is found and its behaviour is verified; the names are not. The
+ * schema lists 55 enum entries, but several are markers that alias their
+ * neighbour rather than taking an ordinal, and no collapse of them lines the
+ * list up with the data: every alignment tried puts a receiver on Best
+ * Quarterback and a punter on the Heisman. Rather than print a label that looks
+ * authoritative and is wrong, DCC reports the number and what the value's shape
+ * says about it.
+ *
+ * What the shape does say, across four saves of one season:
+ *
+ * - `0`-`3` repeat for a player and number in the hundreds: the weekly awards.
+ * - `6`-`27` have one or two winners each and almost never repeat a player:
+ *   the season's individual trophies.
+ * - `28`-`30` are a few dozen rows of all-different players: national teams.
+ * - `31`-`33` are hundreds of rows: the same teams per conference.
+ * - `34`-`37` mirror those two groups: the preseason selections.
+ * - `4` and `5` are always empty, because they are the coach awards and live
+ *   in `CoachAward`. That gap is what pins the field's position.
+ */
+export type AwardShape = 'weekly' | 'trophy' | 'team' | 'conferenceTeam' | 'preseason' | 'unknown'
+
+export function awardShape(type: number): AwardShape {
+  if (type <= 3) return 'weekly'
+  if (type >= 6 && type <= 27) return 'trophy'
+  if (type >= 28 && type <= 30) return 'team'
+  if (type >= 31 && type <= 33) return 'conferenceTeam'
+  if (type >= 34 && type <= 37) return 'preseason'
+  return 'unknown'
+}
+
+export interface PlayerAward {
+  /** Row in `PlayerAward`. */
+  row: number
+  /** Roster row of the player who won it. */
+  playerIndex: number
+  /** The school they won it for. */
+  school: string | null
+  teamIndex: number
+  /** The save's own award-type value. Not yet resolved to a name — see awardShape. */
+  type: number
+  /** What kind of award it is, which the data does settle. */
+  shape: AwardShape
+}
+
+/**
+ * Which bit of a `PlayerAward` row carries the award type.
+ *
+ * Not one of the offsets the store header lists, which is what made this hard:
+ * the header's array holds a used-row count followed by seven offsets for eight
+ * members, and `AwardType` is the member it leaves out. Every earlier attempt
+ * read the array and searched the offsets it named, and the field is in the
+ * four bytes none of them covers.
+ *
+ * Bits 16-18 and 25 of a row are always zero, which leaves two six-bit fields:
+ * one at 19 and this one at 26.
+ */
+const AWARD_TYPE_BIT = 26
+const AWARD_TYPE_WIDTH = 6
+const AWARD_TEAM_AT = 4
+const AWARD_PLAYER_AT = 8
+
+/**
+ * Every award the save has handed out this season.
+ *
+ * `PlayerAward` holds the season being played rather than the dynasty's whole
+ * history: across four saves of one season the rows grow as the awards are
+ * announced — the All-American first team fills from 10 names in week 16 to a
+ * complete 25 at bowl week 1 — and no player ever holds the same award twice.
+ *
+ * The mapping is checked by what it implies rather than by one lucky row.
+ * Every individual trophy has exactly one winner and never repeats a player;
+ * the national All-American teams are all distinct names; the weekly and
+ * conference awards repeat, as they must; and the two coach awards come back
+ * empty because they are not player awards at all.
+ */
+export function readPlayerAwards(payload: Buffer): PlayerAward[] {
+  const t = namedTable(payload, 'PlayerAward')
+  if (!t || t.rowBytes < 12) return []
+
+  const schools: (TeamRecord | undefined)[] = []
+  for (const s of readTeamNames(payload)) schools[s.tableIndex] = s
+
+  const out: PlayerAward[] = []
+  for (let r = 0; r < t.rows; r++) {
+    const o = t.data + r * t.rowBytes
+    if (o + t.rowBytes > payload.length) break
+    // Most of the store is spare capacity; an award names a player.
+    if (payload.readUInt16BE(o + AWARD_PLAYER_AT) !== PLAYER_TAG) continue
+
+    const type = bitsFrom(payload, o, AWARD_TYPE_BIT, AWARD_TYPE_WIDTH)
+
+    const teamIndex = payload.readUInt16BE(o + AWARD_TEAM_AT) === TEAM_TAG
+      ? payload.readUInt16BE(o + AWARD_TEAM_AT + 2) : -1
+
+    out.push({
+      row: r,
+      playerIndex: payload.readUInt16BE(o + AWARD_PLAYER_AT + 2),
+      school: schools[teamIndex]?.name ?? null,
+      teamIndex,
+      type,
+      shape: awardShape(type),
+    })
+  }
+  return out
+}
