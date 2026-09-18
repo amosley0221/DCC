@@ -5,9 +5,9 @@ import { Card, Chip, Empty, Kicker, Meta, SchoolArt, SectionHeader, Tab } from '
 import { TEAM_ID_NAMES } from '../../electron/teamIds'
 import {
   buildLeague, conferenceArtKeys, conferences, FIRST_ROUND, margin, orderByRanks,
-  played, projectPlayoff, QUARTERFINALS, rankings, SEMIFINALS, visibleGames, winPct,
+  played, projectPlayoff, QUARTERFINALS, rankings, readPlayoff, SEMIFINALS, visibleGames, winPct,
 } from '../../electron/league'
-import type { LeagueRow, PlayoffField } from '../../electron/league'
+import type { LeagueRow, PlayoffBracket, PlayoffField } from '../../electron/league'
 import type { CoachOffer, StaffMove } from '../../electron/saveAnalysis'
 import { currentWeek } from '../../electron/season'
 import { bowlBound, predict, predictBracket, predictionLine } from '../../electron/predict'
@@ -116,9 +116,18 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
     () => new Map<string, number | null>(Object.entries(poll.ranks ?? {})),
     [poll.ranks],
   )
+  /**
+   * The playoff as the save actually has it, and the bowls as what is left.
+   *
+   * Both come out of the same pass: a bowl is a postseason game the bracket
+   * does not claim. See readPlayoff — the four first-round games are played on
+   * a campus and everything else in the postseason is at a neutral site, which
+   * is what tells them apart.
+   */
+  const bracket = useMemo(() => readPlayoff(all), [all])
   const bowls = useMemo(
-    () => all.filter((g) => g.postseason).sort((a, b) => a.week - b.week || a.row - b.row),
-    [all],
+    () => [...bracket.bowls].sort((a, b) => a.week - b.week || (a.row ?? 0) - (b.row ?? 0)),
+    [bracket],
   )
 
   const weeks = useMemo(() => {
@@ -381,6 +390,7 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
         {tab === 'POSTSEASON' ? (
           <Postseason
             field={field}
+            bracket={bracket}
             bowls={bowls}
             table={table}
             ranks={pollPlaces}
@@ -546,6 +556,8 @@ export default function League({ onOpenProgram }: { onOpenProgram?: () => void }
 type SeasonGameish = {
   row: number; week: number; home: string | null; away: string | null
   homeScore: number; awayScore: number; played: boolean; postseason: boolean
+  /** Played somewhere neither team lives — what tells a bowl from a playoff game. */
+  neutralSite?: boolean
 }
 
 /**
@@ -563,6 +575,15 @@ type SeasonGameish = {
  * one thing standing between this and bowl logos.
  */
 /** How the game words the reason a job came open. */
+/**
+ * The playoff's rounds, in the order the save's postseason weeks run.
+ *
+ * Named by position rather than read: the save numbers the weeks but does not
+ * say what a round is called, and the sport's bracket is fixed — four campus
+ * games, four quarterfinals, two semifinals, a final.
+ */
+const PLAYOFF_ROUNDS = ['First round', 'Quarterfinals', 'Semifinals', 'National championship']
+
 const REASON_LABEL: Record<StaffMove['reason'], string> = {
   None: '',
   Fired: 'Fired',
@@ -775,8 +796,10 @@ function Carousel({ moves, offers, art, me, onPick }: {
   )
 }
 
-function Postseason({ field, bowls, table, ranks, art, helmet, award, me, onPick }: {
+function Postseason({ field, bracket, bowls, table, ranks, art, helmet, award, me, onPick }: {
   field: PlayoffField
+  /** The bracket the save holds, when it holds one. */
+  bracket: PlayoffBracket<SeasonGameish>
   bowls: SeasonGameish[]
   /** Every program's season, for the arithmetic behind a prediction. */
   table: Map<string, LeagueRow>
@@ -878,7 +901,64 @@ function Postseason({ field, bowls, table, ranks, art, helmet, award, me, onPick
 
   return (
     <>
-      {!field.credible ? (
+      {bracket.games.length ? (
+        <Card className="card-pad">
+          <div className="card-head">
+            <span className="row" style={{ gap: 9, alignItems: 'center' }}>
+              <SchoolArt size={26} file={award('playoff:nationalchampionship')} />
+              <Kicker>The playoff</Kicker>
+            </span>
+            <Meta size={10}>{bracket.teams.size} IN THE FIELD</Meta>
+          </div>
+          <p className="body-serif" style={{ marginTop: 7 }}>
+            The bracket the save itself holds, not a projection. The first round is played on the
+            higher seed's own field and every other postseason game is at a neutral site, which is
+            what separates these from the bowls.
+            {bracket.byes.length ? ` ${bracket.byes.join(', ')} sat out the first round.` : ''}
+          </p>
+          <div className="col" style={{ gap: 0, marginTop: 8 }}>
+            {[...new Set(bracket.games.map((g) => g.week))].sort((a, b) => a - b).map((wk, i) => (
+              <div key={wk}>
+                <Meta size={9}>{(PLAYOFF_ROUNDS[i] ?? `Round ${i + 1}`).toUpperCase()}</Meta>
+                {bracket.games.filter((g) => g.week === wk).map((g) => {
+                  const homeWon = g.homeScore > g.awayScore
+                  const dim = (side: boolean) =>
+                    (!g.played ? 'var(--ink)' : side === homeWon ? 'var(--ink)' : 'var(--ink3)')
+                  return (
+                    <div key={g.row} className="row" style={{
+                      gap: 10, alignItems: 'center', borderTop: '1px solid var(--line)', padding: '8px 0',
+                    }}>
+                      <span className="row" style={{ gap: 7, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                        <SchoolArt size={24} file={helmet(g.away)} />
+                        <span style={{ color: dim(false) }}>{g.away}</span>
+                      </span>
+                      <span className="num" style={{ color: dim(false) }}>{g.played ? g.awayScore : ''}</span>
+                      <Meta size={9}>{g.neutralSite ? 'VS' : 'AT'}</Meta>
+                      <span className="row" style={{ gap: 7, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                        <SchoolArt size={24} file={helmet(g.home)} />
+                        <span style={{ color: dim(true) }}>{g.home}</span>
+                      </span>
+                      <span className="num" style={{ color: dim(true) }}>{g.played ? g.homeScore : ''}</span>
+                      {!g.played ? (
+                        <span title="DCC's estimate, not the game's">
+                          <Meta size={9} color="var(--accent)">
+                            {(predictionLine(predict(
+                              table.get(g.home ?? ''), table.get(g.away ?? ''), !!g.neutralSite,
+                              { home: ranks.get(g.home ?? '') ?? null, away: ranks.get(g.away ?? '') ?? null },
+                            )) ?? '').toUpperCase()}
+                          </Meta>
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {!bracket.games.length && !field.credible ? (
         <Card className="card-pad">
           <div className="card-head">
             <span className="row" style={{ gap: 9, alignItems: 'center' }}>
@@ -910,7 +990,7 @@ function Postseason({ field, bowls, table, ranks, art, helmet, award, me, onPick
         </Card>
       ) : null}
 
-      {field.credible ? (<>
+      {!bracket.games.length && field.credible ? (<>
       <Card className="card-pad">
         <div className="card-head">
           <span className="row" style={{ gap: 9, alignItems: 'center' }}>

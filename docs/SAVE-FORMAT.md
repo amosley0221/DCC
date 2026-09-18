@@ -2243,23 +2243,52 @@ schedule of nobody from an unbeaten schedule of everybody.
 See `apps/desktop/electron/predict.ts` for the constants and
 `check-predict.cjs` for the rules that hold it honest.
 
-### The playoff is not in the save
+### The playoff is in the save — a correction
 
-Projecting the bracket surfaced a real finding. In the bowl-week-1 save the
-game has scheduled 36 postseason fixtures covering 72 teams, and none of them
-is a playoff game: Penn State (13-0), Oklahoma (12-1), Florida State (12-1) and
-Tennessee (11-2) appear in no fixture at all, while eight of the twelve teams
-DCC had been projecting into the field — Boise State, Memphis, Texas Tech,
-Texas A&M, App State, UConn, South Carolina and Bowling Green — are each
-scheduled into an ordinary bowl. Boise State plays Baylor.
+An earlier version of this section claimed the playoff "is not in the save",
+having found 36 postseason fixtures in a bowl-week file and judged none of them
+a playoff game. **That was wrong**, and it shipped in 0.82.0.
 
-So two things changed. `projectPlayoff` now takes the set of teams the save has
-already placed in a bowl and strikes them out, because the save's own schedule
-beats DCC's guess. And because that usually leaves too few credible teams to
-fill twelve places, the field carries a `credible` flag: when it is false the
-League screen shows the teams still unplaced with winning records and says the
-bracket is not in the file, rather than drawing a playoff with 5-7 teams in it.
+The bracket was there the whole time. Four of those 36 fixtures were the
+playoff's first round — Texas Tech at Texas A&M, Ohio State at UConn, Nebraska
+at Memphis, BYU at Alabama — and they were read as ordinary bowls. The teams
+that looked like they were "already placed in a bowl" were playing the playoff.
+Striking them out of the projected field then removed eight genuine playoff
+teams from it, and the field that remained was so thin that the `credible`
+check correctly refused to draw it. Two mistakes that pointed the same way,
+which is why the result looked consistent.
 
-Where the real bracket does exist the projection fills, and DCC plays it out
-round by round to a champion — eleven stacked predictions, which the screen
-marks as calls because an upset in the first round rewrites everything below it.
+**What separates a playoff game from a bowl is where it is played.** Every bowl
+is at a neutral site — 32 of 32 in both saves checked. The playoff's first round
+is on the higher seed's own field, and it is the only postseason game of the
+year that is not neutral. That is the sport's own rule, not a quirk of the file.
+
+So `readPlayoff` seeds the bracket on the postseason games with
+`neutralSite` false, then follows those teams forward: a bowl team plays one
+bowl and stops, while a playoff team keeps appearing in later weeks. Rounds
+after the first are back at neutral sites and could not be told from bowls on
+their own.
+
+Checked against two saves:
+
+| Save | Bracket games | Field | Bowls | Byes |
+| --- | --- | --- | --- | --- |
+| Bowl week 1 (wk 17) | 4 | 8 | 32 | quarterfinals not scheduled yet |
+| Semifinal week (wk 19) | 10 | 12 | 32 | Florida State, Oklahoma, Penn State, Tennessee |
+
+In neither does a playoff team appear in a bowl. And with the exclusion bug
+fixed, the *projection* from the bowl-week save names the real field exactly —
+all twelve, including the eight it had previously thrown out.
+
+The playoff's rows sit in their own block (924-933 in these saves) well after
+the bowls, but the row number is not what identifies them; the neutral-site flag
+is, and that is what the code reads.
+
+One limitation worth stating: the rule depends on the first round existing in
+the file. A save whose postseason held only neutral-site rounds would yield no
+bracket, and DCC would fall back to the projection rather than guess.
+
+Where no bracket is in the save, `projectPlayoff` still fills a field and DCC
+plays it out round by round to a champion — eleven stacked predictions, which
+the screen marks as calls because an upset in the first round rewrites
+everything below it.

@@ -45,6 +45,15 @@ export interface LeagueGame {
   awayScore: number
   played: boolean
   postseason: boolean
+  /**
+   * Played somewhere neither team lives.
+   *
+   * Optional because most callers build these by hand, but it is the one field
+   * that separates a bowl from a playoff game — see `readPlayoff`.
+   */
+  neutralSite?: boolean
+  /** The save's own game row, where the caller has one. Only used for ordering. */
+  row?: number
 }
 
 const empty = (name: string, conference: string | null, division: string | null): LeagueRow => ({
@@ -434,4 +443,90 @@ export function orderByRanks(
     if (ra !== rb) return ra - rb
     return (place.get(a.name) ?? 0) - (place.get(b.name) ?? 0)
   })
+}
+
+/* --------------------------------------------------- the playoff, as played */
+
+export interface PlayoffBracket<T extends LeagueGame = LeagueGame> {
+  /** The playoff's own games, earliest round first. */
+  games: T[]
+  /** Every program in the field. */
+  teams: Set<string>
+  /**
+   * The programs that sat out the first round — the top seeds.
+   *
+   * Worked out by absence: a team whose first playoff game is not in the
+   * opening round did not play one.
+   */
+  byes: string[]
+  /** The bowls, which is every other postseason game. */
+  bowls: T[]
+}
+
+/**
+ * The real bracket, pulled out of the postseason games.
+ *
+ * This exists because the projection was answering a question the save could
+ * already answer, and answering it wrong. An earlier version of DCC reported
+ * that the playoff "is not in the save" — it is, and it always was. The four
+ * first-round games sit among the bowls from the moment the field is set, and
+ * reading them as bowls put eight genuine playoff teams into the bowl slate and
+ * then struck them out of the projected field for being there.
+ *
+ * What separates them is where they are played. Every bowl is at a neutral
+ * site; the playoff's first round is on the higher seed's own field, which is
+ * how the sport does it and the only postseason game of the year that is not
+ * neutral. So the campus games seed the bracket, and the rest of it is found by
+ * following those teams forward — a bowl team plays one bowl and stops, while a
+ * playoff team keeps turning up in later weeks. Rounds after the first are back
+ * at neutral sites and would be indistinguishable from bowls on their own.
+ *
+ * Checked against two real saves: in bowl week it finds four games and eight
+ * teams with the quarterfinals not yet scheduled, and a fortnight later ten
+ * games and exactly twelve teams. Both leave 32 bowls, and in neither does a
+ * playoff team appear in one.
+ */
+export function readPlayoff<T extends LeagueGame>(games: T[]): PlayoffBracket<T> {
+  const post = games.filter((g) => g.postseason && g.home && g.away)
+  const inIt = new Set<T>()
+  const teams = new Set<string>()
+
+  for (const g of post) {
+    // A postseason game on somebody's campus is a first-round playoff game.
+    if (g.neutralSite) continue
+    inIt.add(g)
+    teams.add(g.home!)
+    teams.add(g.away!)
+  }
+
+  // Follow the field forward. Bounded by the game count: each pass either adds
+  // a game or stops.
+  for (let pass = 0; pass < post.length; pass++) {
+    let grew = false
+    for (const g of post) {
+      if (inIt.has(g)) continue
+      if (!teams.has(g.home!) && !teams.has(g.away!)) continue
+      inIt.add(g)
+      teams.add(g.home!)
+      teams.add(g.away!)
+      grew = true
+    }
+    if (!grew) break
+  }
+
+  const bracket = [...inIt].sort((a, b) => a.week - b.week || (a.row ?? 0) - (b.row ?? 0))
+  const firstWeek = bracket.length ? Math.min(...bracket.map((g) => g.week)) : null
+  const played = new Set<string>()
+  for (const g of bracket) {
+    if (g.week !== firstWeek) continue
+    played.add(g.home!)
+    played.add(g.away!)
+  }
+
+  return {
+    games: bracket,
+    teams,
+    byes: [...teams].filter((t) => !played.has(t)).sort(),
+    bowls: post.filter((g) => !inIt.has(g)),
+  }
 }

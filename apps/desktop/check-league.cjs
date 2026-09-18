@@ -334,3 +334,63 @@ console.log('check-league: the conference championship counts for a record but n
 }
 
 console.log('check-league: a bowl place and a playoff place are not the same place')
+
+/* ------------------------------- the playoff is in the save, and is not a bowl */
+{
+  // The bug this exists for: DCC reported that the bracket "is not in the save"
+  // when it had been there all along. The four first-round games sit among the
+  // bowls, and reading them as bowls put eight playoff teams in the bowl slate
+  // and then struck them out of the field for being there.
+  const g = (row, week, away, home, neutral, played) => ({
+    row, week, away, home, awayScore: played ? 20 : 0, homeScore: played ? 30 : 0,
+    played, postseason: true, neutralSite: neutral,
+  })
+  const games = [
+    // Four bowls, all at neutral sites, as every bowl is.
+    g(1, 1, 'Liberty', 'C. Carolina', true, true),
+    g(2, 1, 'Colorado', 'Old Dominion', true, true),
+    g(3, 2, 'Navy', 'UL Monroe', true, true),
+    g(4, 2, 'Illinois', 'Washington St.', true, true),
+    // The playoff: first round on a campus, then neutral from there.
+    g(10, 1, 'Texas Tech', 'Texas A&M', false, true),
+    g(11, 1, 'BYU', 'Alabama', false, true),
+    g(12, 2, 'Alabama', 'Penn State', true, true),
+    g(13, 2, 'Texas Tech', 'Oklahoma', true, true),
+    g(14, 3, 'Penn State', 'Oklahoma', true, false),
+  ]
+  const b = L.readPlayoff(games)
+
+  assert.equal(b.games.length, 5, 'five playoff games, not nine')
+  assert.equal(b.bowls.length, 4, 'and the four bowls are left alone')
+  assert.ok(!b.bowls.some((x) => x.row >= 10), 'no playoff game is filed as a bowl')
+
+  // The field is everybody the bracket touches, byes included.
+  assert.deepEqual([...b.teams].sort(), [
+    'Alabama', 'BYU', 'Oklahoma', 'Penn State', 'Texas A&M', 'Texas Tech',
+  ])
+  // A team that entered in a later round did not play a first-round game.
+  assert.deepEqual(b.byes, ['Oklahoma', 'Penn State'])
+
+  // A bowl team must never be pulled in, however many bowls it plays.
+  assert.ok(!b.teams.has('Liberty'))
+  assert.ok(!b.teams.has('Navy'))
+}
+
+/* ----------------------------- and with no campus game there is no bracket */
+{
+  // Before the field is set every postseason game is a neutral-site bowl, and
+  // inventing a bracket out of them would be worse than admitting to none.
+  const bowls = [
+    { row: 1, week: 1, away: 'Liberty', home: 'C. Carolina', awayScore: 0, homeScore: 0, played: false, postseason: true, neutralSite: true },
+    { row: 2, week: 1, away: 'Navy', home: 'UL Monroe', awayScore: 0, homeScore: 0, played: false, postseason: true, neutralSite: true },
+  ]
+  const b = L.readPlayoff(bowls)
+  assert.equal(b.games.length, 0)
+  assert.equal(b.bowls.length, 2)
+  assert.equal(b.teams.size, 0)
+  assert.deepEqual(b.byes, [])
+  // And a regular season on its own is not a postseason at all.
+  assert.equal(L.readPlayoff([]).games.length, 0)
+}
+
+console.log('check-league: the playoff is read from the save, and a bowl is not one')

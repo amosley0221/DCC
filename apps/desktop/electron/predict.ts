@@ -1,4 +1,7 @@
-import { LeagueRow, power, played, FIRST_ROUND, QUARTERFINALS, SEMIFINALS } from './league'
+import {
+  LeagueRow, LeagueGame, power, played, readPlayoff,
+  FIRST_ROUND, QUARTERFINALS, SEMIFINALS,
+} from './league'
 
 /**
  * Who is favoured in a game that has not been played.
@@ -213,16 +216,20 @@ export function predictBracket(
 }
 
 /**
- * Teams the postseason has already placed, and so cannot be in the playoff.
+ * Teams a bowl has already claimed, and so cannot be in the playoff.
  *
  * Only meaningful once the bowls are on the schedule; before that it is empty
  * and the projection is unconstrained, which is correct — in October nothing
  * has placed anybody.
+ *
+ * The playoff's own games are postseason games too, and an earlier version of
+ * this counted them: eight teams were struck out of the field for "playing a
+ * bowl" when the game they were playing was the playoff first round. So the
+ * bracket is separated out first and only the genuine bowls are read here.
  */
-export function bowlBound(games: { postseason: boolean; home: string | null; away: string | null }[]): Set<string> {
+export function bowlBound(games: LeagueGame[]): Set<string> {
   const out = new Set<string>()
-  for (const g of games) {
-    if (!g.postseason) continue
+  for (const g of readPlayoff(games).bowls) {
     if (g.home) out.add(g.home)
     if (g.away) out.add(g.away)
   }

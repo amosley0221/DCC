@@ -8,7 +8,23 @@ this project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **The playoff was in your save all along, and DCC said it wasn't.** 0.82.0
+  reported "the bracket is not in the file" on the League screen. It was there
+  the whole time: four of the postseason fixtures are the playoff's first round,
+  and DCC was reading them as ordinary bowls. That did double damage — the
+  eight teams playing them looked like they had a bowl to go to, so they were
+  struck out of the projected field, and what was left was too thin to draw.
+
+  What tells them apart is where they are played. Every bowl is at a neutral
+  site; the playoff's first round is on the higher seed's own field, which is
+  how the sport does it. DCC now reads the bracket straight out of the save and
+  shows it — the real matchups, the real scores, and who had a bye — instead of
+  a projection. The bowl list no longer contains playoff games, and with the
+  exclusion fixed the projection, where one is still needed, names the right
+  field: from your bowl-week save it now picks the twelve teams that actually
+  made it.
 
 ## [0.82.0] - 2026-09-08
 
